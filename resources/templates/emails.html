@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+
+<h3 class="uppercase text-lg my-8">{{header}}</h3>
+<div>
+  <p class="">Total e-mail count: {{page.total}}</p>
+  <div class="my-4">
+    {% if page.page > 1 %}
+    <a class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" href="/emails?page={{page.page|add:-1}}&page-size={{page.size}}">Prev</a>
+    {% else %}
+    <a class="disabled:text-indigo-100 rounded-lg px-4 py-2 disabled:bg-sky-500" href="#">Prev</a>
+    {% endif %}
+    <span class="mx-2">{{page.page}}</span>
+    {% if page.page <= page.last-page %}
+    <a class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" href="/emails?page={{page.page|add:1}}&page-size={{page.size}}">Next</a>
+    {% else %}
+    <a class="disabled:text-indigo-100 rounded-lg px-4 py-2 disabled:bg-sky-500" href="#">Next</a>
+    {% endif %}
+  </div>
+</div>
+<div>
+  <table class="table-auto">
+    <thead><tr class="border-b p-4 pl-8 pt-0 pb-3 text-slate-700 text-left">
+        <th><strong>Date</strong></th>
+        <th><strong>Subject</strong></th>
+        <th><strong>From</strong></th>
+        <th><strong>To</strong></th>
+        <th><strong>Language</strong></th>
+        <th><strong>Category</strong></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for email in emails %}
+      <tr class="border-b p-4 pl-8 pt-0 pb-3 text-slate-700 text-left">
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.header.date|date:"dd.MM.yyyy"}}<a/></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.header.subject}}</a></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.participants|concat-senders}}</a></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.participants|concat-receivers}}</a></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.metadata.language}}</a></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.metadata.category}}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    </table>
+  </div>
+
+{% endblock %}

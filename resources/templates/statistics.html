@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2 class="uppercase text-3xl my-8">Statistics</h2>
+<nav class="flow flow-row space-x-4">
+  <a class="nav-button" href="/statistics" role="button">Overall</a>
+  <a class="nav-button" href="/statistics/types" role="button">Types</a>
+  <a class="nav-button" href="/statistics/contacts" role="button">Contacts</a>
+  <a class="nav-button" href="/statistics/languages" role="button">Languages</a>
+  <a class="nav-button" href="/statistics/categories" role="button">Categories</a>
+</nav>
+
+{% if interval-filter %}
+<h3 class="uppercase text-lg my-8 mx-16">Filter</h3>
+<form action="{{interval-filter.url}}" method="GET">
+  <div class="flex flex-row justify-start content-center">
+    <div class="w-32 mx-16">
+      <select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-purple-900 focus:border-purple-900 block w-full p-2.5" name="interval" autocomplete="off">
+        <option value="yearly" {% if interval-filter.selected-interval = yearly %}selected{% endif %}>yearly</option>
+        <option value="monthly" {% if interval-filter.selected-interval = monthly %}selected{% endif %}>monthly</option>
+      </select>
+    </div>
+    <div class="mx-4">
+      <select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-purple-900 focus:border-purple-900 block w-full p-2.5" name="year" autocomplete="off">
+        {% for year in interval-filter.years %}
+        <option {% if interval-filter.selected-year = year %}selected{% endif %} value="{{year}}">{{year}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="rounded-none ml-3 px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white"  type="submit">Apply</button>
+  </div>
+</form>
+
+{% endif %}
+  
+
+<div class="flex flex-start flex-wrap">
+  {% for stats in statistics %}
+  <div class="mx-16">
+    <h3 class="uppercase text-lg my-8">{{stats.header}}</h3>
+    {% if stats.type = :bar-chart %}
+    <div id="{{stats.id}}"></div>
+    <script>vegaEmbed('#{{stats.id}}', {{stats.json-data|safe}});</script>
+    {% elif stats.type = :table %}
+  <table class="border-collapse table-auto w-full text-sm">
+    <thead>
+      <tr>{% for header in stats.data.headers %}<th class="text-left">{{header}}</th>{% endfor %}</tr>
+    </thead>
+    <tbody> 
+      {% for values in stats.data.values %}
+      <tr>
+        {% for val in values %}
+        <td class="text-left">{{val}}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+    {% endif %}
+  </div>
+{% endfor %}
+</div>
+
+{% endblock %}

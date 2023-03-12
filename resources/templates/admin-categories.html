@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="uppercase text-lg my-8">Manage Categories</h3>
+<table>
+  <tbody>
+    <tr><th>Name</th><th>Delete</th></tr>
+    {% for category in categories %}
+    <tr>
+      <td>{{category.name}}</td>
+      <td>
+        <form action="/admin/categories/{{category.id}}" id="{{category.id}}" method="DELETE">
+          <input name="method" type="hidden" value="DELETE">
+          <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">X</button>
+        </form>
+      </td>
+
+      <script>document.getElementById('{{category.id}}').addEventListener('submit', (e) => {
+                                e.preventDefault();
+    fetch('/admin/categories/{{category.id}}', {method: 'DELETE'})
+        .then(() => window.location.href = '/admin/categories')});
+      </script>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<h3 class="uppercase text-lg my-8">New Category</h3>
+<form action="/admin/categories" method="POST">
+  <input class="pr-4" name="name" value="">
+  <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Add category</button></form>
+
+{% endblock %}

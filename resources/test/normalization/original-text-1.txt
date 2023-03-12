@@ -1,0 +1,110 @@
+( https://plex.tv?utm_source=Plex&utm_medium=email&utm_content=plex_logo_header&utm_campaign=May+Newsletter+2016 )
+
+Newsletter May 2016
+
+Plex Web now with global search
+
+Perhaps the biggest recent update with the most noticeable changes, our Web player upgrade really blew some socks off, with powerful new search capabilities and some really nice UI upgrades. Check the blog for a complete rundown of all the awesome new stuff you get to enjoy in our best web app yet.
+
+LEARN MORE
+( https://blog.plex.tv/2016/04/07/seek-plex-shall-find-leveling-web-app/?utm_source=Plex&utm_medium=email&utm_content=web_app_button&utm_campaign=May+Newsletter+2016 )
+
+Samsung TVs can’t get enough of Plex
+
+One other super exciting development in our world this month is that we will be shipping our brand new official smart TV app on all 2016 Samsung smart TVs! Plex is one of the top apps on Samsung TVs, which are great for getting that movie theater experience with movie trailers and extras, one of the perks you get with a Plex Pass ( https://plex.tv/subscription/about?utm_source=Plex&utm_medium=email&utm_content=samsung_pp_inline&utm_campaign=May+Newsletter+2016 ). Roll-out has begun with their higher end models, but Plex will be included on all 2016 models that support Tizen apps.
+
+Roku keeps getting better
+
+Earlier this year, we completely revamped our Roku app, and now it’s even better. We’ve added Rotten Tomatoes, theme music for your collection of TV shows, and handy shortcuts to mark entire seasons or series as watched or unwatched within the app. We also added options to play a movie trailer or browse movie details from the playlist screen, as well as navigate to the show, season, or episode details available for TV shows.
+
+LEARN MORE
+( https://forums.plex.tv/discussion/comment/1181617/?utm_source=Plex&utm_medium=email&utm_content=roku_button&utm_campaign=May+Newsletter+2016#Comment_1181617 )
+
+Treats for our iOS users
+
+iOS got some groovy new fixings as well. With the new post-play screen, binge watching shows is as easy as getting sucked into the blackhole that is baby goat memes. Now you can begin watching the next episode or figure out what to watch after you finish a movie. Or use offline syncing, one of the most awesome Plex Pass ( https://plex.tv/subscription/about?utm_source=Plex&utm_medium=email&utm_content=ios_pp_inline&utm_campaign=May+Newsletter+2016 ) features, to have pre-converted files accessible always. In addition, you can enjoy direct playback of Apple Lossless tracks. All that and all the Rotten Tomatoes reviews one could ask for.
+
+LEARN MORE
+( https://forums.plex.tv/discussion/comment/1173867/?utm_source=Plex&utm_medium=email&utm_content=ios_button&utm_campaign=May+Newsletter+2016#Comment_1173867 )
+
+Android gets subtitles and more
+
+Android—both mobile and TV—got several improvements in appearance and lots of bug fixes. On mobile, we added support for embedded PGS/VobSub subtitles for Direct Played MKVs, meaning you can always read along, even when you’re watching in bed with the volume way down. We also updated the look of the friends screen and improved Camera Upload for our Plex Pass ( https://plex.tv/subscription/about?utm_source=Plex&utm_medium=email&utm_content=android_pp_inline&utm_campaign=May+Newsletter+2016 ) users. For  Android TV, you can now get some additional video info during playback, including how much of your video has loaded.
+
+LEARN MORE
+( https://forums.plex.tv/discussion/comment/1176384/?utm_source=Plex&utm_medium=email&utm_content=android_androidtv_button&utm_campaign=May+Newsletter+2016#Comment_1176384 )
+
+Why Get a Plex Pass?
+
+In addition to giving you access to awesome features and benefits, Plex Pass subscriptions support our development of new features and platforms, allowing us to bring the best experience to every Plex user. Below are a few highlights of premium features. For a complete list, check out our Plex Pass ( https://plex.tv/subscription/about?utm_source=Plex&utm_medium=email&utm_content=pp_plex_pass&utm_campaign=May+Newsletter+2016 ) overview page.
+
+Mobile Sync
+
+Bring your media with you on your Android ( https://play.google.com/store/apps/details?id=com.plexapp.android&hl=en?utm_source=Plex&utm_medium=email&utm_content=pp_android&utm_campaign=May+Newsletter+2016 ), iOS ( https://itunes.apple.com/us/app/plex/id383457673?mt=8?utm_source=Plex&utm_medium=email&utm_content=pp_ios&utm_campaign=May+Newsletter+2016 ), Windows ( https://www.microsoft.com/en-us/store/apps/plex/9wzdncrfj3q8?utm_source=Plex&utm_medium=email&utm_content=pp_windows&utm_campaign=May+Newsletter+2016 ) or Windows Phone ( https://www.microsoft.com/en-us/store/apps/plex/9wzdncrfj3q8?utm_source=Plex&utm_medium=email&utm_content=pp_windows_phone&utm_campaign=May+Newsletter+2016 ) device and enjoy it offline anywhere.
+
+Cloud Sync
+
+Sync specific content from your Plex Media Server to supported cloud storage providers to enjoy it anywhere you have an internet connection.
+
+Camera Upload
+
+Wirelessly sync your phone or tablet photos automatically to your Plex Media Server.
+
+Parental Controls
+
+Enable parental controls, create customized, managed accounts, and restrict content users can access.
+
+Movie Trailers & Extras
+
+Automatically see high quality movie trailers, cast interviews, and other extras for movies in your library.
+
+Early Access
+
+Be the first to get new apps as soon as we release them, free of charge.
+
+Premium Music
+
+Enjoy lyrics from LyricFind ( https://blog.plex.tv/2015/12/23/let-it-snow-lyrics-for-all-your-music/?utm_source=Plex&utm_medium=email&utm_content=pp_lyricfind&utm_campaign=May+Newsletter+2016 ), automatic Plex Mix playlists based on mood or similar tracks, and premium metadata matching for high quality art, album reviews, artist bios and more!
+
+Stay updated & win stuff
+
+Join us on Facebook, Twitter, and Google+ for up-to-date Plex information and the occasional chance to win something awesome. (Like a gadget, not Barkley. Nobody wins Barkley.)
+
+( https://twitter.com/plex?utm_source=Plex&utm_medium=email&utm_content=win_stuff_twitter&utm_campaign=May+Newsletter+2016 )
+
+( https://www.facebook.com/plexapp?utm_source=Plex&utm_medium=email&utm_content=win_stuff_facebook&utm_campaign=May+Newsletter+2016 )
+
+( https://plus.google.com/+plex?utm_source=Plex&utm_medium=email&utm_content=win_stuff_goggle&utm_campaign=May+Newsletter+2016 )
+
+We want you!
+
+We're always on the hunt for awesome and talented people to join our merry band of Plex makers. While the search for amazing people never ends, we’re specifically looking for hardcore devops folks with scalable cross-cloud orchestration tools experience, as well as mobile engineers with experience in Android and iOS. If you love Plex and are interested in joining the team, we would love to talk to you! As long as you are passionate, talented, and connected to the Internet, it doesn’t matter where you live—our employees hail from all over this beautiful planet of ours.
+
+SEND RESUME
+( mailto:careers@plex.tv )
+
+People love Plex
+
+Austin Keeley
+( https://twitter.com/austinkeeley/status/732547851893538816?ref_src=twsrc%5Etfw?utm_source=Plex&utm_medium=email&utm_content=love_plex_austin&utm_campaign=May+Newsletter+2016 )
+
+The best streaming music service is just setting up your own @plex ( https://twitter.com/plex?utm_source=Plex&utm_medium=email&utm_content=love_plex_plex_1&utm_campaign=May+Newsletter+2016 ) server. It's obviously not for everyone, but it's worked well for me.
+
+Andy spinner Smith
+( https://twitter.com/andycs169/status/732855102428581889?ref_src=twsrc%5Etfw?utm_source=Plex&utm_medium=email&utm_content=love_plex_plex_andy&utm_campaign=May+Newsletter+2016 )
+
+@plex ( https://twitter.com/plex?utm_source=Plex&utm_medium=email&utm_content=love_plex_plex_2&utm_campaign=May+Newsletter+2016 ) LOVE LOVE LOVE your software. Server on Windows file server machine and AndroidTV app on my Sony Bravia. #Perfection ( https://twitter.com/hashtag/Perfection?src=hash&ref_src=twsrc%5Etfw?utm_source=Plex&utm_medium=email&utm_content=love_plex_perfection&utm_campaign=May+Newsletter+2016 )
+
+( https://plex.tv?utm_source=Plex&utm_medium=email&utm_content=plex_logo_footer&utm_campaign=May+Newsletter+2016 )
+
+( https://twitter.com/plex?utm_source=Plex&utm_medium=email&utm_content=social_footer_twitter&utm_campaign=May+Newsletter+2016 )
+
+( https://www.facebook.com/plexapp?utm_source=Plex&utm_medium=email&utm_content=social_footer_facebook&utm_campaign=May+Newsletter+2016 )
+
+( https://plus.google.com/+plex?utm_source=Plex&utm_medium=email&utm_content=social_footer_google&utm_campaign=May+Newsletter+2016 )
+
+( https://www.linkedin.com/company/plex-inc?utm_source=Plex&utm_medium=email&utm_content=social_footer_linkdin&utm_campaign=May+Newsletter+2016 )
+
+( https://blog.plex.tv/feed/?utm_source=Plex&utm_medium=email&utm_content=social_footer_rss&utm_campaign=May+Newsletter+2016 )
+
+Copyright © 2016 Plex, Inc. All rights reserved.

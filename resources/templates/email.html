@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2 class="uppercase text-lg my-10">{{email.header.subject}}</h2>
+<p><strong>Message ID: </strong>{{email.header.message-id}}</p>
+<p><strong>Date: </strong>{{email.header.date|date:"dd.MM.yyyy HH:mm:ss"}}</p>
+<p><strong>Senders: </strong>{{email.participants|concat-senders}}</p>
+<p><strong>Recipients: </strong>{{email.participants|concat-receivers}}</p>
+<p><strong>Cc: </strong>{{email.participants|concat-cc}}</p>
+<p><strong>Bcc: </strong>{{email.participants|concat-bcc}}</p>
+<h3 class="uppercase text-lg my-8">Metadata</h3>
+<form action="/metadata" id="email" method="post">
+  <input form="email" hidden="true" name="message-id" type="text" value="{{email.header.message-id}}">
+  <input form="email" hidden="true" name="language-confidence" type="text" value="1">
+  <input form="email" hidden="true" name="category-confidence" type="text" value="1">
+  <input form="email" hidden="true" name="redirect-url" type="text" value="/emails">
+  <p><strong>Language: </strong><input form="email" name="language" type="text" value="{{email.metadata.language}}"></p>
+  <p><strong>Language Confidence: </strong>{{email.metadata.language-confidence}}</p>
+  <p><strong>Category: </strong>
+    <select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" form="email" name="category" autocomplete="off">
+      {% for category in categories %}
+      <option value="{{category.id}}" {% if category.id = email.metadata.category-id %}selected{% endif %}>{{category.name}}</option>
+      {% endfor %}
+    </select>
+  </p>
+  <p><strong>Category Confidence: </strong>{{email.metadata.category-confidence}}</p>
+</form>
+<button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" form="email">Update Metadata</button>
+<h3 class="uppercase text-lg my-8">Contents</h3>
+
+{% for body-part in email.body %}
+
+<div>
+  <p><strong>Mime Type: </strong>{{body-part.mime-type}}</p>
+  <p><strong>Charset: </strong>{{body-part.charset}}</p>
+  <p><strong>Transfer Encoding: </strong>{{body-part.transfer-encoding}}</p>
+  {% if body-part.name %}<p><strong>File Name: </strong>{{body-part.name}}</p> {% endif %}
+  {{body-part.sanitized-content}}
+</div>
+<br/>
+{% endfor %}
+
+{% endblock %}

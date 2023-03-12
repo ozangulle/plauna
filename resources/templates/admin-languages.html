@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="uppercase text-lg my-8">Language Detection</h3>
+
+<form action="/metadata/languages" id="detect" method="post">
+  <input type="hidden" name="redirect-url" value="/admin/languages"</input>
+  <button class="rounded-none ml-3 px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit" form="detect">Detect Languages</button>
+</form>
+
+<h3 class="uppercase text-lg my-8">Language Preferences</h3>
+
+<form action="/admin/languages" id="preferences" method="post">
+{% for preference in language-preferences %}
+<input form="preferences" hidden="true" name="id" type="text" value="{{preference.id}}">
+<input form="preferences" hidden="true" name="language" type="text" value="{{preference.language}}">
+{% endfor %}
+
+<table>
+  <thead>
+    <tr><th>Language</th><th>Use in Training?</th></tr>
+  </thead>
+  <tbody>
+    {% for preference in language-preferences %}
+    <tr><td>{{preference.language}}</td><td><input {% if preference.use_in_training = 1 %}checked{% endif %} form="preferences" name="use" type="checkbox" value="{{preference.language}}"></td></tr>
+    {% endfor %}
+    <tr><th><button class="rounded-none ml-3 px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white"  form="preferences">Send</button></th></tr>
+</tbody></table>
+
+</form>
+
+{% endblock %}

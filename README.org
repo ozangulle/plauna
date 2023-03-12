@@ -1,0 +1,27 @@
+* Plauna
+
+** Installation - How to Download
+
+The easiest way to get plauna is using the [docker image](https://hub.docker.com/repository/docker/ozangulle/plauna/general).
+
+The second way to getting plauna is fetching it from the git repository and compiling using clojure cli with the command:
+
+#+BEGIN_SRC
+clj -T:build uber
+#+END_SRC
+
+
+** How to use
+
+*** Configuration
+
+#+BEGIN_SRC clojure
+{:data-folder "/home/myhome/exmaple-directory" ; the location for the db, training files and models
+ :server {:port 8080} ; if port is not set in config, the server uses a random port
+ :email {:addresses ["me@example.com", "anotheraccount@secondexample.com"]
+         :clients [{:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox"}]}}
+#+END_SRC
+
+*** Starting
+
+The application requires a configuration file to start. The configuration file can be explicitly named as an argument when starting the application using the flag "--config-file=/absolute/path/to/location". If no config file argument is used, it defaults to "~/.config/plauna.edn".

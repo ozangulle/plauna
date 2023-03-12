@@ -1,0 +1,15 @@
+Date: Thu, 10 Jan 2022 12:00:00 +0000
+From: tester@example.com
+To: test@example.com
+Subject: Lorem Ipsum Sample
+MIME-Version: 1.0
+Message-ID: <unique_message_id@example.com>
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: 7bit
+
+Dear Test,
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ac justo vel odio efficitur consectetur. Integer nec urna vitae elit imperdiet ultrices. Fusce vel neque vel justo dapibus luctus a eget quam.
+
+Sincerely,
+Tester

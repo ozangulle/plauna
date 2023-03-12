@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="uppercase text-lg my-10">Preferences</h3>
+
+<form action="/admin/preferences" method="POST">
+  <div class="grid gap-6 mb-6 md:grid-cols-2">
+    <input type="hidden" name="redirect-url" value="/admin/preferences"</input>
+    <div>
+      <label class="block mb-2 text-sm font-medium text-gray-900"  for="language-detection-threshold">Language Detection Threshold</label>
+      <input class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-purple-900 focus:border-purple-900 block p-2.5" name="language-detection-threshold" value="{{language-detection-threshold}}">
+    </div>
+    <div>
+      <label class="block mb-2 text-sm font-medium text-gray-900" for="categorization-threshold">Categorization Threshold</label>
+      <input class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-purple-900 focus:border-purple-900 block p-2.5" name="categorization-threshold" value="{{categorization-threshold}}">
+    </div>
+  </div>
+  <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="send">Save</button>
+ </form>
+{% endblock %}

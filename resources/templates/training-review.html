@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<form action="/metadata" id="emails" method="post"></form>
+<input form="emails" hidden="true" name="redirect-url" type="text" value="/training">
+<h3 class="uppercase text-lg my-8">Category Training</h3>
+<div class="columns-3">
+  <form action="/training/new" method="post">
+    <input class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit" value="Generate new data">
+  </form>
+  <form action="/training" id="train-new" method="post">
+    <input form="train-new" hidden="true" name="redirect-url" type="text" value="/training">
+    <input class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit" value="Train with Existing Data">
+  </form>
+  <a class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" href="/training/new">Categorize Fresh Data</a>
+</div>
+
+<form action="" method="get">
+  <select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="language">
+    {% for language in languages %}
+    </option><option value="{{language.language}}">{{language.language}}</option>
+    {% endfor %}
+  </select>
+  <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Add filter</button>
+</form>
+
+
+<div>
+  <p class="">Total e-mail count: {{page.total}}</p>
+  <div class="my-4">
+    {% if page.page > 1 %}
+    <a class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" href="?page={{page.page|add:-1}}&page-size={{page.size}}">Prev</a>
+    {% else %}
+    <a class="disabled:text-indigo-100 rounded-lg px-4 py-2 disabled:bg-sky-500" href="#">Prev</a>
+    {% endif %}
+    <span class="mx-2">{{page.page}}</span>
+    {% if page.page <= page.last-page %}
+    <a class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" href="?page={{page.page|add:1}}&page-size={{page.size}}">Next</a>
+    {% else %}
+    <a class="disabled:text-indigo-100 rounded-lg px-4 py-2 disabled:bg-sky-500" href="#">Next</a>
+    {% endif %}
+  </div>
+</div>
+
+{% for email in emails %}
+<input form="emails" hidden="true" name="message-id" type="text" value="{{email.header.message-id}}">
+<input form="emails" hidden="true" name="language-confidence" type="text" value="1">
+<input form="emails" hidden="true" name="category-confidence" type="text" value="1">
+{% endfor %}
+
+<table class="table-auto">
+  <thead>
+    <tr class="border-b p-4 pl-8 pt-0 pb-3 text-slate-700 text-left">
+      <th>Date</th><th>Sender</th><th>Subject</th><th>Language</th><th>Language Confidence</th><th>Category</th><th>Category Confidence</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for email in emails %}
+
+    <tr class="border-b p-4 pl-8 pt-0 pb-3 text-slate-700 text-left">
+      <td><a href="/emails/{{email.header.message-id}}" target="_blank">{{email.header.date|date:"dd.MM.yyyy"}}</a></td>
+      <td>{{email.participants|concat-senders}}</td>
+      <td>{{email.header.subject}}</td>
+      <td><input form="emails" name="language" type="text" value="{{email.metadata.language}}"></td>
+      <td>{{email.metadata.language-confidence}}</td>
+      <td><select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" form="emails" name="category">
+          {% for category in categories %}
+          <option value="{{category.id}}">{{category.name}}</option>
+          {% endfor %}
+      </select></td>
+      <td>{{email.metadata.category-confidence}}</td>
+    </tr>
+
+    {% endfor %}
+    <tr class="border-b p-4 pl-8 pt-0 pb-3 text-slate-700 text-left"><td>
+        <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" form="emails">Send</button></td></tr>
+  </tbody>
+</table>
+
+{% endblock %}

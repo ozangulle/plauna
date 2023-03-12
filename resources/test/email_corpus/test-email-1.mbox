@@ -1,0 +1,24 @@
+From 12879452123124@xxx Wed Dec 10 10:10:10 +0000 2000
+Date: Wed, 10 Dec 2000 10:10:10 -0800 (PST)
+From: Test Guy <test@guy.com>
+Subject: Re: Testing
+To: Test Person <test@person.net>
+Cc: cctest1 <cc1@test.com>, cctest2 <cc2@test.com>, cctest3 <cc3@test.com>, cctest4 <cc4@test.com>, cctest5 <cc5@test.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="0-1813390255-1228280316=:99832"
+Message-ID: <485551.99832.qm@web55106.mail.test.com>
+
+--0-1813390255-1228280316=:99832
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+This is a test message.
+
+--0-1813390255-1228280316=:99832
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Test, but html.
+
+--0-1813390255-1228280316=:99832--
+

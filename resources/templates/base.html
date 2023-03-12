@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6" type="text/javascript"></script>
+    <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
+    <link href="/css/custom.css" rel="stylesheet" type="text/css">
+    <meta charset="UTF-8">
+  </head>
+  <meta content="width=device-width, initial-scale=1" name="viewport">
+  <body class="countainer mx-8 my-4">
+    <h1 class="uppercase text-lg my-8">plauna</h1>
+    <nav class="flex flex-row space-x-8">
+      <a class="nav-button" href="/admin">Admin</a>
+      <a class="nav-button" href="/statistics">Statistics</a>
+      <a class="nav-button" href="/emails">Emails</a>
+      <a class="nav-button" href="/training">Training Data</a>
+      <a class="nav-button" href="/watchers">Watchers</a>
+    </nav>
+    <main class="">
+      {% block content %}
+      {% endblock %}
+    </main>
+  </body>
+</html>

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="uppercase text-lg my-10">Administration</h3>
+<div class="grid">
+  <nav class="flow flow-row space-x-4">
+    <a class="sub-nav-button" href="/admin/categories" role="button">Manage Categories</a>
+    <a class="sub-nav-button" href="/admin/languages" role="button">Manage Languages</a>
+    <a class="sub-nav-button" href="/admin/preferences" role="button">Preferences</a>
+  </nav>
+
+
+  <h4 class="text-l mt-16 mb-2">Parse E-Mails</h4>
+  <div class="columns-2 mt-2">
+    <form action="emails/parse" enctype="multipart/form-data" method="POST">
+      <input name="redirect-url" type="hidden" value="/admin" />
+      <input name="filename" type="file" />
+      <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Parse Mbox</button>
+    </form>
+  </div>
+</div>
+
+  <h4 class="text-l mt-16 mb-2">Danger Zone</h4>
+  <div class="flex-container">
+    <form action="/admin/database" id="db-delete" method="DELETE">
+      <input name="method" type="hidden" value="DELETE" />
+      <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Delete Database</button>
+    </form>
+    <form action="/admin/database" method="POST" value="post">
+      <button class="rounded-none mx-3 px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Create Database</button>
+    </form>
+    <form action="/admin/training" id="training-delete" method="DELETE">
+      <input name="method" type="hidden" value="DELETE" />
+      <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Delete Training Data</button>
+    </form>
+    <form action="/admin/models" id="models-delete" method="DELETE">
+      <input name="method" type="hidden" value="DELETE" />
+      <button class="rounded-none ml-3 px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Delete Models</button>
+    </form>
+  </div>
+
+
+<script>const deleteForm = document.getElementById('db-delete');
+                             deleteForm.addEventListener('submit', (e) => {
+                                e.preventDefault();
+                                fetch('/admin/database', {method: 'DELETE'})
+                                .then(() => window.location.href = '/admin')
+                             });</script><script>const deleteTraining = document.getElementById('training-delete');
+                             deleteTraining.addEventListener('submit', (e) => {
+                                e.preventDefault();
+                                fetch('/admin/training', {method: 'DELETE'})
+                                .then(() => window.location.href = '/admin')
+                             });</script><script>const deleteModels = document.getElementById('models-delete');
+                             deleteModels.addEventListener('submit', (e) => {
+                                e.preventDefault();
+                                fetch('/admin/models', {method: 'DELETE'})
+                                .then(() => window.location.href = '/admin')
+                             });
+</script>
+
+{% endblock %}

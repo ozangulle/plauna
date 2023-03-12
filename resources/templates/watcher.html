@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="uppercase text-lg my-8">Imap Watcher for {{host}} - {{user}}</h3>
+<div class="flex flex-nowrap">
+  <form id="parse" action="/watchers/{{id}}" method="POST">
+    <label for="move">Move e-mails after categorization</label>
+    <input name="move" type="checkbox">
+    <select class="my-2 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" name="folder">
+      {% for folder in folders %}
+      <option value="{{folder}}">{{folder}}</option>
+      {% endfor %}
+    </select>
+    <button form="parse" class="my-2 rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white">Parse E-mails</button>
+  </form>
+</div>
+
+{% endblock %}

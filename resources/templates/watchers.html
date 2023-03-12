@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="uppercase text-lg my-8">IMAP Clients</h3>
+<table class="table-auto border-separate border-spacing-4">
+  <thead>
+    <tr class="border-b text-slate-700 text-left">
+      <th>Account</th>
+      <th>Logged-in?</th>
+      <th>Folder open?</th>
+      <th>Restart watcher</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for watcher in watchers %}
+    <tr class="border-btext-slate-700">
+      <td class="text-left">
+        <a class="border-b-2 rounded-none px-4 py-2 border-purple-900 hover:bg-purple-900 hover:text-white" href="/watchers/{{watcher.id}}">{{watcher.string}}</a>
+      </td>
+      <td class="text-center">{{watcher.logged-in}}</td>
+      <td class="text-center">{{watcher.folder-open}}</td>
+      <td class="text-center">
+        <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white"><a href="/watchers/{{watcher.id}}/restart">Restart</a></button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}
