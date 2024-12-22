@@ -34,12 +34,12 @@
     <tbody>
       {% for email in emails %}
       <tr class="border-b p-4 pl-8 pt-0 pb-3 text-slate-700 text-left">
-        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.header.date|date:"dd.MM.yyyy"}}<a/></td>
-        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.header.subject}}</a></td>
-        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.participants|concat-senders}}</a></td>
-        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.participants|concat-receivers}}</a></td>
-        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.metadata.language}}</a></td>
-        <td><a class="block mr-4" href="/emails/{{email.header.message-id}}">{{email.metadata.category}}</a></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id|urlescape}}">{{email.header.date|date:"dd.MM.yyyy"}}<a/></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id|urlescape}}">{{email.header.subject}}</a></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id|urlescape}}">{{email.participants|concat-senders}}</a></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id|urlescape}}">{{email.participants|concat-receivers}}</a></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id|urlescape}}">{{email.metadata.language}}</a></td>
+        <td><a class="block mr-4" href="/emails/{{email.header.message-id|urlescape}}">{{email.metadata.category}}</a></td>
       </tr>
       {% endfor %}
     </tbody>
