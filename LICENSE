@@ -1,280 +1,287 @@
-Eclipse Public License - v 2.0
+                      EUROPEAN UNION PUBLIC LICENCE v. 1.2
+                      EUPL © the European Union 2007, 2016
 
-    THE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE
-    PUBLIC LICENSE ("AGREEMENT"). ANY USE, REPRODUCTION OR DISTRIBUTION
-    OF THE PROGRAM CONSTITUTES RECIPIENT'S ACCEPTANCE OF THIS AGREEMENT.
+This European Union Public Licence (the ‘EUPL’) applies to the Work (as defined
+below) which is provided under the terms of this Licence. Any use of the Work,
+other than as authorised under this Licence is prohibited (to the extent such
+use is covered by a right of the copyright holder of the Work).
 
-1. DEFINITIONS
+The Work is provided under the terms of this Licence when the Licensor (as
+defined below) has placed the following notice immediately following the
+copyright notice for the Work:
 
-"Contribution" means:
+        Licensed under the EUPL
 
-  a) in the case of the initial Contributor, the initial content
-     Distributed under this Agreement, and
+or has expressed by any other means his willingness to license under the EUPL.
 
-  b) in the case of each subsequent Contributor:
-     i) changes to the Program, and
-     ii) additions to the Program;
-  where such changes and/or additions to the Program originate from
-  and are Distributed by that particular Contributor. A Contribution
-  "originates" from a Contributor if it was added to the Program by
-  such Contributor itself or anyone acting on such Contributor's behalf.
-  Contributions do not include changes or additions to the Program that
-  are not Modified Works.
+1. Definitions
 
-"Contributor" means any person or entity that Distributes the Program.
+In this Licence, the following terms have the following meaning:
 
-"Licensed Patents" mean patent claims licensable by a Contributor which
-are necessarily infringed by the use or sale of its Contribution alone
-or when combined with the Program.
+- ‘The Licence’: this Licence.
 
-"Program" means the Contributions Distributed in accordance with this
-Agreement.
+- ‘The Original Work’: the work or software distributed or communicated by the
+  Licensor under this Licence, available as Source Code and also as Executable
+  Code as the case may be.
 
-"Recipient" means anyone who receives the Program under this Agreement
-or any Secondary License (as applicable), including Contributors.
+- ‘Derivative Works’: the works or software that could be created by the
+  Licensee, based upon the Original Work or modifications thereof. This Licence
+  does not define the extent of modification or dependence on the Original Work
+  required in order to classify a work as a Derivative Work; this extent is
+  determined by copyright law applicable in the country mentioned in Article 15.
 
-"Derivative Works" shall mean any work, whether in Source Code or other
-form, that is based on (or derived from) the Program and for which the
-editorial revisions, annotations, elaborations, or other modifications
-represent, as a whole, an original work of authorship.
+- ‘The Work’: the Original Work or its Derivative Works.
 
-"Modified Works" shall mean any work in Source Code or other form that
-results from an addition to, deletion from, or modification of the
-contents of the Program, including, for purposes of clarity any new file
-in Source Code form that contains any contents of the Program. Modified
-Works shall not include works that contain only declarations,
-interfaces, types, classes, structures, or files of the Program solely
-in each case in order to link to, bind by name, or subclass the Program
-or Modified Works thereof.
+- ‘The Source Code’: the human-readable form of the Work which is the most
+  convenient for people to study and modify.
 
-"Distribute" means the acts of a) distributing or b) making available
-in any manner that enables the transfer of a copy.
+- ‘The Executable Code’: any code which has generally been compiled and which is
+  meant to be interpreted by a computer as a program.
 
-"Source Code" means the form of a Program preferred for making
-modifications, including but not limited to software source code,
-documentation source, and configuration files.
+- ‘The Licensor’: the natural or legal person that distributes or communicates
+  the Work under the Licence.
 
-"Secondary License" means either the GNU General Public License,
-Version 2.0, or any later versions of that license, including any
-exceptions or additional permissions as identified by the initial
-Contributor.
+- ‘Contributor(s)’: any natural or legal person who modifies the Work under the
+  Licence, or otherwise contributes to the creation of a Derivative Work.
 
-2. GRANT OF RIGHTS
+- ‘The Licensee’ or ‘You’: any natural or legal person who makes any usage of
+  the Work under the terms of the Licence.
 
-  a) Subject to the terms of this Agreement, each Contributor hereby
-  grants Recipient a non-exclusive, worldwide, royalty-free copyright
-  license to reproduce, prepare Derivative Works of, publicly display,
-  publicly perform, Distribute and sublicense the Contribution of such
-  Contributor, if any, and such Derivative Works.
+- ‘Distribution’ or ‘Communication’: any act of selling, giving, lending,
+  renting, distributing, communicating, transmitting, or otherwise making
+  available, online or offline, copies of the Work or providing access to its
+  essential functionalities at the disposal of any other natural or legal
+  person.
 
-  b) Subject to the terms of this Agreement, each Contributor hereby
-  grants Recipient a non-exclusive, worldwide, royalty-free patent
-  license under Licensed Patents to make, use, sell, offer to sell,
-  import and otherwise transfer the Contribution of such Contributor,
-  if any, in Source Code or other form. This patent license shall
-  apply to the combination of the Contribution and the Program if, at
-  the time the Contribution is added by the Contributor, such addition
-  of the Contribution causes such combination to be covered by the
-  Licensed Patents. The patent license shall not apply to any other
-  combinations which include the Contribution. No hardware per se is
-  licensed hereunder.
+2. Scope of the rights granted by the Licence
 
-  c) Recipient understands that although each Contributor grants the
-  licenses to its Contributions set forth herein, no assurances are
-  provided by any Contributor that the Program does not infringe the
-  patent or other intellectual property rights of any other entity.
-  Each Contributor disclaims any liability to Recipient for claims
-  brought by any other entity based on infringement of intellectual
-  property rights or otherwise. As a condition to exercising the
-  rights and licenses granted hereunder, each Recipient hereby
-  assumes sole responsibility to secure any other intellectual
-  property rights needed, if any. For example, if a third party
-  patent license is required to allow Recipient to Distribute the
-  Program, it is Recipient's responsibility to acquire that license
-  before distributing the Program.
+The Licensor hereby grants You a worldwide, royalty-free, non-exclusive,
+sublicensable licence to do the following, for the duration of copyright vested
+in the Original Work:
 
-  d) Each Contributor represents that to its knowledge it has
-  sufficient copyright rights in its Contribution, if any, to grant
-  the copyright license set forth in this Agreement.
+- use the Work in any circumstance and for all usage,
+- reproduce the Work,
+- modify the Work, and make Derivative Works based upon the Work,
+- communicate to the public, including the right to make available or display
+  the Work or copies thereof to the public and perform publicly, as the case may
+  be, the Work,
+- distribute the Work or copies thereof,
+- lend and rent the Work or copies thereof,
+- sublicense rights in the Work or copies thereof.
 
-  e) Notwithstanding the terms of any Secondary License, no
-  Contributor makes additional grants to any Recipient (other than
-  those set forth in this Agreement) as a result of such Recipient's
-  receipt of the Program under the terms of a Secondary License
-  (if permitted under the terms of Section 3).
+Those rights can be exercised on any media, supports and formats, whether now
+known or later invented, as far as the applicable law permits so.
 
-3. REQUIREMENTS
+In the countries where moral rights apply, the Licensor waives his right to
+exercise his moral right to the extent allowed by law in order to make effective
+the licence of the economic rights here above listed.
 
-3.1 If a Contributor Distributes the Program in any form, then:
+The Licensor grants to the Licensee royalty-free, non-exclusive usage rights to
+any patents held by the Licensor, to the extent necessary to make use of the
+rights granted on the Work under this Licence.
 
-  a) the Program must also be made available as Source Code, in
-  accordance with section 3.2, and the Contributor must accompany
-  the Program with a statement that the Source Code for the Program
-  is available under this Agreement, and informs Recipients how to
-  obtain it in a reasonable manner on or through a medium customarily
-  used for software exchange; and
+3. Communication of the Source Code
 
-  b) the Contributor may Distribute the Program under a license
-  different than this Agreement, provided that such license:
-     i) effectively disclaims on behalf of all other Contributors all
-     warranties and conditions, express and implied, including
-     warranties or conditions of title and non-infringement, and
-     implied warranties or conditions of merchantability and fitness
-     for a particular purpose;
+The Licensor may provide the Work either in its Source Code form, or as
+Executable Code. If the Work is provided as Executable Code, the Licensor
+provides in addition a machine-readable copy of the Source Code of the Work
+along with each copy of the Work that the Licensor distributes or indicates, in
+a notice following the copyright notice attached to the Work, a repository where
+the Source Code is easily and freely accessible for as long as the Licensor
+continues to distribute or communicate the Work.
 
-     ii) effectively excludes on behalf of all other Contributors all
-     liability for damages, including direct, indirect, special,
-     incidental and consequential damages, such as lost profits;
+4. Limitations on copyright
 
-     iii) does not attempt to limit or alter the recipients' rights
-     in the Source Code under section 3.2; and
+Nothing in this Licence is intended to deprive the Licensee of the benefits from
+any exception or limitation to the exclusive rights of the rights owners in the
+Work, of the exhaustion of those rights or of other applicable limitations
+thereto.
 
-     iv) requires any subsequent distribution of the Program by any
-     party to be under a license that satisfies the requirements
-     of this section 3.
+5. Obligations of the Licensee
 
-3.2 When the Program is Distributed as Source Code:
+The grant of the rights mentioned above is subject to some restrictions and
+obligations imposed on the Licensee. Those obligations are the following:
 
-  a) it must be made available under this Agreement, or if the
-  Program (i) is combined with other material in a separate file or
-  files made available under a Secondary License, and (ii) the initial
-  Contributor attached to the Source Code the notice described in
-  Exhibit A of this Agreement, then the Program may be made available
-  under the terms of such Secondary Licenses, and
+Attribution right: The Licensee shall keep intact all copyright, patent or
+trademarks notices and all notices that refer to the Licence and to the
+disclaimer of warranties. The Licensee must include a copy of such notices and a
+copy of the Licence with every copy of the Work he/she distributes or
+communicates. The Licensee must cause any Derivative Work to carry prominent
+notices stating that the Work has been modified and the date of modification.
 
-  b) a copy of this Agreement must be included with each copy of
-  the Program.
+Copyleft clause: If the Licensee distributes or communicates copies of the
+Original Works or Derivative Works, this Distribution or Communication will be
+done under the terms of this Licence or of a later version of this Licence
+unless the Original Work is expressly distributed only under this version of the
+Licence — for example by communicating ‘EUPL v. 1.2 only’. The Licensee
+(becoming Licensor) cannot offer or impose any additional terms or conditions on
+the Work or Derivative Work that alter or restrict the terms of the Licence.
 
-3.3 Contributors may not remove or alter any copyright, patent,
-trademark, attribution notices, disclaimers of warranty, or limitations
-of liability ("notices") contained within the Program from any copy of
-the Program which they Distribute, provided that Contributors may add
-their own appropriate notices.
+Compatibility clause: If the Licensee Distributes or Communicates Derivative
+Works or copies thereof based upon both the Work and another work licensed under
+a Compatible Licence, this Distribution or Communication can be done under the
+terms of this Compatible Licence. For the sake of this clause, ‘Compatible
+Licence’ refers to the licences listed in the appendix attached to this Licence.
+Should the Licensee's obligations under the Compatible Licence conflict with
+his/her obligations under this Licence, the obligations of the Compatible
+Licence shall prevail.
 
-4. COMMERCIAL DISTRIBUTION
+Provision of Source Code: When distributing or communicating copies of the Work,
+the Licensee will provide a machine-readable copy of the Source Code or indicate
+a repository where this Source will be easily and freely available for as long
+as the Licensee continues to distribute or communicate the Work.
 
-Commercial distributors of software may accept certain responsibilities
-with respect to end users, business partners and the like. While this
-license is intended to facilitate the commercial use of the Program,
-the Contributor who includes the Program in a commercial product
-offering should do so in a manner which does not create potential
-liability for other Contributors. Therefore, if a Contributor includes
-the Program in a commercial product offering, such Contributor
-("Commercial Contributor") hereby agrees to defend and indemnify every
-other Contributor ("Indemnified Contributor") against any losses,
-damages and costs (collectively "Losses") arising from claims, lawsuits
-and other legal actions brought by a third party against the Indemnified
-Contributor to the extent caused by the acts or omissions of such
-Commercial Contributor in connection with its distribution of the Program
-in a commercial product offering. The obligations in this section do not
-apply to any claims or Losses relating to any actual or alleged
-intellectual property infringement. In order to qualify, an Indemnified
-Contributor must: a) promptly notify the Commercial Contributor in
-writing of such claim, and b) allow the Commercial Contributor to control,
-and cooperate with the Commercial Contributor in, the defense and any
-related settlement negotiations. The Indemnified Contributor may
-participate in any such claim at its own expense.
+Legal Protection: This Licence does not grant permission to use the trade names,
+trademarks, service marks, or names of the Licensor, except as required for
+reasonable and customary use in describing the origin of the Work and
+reproducing the content of the copyright notice.
 
-For example, a Contributor might include the Program in a commercial
-product offering, Product X. That Contributor is then a Commercial
-Contributor. If that Commercial Contributor then makes performance
-claims, or offers warranties related to Product X, those performance
-claims and warranties are such Commercial Contributor's responsibility
-alone. Under this section, the Commercial Contributor would have to
-defend claims against the other Contributors related to those performance
-claims and warranties, and if a court requires any other Contributor to
-pay any damages as a result, the Commercial Contributor must pay
-those damages.
+6. Chain of Authorship
 
-5. NO WARRANTY
+The original Licensor warrants that the copyright in the Original Work granted
+hereunder is owned by him/her or licensed to him/her and that he/she has the
+power and authority to grant the Licence.
 
-EXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, AND TO THE EXTENT
-PERMITTED BY APPLICABLE LAW, THE PROGRAM IS PROVIDED ON AN "AS IS"
-BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR
-IMPLIED INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF
-TITLE, NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR
-PURPOSE. Each Recipient is solely responsible for determining the
-appropriateness of using and distributing the Program and assumes all
-risks associated with its exercise of rights under this Agreement,
-including but not limited to the risks and costs of program errors,
-compliance with applicable laws, damage to or loss of data, programs
-or equipment, and unavailability or interruption of operations.
+Each Contributor warrants that the copyright in the modifications he/she brings
+to the Work are owned by him/her or licensed to him/her and that he/she has the
+power and authority to grant the Licence.
 
-6. DISCLAIMER OF LIABILITY
+Each time You accept the Licence, the original Licensor and subsequent
+Contributors grant You a licence to their contributions to the Work, under the
+terms of this Licence.
 
-EXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, AND TO THE EXTENT
-PERMITTED BY APPLICABLE LAW, NEITHER RECIPIENT NOR ANY CONTRIBUTORS
-SHALL HAVE ANY LIABILITY FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING WITHOUT LIMITATION LOST
-PROFITS), HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-ARISING IN ANY WAY OUT OF THE USE OR DISTRIBUTION OF THE PROGRAM OR THE
-EXERCISE OF ANY RIGHTS GRANTED HEREUNDER, EVEN IF ADVISED OF THE
-POSSIBILITY OF SUCH DAMAGES.
+7. Disclaimer of Warranty
 
-7. GENERAL
+The Work is a work in progress, which is continuously improved by numerous
+Contributors. It is not a finished work and may therefore contain defects or
+‘bugs’ inherent to this type of development.
 
-If any provision of this Agreement is invalid or unenforceable under
-applicable law, it shall not affect the validity or enforceability of
-the remainder of the terms of this Agreement, and without further
-action by the parties hereto, such provision shall be reformed to the
-minimum extent necessary to make such provision valid and enforceable.
+For the above reason, the Work is provided under the Licence on an ‘as is’ basis
+and without warranties of any kind concerning the Work, including without
+limitation merchantability, fitness for a particular purpose, absence of defects
+or errors, accuracy, non-infringement of intellectual property rights other than
+copyright as stated in Article 6 of this Licence.
 
-If Recipient institutes patent litigation against any entity
-(including a cross-claim or counterclaim in a lawsuit) alleging that the
-Program itself (excluding combinations of the Program with other software
-or hardware) infringes such Recipient's patent(s), then such Recipient's
-rights granted under Section 2(b) shall terminate as of the date such
-litigation is filed.
+This disclaimer of warranty is an essential part of the Licence and a condition
+for the grant of any rights to the Work.
 
-All Recipient's rights under this Agreement shall terminate if it
-fails to comply with any of the material terms or conditions of this
-Agreement and does not cure such failure in a reasonable period of
-time after becoming aware of such noncompliance. If all Recipient's
-rights under this Agreement terminate, Recipient agrees to cease use
-and distribution of the Program as soon as reasonably practicable.
-However, Recipient's obligations under this Agreement and any licenses
-granted by Recipient relating to the Program shall continue and survive.
+8. Disclaimer of Liability
 
-Everyone is permitted to copy and distribute copies of this Agreement,
-but in order to avoid inconsistency the Agreement is copyrighted and
-may only be modified in the following manner. The Agreement Steward
-reserves the right to publish new versions (including revisions) of
-this Agreement from time to time. No one other than the Agreement
-Steward has the right to modify this Agreement. The Eclipse Foundation
-is the initial Agreement Steward. The Eclipse Foundation may assign the
-responsibility to serve as the Agreement Steward to a suitable separate
-entity. Each new version of the Agreement will be given a distinguishing
-version number. The Program (including Contributions) may always be
-Distributed subject to the version of the Agreement under which it was
-received. In addition, after a new version of the Agreement is published,
-Contributor may elect to Distribute the Program (including its
-Contributions) under the new version.
+Except in the cases of wilful misconduct or damages directly caused to natural
+persons, the Licensor will in no event be liable for any direct or indirect,
+material or moral, damages of any kind, arising out of the Licence or of the use
+of the Work, including without limitation, damages for loss of goodwill, work
+stoppage, computer failure or malfunction, loss of data or any commercial
+damage, even if the Licensor has been advised of the possibility of such damage.
+However, the Licensor will be liable under statutory product liability laws as
+far such laws apply to the Work.
 
-Except as expressly stated in Sections 2(a) and 2(b) above, Recipient
-receives no rights or licenses to the intellectual property of any
-Contributor under this Agreement, whether expressly, by implication,
-estoppel or otherwise. All rights in the Program not expressly granted
-under this Agreement are reserved. Nothing in this Agreement is intended
-to be enforceable by any entity that is not a Contributor or Recipient.
-No third-party beneficiary rights are created under this Agreement.
+9. Additional agreements
 
-Exhibit A - Form of Secondary Licenses Notice
+While distributing the Work, You may choose to conclude an additional agreement,
+defining obligations or services consistent with this Licence. However, if
+accepting obligations, You may act only on your own behalf and on your sole
+responsibility, not on behalf of the original Licensor or any other Contributor,
+and only if You agree to indemnify, defend, and hold each Contributor harmless
+for any liability incurred by, or claims asserted against such Contributor by
+the fact You have accepted any warranty or additional liability.
 
-"This Source Code may also be made available under the following
-Secondary Licenses when the conditions for such availability set forth
-in the Eclipse Public License, v. 2.0 are satisfied: GNU General Public
-License as published by the Free Software Foundation, either version 2
-of the License, or (at your option) any later version, with the GNU
-Classpath Exception which is available at
-https://www.gnu.org/software/classpath/license.html."
+10. Acceptance of the Licence
 
-  Simply including a copy of this Agreement, including this Exhibit A
-  is not sufficient to license the Source Code under Secondary Licenses.
+The provisions of this Licence can be accepted by clicking on an icon ‘I agree’
+placed under the bottom of a window displaying the text of this Licence or by
+affirming consent in any other similar way, in accordance with the rules of
+applicable law. Clicking on that icon indicates your clear and irrevocable
+acceptance of this Licence and all of its terms and conditions.
 
-  If it is not possible or desirable to put the notice in a particular
-  file, then You may include the notice in a location (such as a LICENSE
-  file in a relevant directory) where a recipient would be likely to
-  look for such a notice.
+Similarly, you irrevocably accept this Licence and all of its terms and
+conditions by exercising any rights granted to You by Article 2 of this Licence,
+such as the use of the Work, the creation by You of a Derivative Work or the
+Distribution or Communication by You of the Work or copies thereof.
 
-  You may add additional accurate notices of copyright ownership.
+11. Information to the public
+
+In case of any Distribution or Communication of the Work by means of electronic
+communication by You (for example, by offering to download the Work from a
+remote location) the distribution channel or media (for example, a website) must
+at least provide to the public the information requested by the applicable law
+regarding the Licensor, the Licence and the way it may be accessible, concluded,
+stored and reproduced by the Licensee.
+
+12. Termination of the Licence
+
+The Licence and the rights granted hereunder will terminate automatically upon
+any breach by the Licensee of the terms of the Licence.
+
+Such a termination will not terminate the licences of any person who has
+received the Work from the Licensee under the Licence, provided such persons
+remain in full compliance with the Licence.
+
+13. Miscellaneous
+
+Without prejudice of Article 9 above, the Licence represents the complete
+agreement between the Parties as to the Work.
+
+If any provision of the Licence is invalid or unenforceable under applicable
+law, this will not affect the validity or enforceability of the Licence as a
+whole. Such provision will be construed or reformed so as necessary to make it
+valid and enforceable.
+
+The European Commission may publish other linguistic versions or new versions of
+this Licence or updated versions of the Appendix, so far this is required and
+reasonable, without reducing the scope of the rights granted by the Licence. New
+versions of the Licence will be published with a unique version number.
+
+All linguistic versions of this Licence, approved by the European Commission,
+have identical value. Parties can take advantage of the linguistic version of
+their choice.
+
+14. Jurisdiction
+
+Without prejudice to specific agreement between parties,
+
+- any litigation resulting from the interpretation of this License, arising
+  between the European Union institutions, bodies, offices or agencies, as a
+  Licensor, and any Licensee, will be subject to the jurisdiction of the Court
+  of Justice of the European Union, as laid down in article 272 of the Treaty on
+  the Functioning of the European Union,
+
+- any litigation arising between other parties and resulting from the
+  interpretation of this License, will be subject to the exclusive jurisdiction
+  of the competent court where the Licensor resides or conducts its primary
+  business.
+
+15. Applicable Law
+
+Without prejudice to specific agreement between parties,
+
+- this Licence shall be governed by the law of the European Union Member State
+  where the Licensor has his seat, resides or has his registered office,
+
+- this licence shall be governed by Belgian law if the Licensor has no seat,
+  residence or registered office inside a European Union Member State.
+
+Appendix
+
+‘Compatible Licences’ according to Article 5 EUPL are:
+
+- GNU General Public License (GPL) v. 2, v. 3
+- GNU Affero General Public License (AGPL) v. 3
+- Open Software License (OSL) v. 2.1, v. 3.0
+- Eclipse Public License (EPL) v. 1.0
+- CeCILL v. 2.0, v. 2.1
+- Mozilla Public Licence (MPL) v. 2
+- GNU Lesser General Public Licence (LGPL) v. 2.1, v. 3
+- Creative Commons Attribution-ShareAlike v. 3.0 Unported (CC BY-SA 3.0) for
+  works other than software
+- European Union Public Licence (EUPL) v. 1.1, v. 1.2
+- Québec Free and Open-Source Licence — Reciprocity (LiLiQ-R) or Strong
+  Reciprocity (LiLiQ-R+).
+
+The European Commission may update this Appendix to later versions of the above
+licences without producing a new version of the EUPL, as long as they provide
+the rights granted in Article 2 of this Licence and protect the covered Source
+Code from exclusive appropriation.
+
+All other changes or additions to this Appendix require the production of a new
+EUPL version.
