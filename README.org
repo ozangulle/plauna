@@ -1,8 +1,12 @@
 * Plauna
 
+** Overview
+
+Plauna is a service that helps organize e-mails. It can parse e-mails from mbox files or directly by connecting to IMAP folders and show statistics about them. The e-mail data in the database can be then categorized and trained to automatically categorize and refile incoming e-mails.
+
 ** Installation - How to Download
 
-The easiest way to get plauna is using the [docker image](https://hub.docker.com/repository/docker/ozangulle/plauna/general).
+The easiest way to get plauna is using the [[https://hub.docker.com/repository/docker/ozangulle/plauna/general][docker image]].
 
 The second way to getting plauna is fetching it from the git repository and compiling using clojure cli with the command:
 
