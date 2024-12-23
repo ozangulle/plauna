@@ -14,8 +14,8 @@
   (:gen-class))
 
 (telemere/streams->telemere!)
-
 (telemere/set-min-level! :info)
+(telemere/set-min-level! :slf4j "org.eclipse.jetty.server.*" :error)
 
 (set! *warn-on-reflection* true)
 

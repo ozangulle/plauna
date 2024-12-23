@@ -115,7 +115,7 @@
     (create-folders store category-names)))
 
 (defn initialize-client-setup! [connection-config]
-  (let [category-names (map :name (db/get-categories))]
+  (let [category-names (mapv :name (db/get-categories))]
     (t/log! :info ["Creating directories from category names" category-names])
     (t/log! {:level :info
              :data  {:result (setup-folders! connection-config category-names)}}
