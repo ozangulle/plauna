@@ -13,8 +13,7 @@
             [plauna.util.page :as page]
             [plauna.database :as db]
             [taoensso.telemere :as t]
-            [clojure.core.async :as async]
-            [plauna.messaging :as messaging])
+            [clojure.core.async :as async])
   (:import (org.flywaydb.core Flyway))
   (:gen-class))
 

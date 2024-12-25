@@ -3,7 +3,6 @@
             [clojure.tools.reader.edn :as edn]
             [clojure.core.async :as async]
             [clojure.string :as string]
-            [plauna.util.errors :as errors]
             [taoensso.telemere :as t]
             [plauna.messaging :as messaging])
   (:import [java.io File]))
@@ -85,11 +84,8 @@
     :train (doseq [file (training-files)] (io/delete-file (:file file)))))
 
 (defn write-to-training-file
-  "Takes data as collection, requires elements to have the fields :language and :category (category name, not id!)
-  Returns nil"
-  [data]
-  (doseq [language (keys data)]
-    (spit (training-file language) (get data language) :append true)))
+  [language data]
+  (spit (training-file language) data :append true))
 
 
 (defn email-start? [line]

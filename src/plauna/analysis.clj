@@ -1,7 +1,6 @@
 (ns plauna.analysis
   (:require [clojure.string :as cs]
             [plauna.database :as db]
-            [plauna.messaging :as messaging]
             [clojure.core.async :as async]
             [taoensso.telemere :as t]
             [cld.core :as lang]
@@ -20,8 +19,6 @@
 (defn language-detection-threshold [] (or (db/fetch-preference (name :language-detection-threshold)) 0.65))
 
 (defn categorization-threshold [] (or (db/fetch-preference (name :categorization-threshold)) 0.65))
-
-(comment (categorization-threshold))
 
 (defn ^String categorization-algorithm [] (or (:categorization-algorithm (db/fetch-preference :categorization-algorithm)) NaiveBayesTrainer/NAIVE_BAYES_VALUE))
 
@@ -45,7 +42,12 @@
       (DocumentSampleStream.)))
 
 (defn format-training-data [data]
-  (reduce (fn [acc el] (str acc (:category el) " " (:subject el) " " (:training-content el) "\n")) "" data))
+  (transduce
+   (comp (map #(core-email/training-content "text/html" %))
+         (map #(str (:category %) " " (if (some? (:subject %)) (cs/trim (:subject %)) "") " " (:training-content %) "\n")))
+   str
+   ""
+   data))
 
 (defn training-parameters []
   (doto (new TrainingParameters)

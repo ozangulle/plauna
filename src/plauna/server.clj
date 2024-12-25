@@ -98,9 +98,7 @@
   (doseq [language (languages-to-use-in-training)
           :let [entity-query {:entity :enriched-email :page {:size 100 :page 1}}
                 sql-query {:where [:and [:<> :category nil] [:= :language language]]}
-                write-func (fn [data] (->> (map (fn [enriched-email] (core-email/training-content "text/html" enriched-email)) data)
-                                           ((fn [data] {language (analysis/format-training-data data)}))
-                                           files/write-to-training-file))]]
+                write-func (fn [data] (files/write-to-training-file language (analysis/format-training-data data)))]]
     (core-email/iterate-over-all-pages db/fetch-data write-func entity-query sql-query false)))
 
 (defn write-emails-to-training-files-and-train []
@@ -427,7 +425,3 @@
       nil)
     (do (t/log! :info "No server running.")
         nil)))
-
-(comment
-  (start-server {:server {:port 8080}})
-  ,)

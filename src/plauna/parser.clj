@@ -1,7 +1,6 @@
 (ns plauna.parser
   (:require
    [plauna.core.email :refer [construct-email]]
-   [plauna.core.events :as events]
    [clojure.string :as st]
    [clojure.java.io :refer [input-stream copy]]
    [clojure.core.async :refer [chan sub] :as async]
@@ -19,19 +18,16 @@
 
 (set! *warn-on-reflection* true)
 
-(defn html->text [^String html] (.text (org.jsoup.Jsoup/parse html "UTF-8")))
+(defn html->text [^String html] (.text (Jsoup/parse html "UTF-8")))
 
 (def BracketsNormalizer (reify CharSequenceNormalizer
-                          (normalize [_ text] (-> (st/replace text #"\( \)" "")
-                                                  st/trim))))
+                          (normalize [_ text] ((comp st/trim #(st/replace % #"\( \)" "")) text))))
 
 (def MailtoNormalizer (reify CharSequenceNormalizer
-                        (normalize [_ text] (-> (st/replace text #"(mailto:)?(?<![-+_.0-9A-Za-z])[-+_.0-9A-Za-z]+@[-0-9A-Za-z]+[-.0-9A-Za-z]+" "")
-                                                   st/trim))))
+                        (normalize [_ text] ((comp st/trim #(st/replace % #"(mailto:)?(?<![-+_.0-9A-Za-z])[-+_.0-9A-Za-z]+@[-0-9A-Za-z]+[-.0-9A-Za-z]+" "")) text))))
 
 (def BetterURLNormalizer (reify CharSequenceNormalizer
-                           (normalize [_ text] (-> (st/replace text #"https?://[-_.?&~%;+=/#0-9A-Za-z]+" "")
-                                                      st/trim))))
+                           (normalize [_ text] ((comp st/trim #(st/replace % #"https?://[-_.?&~%;+=/#0-9A-Za-z]+" "")) text))))
 
 (def ^CharSequenceNormalizer normalizer (new AggregateCharSequenceNormalizer
                                              (into-array CharSequenceNormalizer
