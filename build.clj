@@ -7,7 +7,7 @@
 (def basis (delay (b/create-basis {:project "deps.edn"})))
 (def version "0.0.1")
 (def app-name "plauna")
-(def uber-file-name (format "%s/%s-%s-standalone.jar" build-folder app-name version)) ; path for result uber file
+(def uber-file-name (format "%s/%s-standalone.jar" build-folder app-name)) ; path for result uber file
 
 (defn clean [_]
   (b/delete {:path "target"})
