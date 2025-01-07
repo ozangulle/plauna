@@ -48,10 +48,18 @@
 
 (add-filter! :concat-bcc (partial concat-contacts :bcc))
 
-(defn list-emails [emails page-info]
+(add-filter! :double-format-nillable (fn [n & [decimal-places]]
+                                       (if (nil? n)
+                                         0
+                                         (let [n (double n)]
+                                           (format (str "%." (if decimal-places decimal-places "1") "f")
+                                                   n)))
+                                       ))
+
+(defn list-emails [emails page-info categories]
   (let [last-page {:last-page (quot (:total page-info) (:size page-info))}
         emails-with-java-date (map #(update-in % [:header :date] timestamp->date) emails)]
-    (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails"})))
+    (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories})))
 
 (defn list-email-contents [email-data categories]
   (render-file "email.html" {:email (update-in email-data [:header :date] timestamp->date) :categories categories}))

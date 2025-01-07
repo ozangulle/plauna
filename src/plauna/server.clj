@@ -28,12 +28,6 @@
 
 (def html-headers {"Content-Type" "text/html; charset=UTF-8"})
 
-(defn get-param-or [request param or]
-  (let [param-in-request (param request)]
-    (if (nil? param-in-request)
-      or
-      (Integer/parseInt param-in-request))))
-
 (defn interleave-all [& seqs]
   (reduce (fn [acc index] (into acc (map #(get % index) seqs)))
     []
@@ -179,11 +173,24 @@
                   :group-by [:interval]
                   :where where-clause})))
 
-(defn paginated-strictly-enriched-emails [page]
-  (db/fetch-data {:entity :enriched-email :strict true :page page} {:where [:and [:<> :category nil] [:<> :language nil]] :order-by [[:category-modified :desc]]}))
-
 (defn enriched-email-by-message-id [id] (first (db/fetch-data {:entity :enriched-email :strict false} {:where [:= :message-id id]})))
 
+;; TODO change name template
+(def emails-template {:page-size {:default 20 :type-fn Integer/parseInt}
+                      :page {:default 1 :type-fn Integer/parseInt}
+                      :filter {:default "all" :type-fn (fn [x] x)}})
+
+(defn template->request-parameters [template]
+  (fn [rp] (reduce (fn [acc [k v]] (if (contains? rp k)
+                                               (conj acc {k ((:type-fn v) (get rp k))})
+                                               (conj acc {k (:default v)})))
+                                 {} template)))
+
+(defn filter->sql-clause [filter]
+  (cond
+    (= filter "enriched-only") {:where [:and [:<> :metadata.category nil] [:<> :metadata.language nil]] :order-by [[:date :desc]]}
+    (= filter "without-category") {:where [:= :metadata.category nil] :order-by [[:date :desc]]}
+    :else {:order-by [[:date :desc]]}))
 
 (comp/defroutes routes
 
@@ -298,17 +305,7 @@
                                      {:years             years
                                       :selected-interval selected-interval
                                       :selected-year     (get params :year)}))))
-  (comp/GET "/training" {request-params :params}
-    (let [page (get-param-or request-params :page 1)
-          page-size (get-param-or request-params :page-size 10)
-          categories (db/get-categories)
-          result (paginated-strictly-enriched-emails {:size page-size :page page})
-          languages (db/get-languages)
-          size (:size result)
-          page (:page result)
-          total (:total result)]
-      (success-html-with-body (markup/email-training-page (:data result) categories languages {:size size :page page :total total}))))
-
+  
   (comp/POST "/metadata" request
     (save-metadata-form (:params request))
     (redirect-request request))
@@ -317,37 +314,20 @@
     (write-emails-to-training-files-and-train)
     (redirect-request request))
 
-  (comp/GET "/training/new" {params :params}
-    (let [page (get-param-or params :page 1)
-          page-size (get-param-or params :page-size 20)
-          language (get params :language)
-          sql-clause (if (nil? language)
-                       {:where [:and [:<> :language nil] [:= :category nil]]}
-                       {:where [:and [:= :language language] [:= :category nil]]})
-          untrained-emails (db/fetch-data {:entity :enriched-email :page (page/page-request page page-size) :strict false} sql-clause)
+  (comp/POST "/training/new" request 
+    (let [n (get (:route-params request) :new 20)]
+      (categorize-uncategorized-n-emails n)
+      (redirect-request request)))
+
+  (comp/GET "/emails" {params :params}
+    (let [parse-fn (template->request-parameters emails-template)
+          {page-size :page-size page :page filter :filter} (parse-fn params)
           categories (conj (db/get-categories) {:id -1 :name "n/a"})
-          page-info {:size (:size untrained-emails) :page (:page untrained-emails) :total (:total untrained-emails)}
-          languages (db/get-languages)]
+          sql-clause (filter->sql-clause filter)
+          result (db/fetch-data {:entity :enriched-email :strict false :page (page/page-request page page-size)} sql-clause)]
       {:status 200
        :header html-headers
-       :body   (markup/email-new-training-page untrained-emails categories languages page-info)}))
-
-  (comp/POST "/training/new" {route-params :route-params}
-    (let [n (get route-params :new 20)]
-      (write-emails-to-training-files-and-train)
-      (categorize-uncategorized-n-emails n)
-      {:status 301
-       :header {"Location" "/training"}}))
-
-  (comp/GET "/emails" [page page-size]
-    (if (or (nil? page) (nil? page-size))
-      (redirect "/emails?page=1&page-size=20")
-      (let [parsed-page (as-int page)
-            parsed-page-size (as-int page-size)
-            result (db/fetch-data {:entity :enriched-email :strict false :page (page/page-request parsed-page parsed-page-size)} {:order-by [[:date :desc]]})]
-        {:status 200
-         :header html-headers
-         :body   (markup/list-emails (:data result) {:size parsed-page-size :page (:page result) :total (:total result)})})))
+       :body   (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (clojure.math/ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories)}))
 
   (comp/GET "/emails/:id" [id]
     (let [decoded-id (url-decode id)
