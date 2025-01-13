@@ -1,13 +1,13 @@
 .nav-button {
     border-bottom: solid;
-    border-bottom-color: rgb(59 7 100);
+    border-bottom-color: black;
     border-bottom-width: thick;
     text-transform: uppercase;
 }
 
 .sub-nav-button {
     border-bottom: solid;
-    border-bottom-color: rgb(59 7 100);
+    border-bottom-color: black;
     border-bottom-width: thick;
     text-transform: uppercase;
     font-size: 0.9em;
@@ -16,26 +16,3 @@
 .flex-container {
     display: flex;
 }
-
-/* Pagination links */
-/*.pagination a {
-  color: black;
-  float: left;
-  padding: 8px 16px;
-  text-decoration: none;
-  transition: background-color .3s;
-}*/
-
-/* Style the active/current link */
-/*.pagination a.active {
-  background-color: dodgerblue;
-  color: white;
-}*/
-
-/* Add a grey background color on mouse-over */
-/*.pagination a:hover:not(.active) {background-color: #ddd;} 
-
-.html-email {
-    width: 100%;
-    height: 100%;
-}*/

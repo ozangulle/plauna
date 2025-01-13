@@ -16,19 +16,19 @@
 <form action="{{interval-filter.url}}" method="GET">
   <div class="flex flex-row justify-start content-center">
     <div class="w-32 mx-16">
-      <select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-purple-900 focus:border-purple-900 block w-full p-2.5" name="interval" autocomplete="off">
+      <select class="block mr-4 bg-gray-50 border border-gray-200 text-gray-700 focus:bg-gray-700 focus:ring-gray-200 focus:border-gray-200 focus:text-white text-sm rounded-lg block w-full p-2.5 w-full" name="interval" autocomplete="off">
         <option value="yearly" {% if interval-filter.selected-interval = yearly %}selected{% endif %}>yearly</option>
         <option value="monthly" {% if interval-filter.selected-interval = monthly %}selected{% endif %}>monthly</option>
       </select>
     </div>
     <div class="mx-4">
-      <select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-purple-900 focus:border-purple-900 block w-full p-2.5" name="year" autocomplete="off">
+      <select class="block mr-4 bg-gray-50 border border-gray-200 text-gray-700 focus:bg-gray-700 focus:ring-gray-200 focus:border-gray-200 focus:text-white text-sm rounded-lg block w-full p-2.5 w-full" name="year" autocomplete="off">
         {% for year in interval-filter.years %}
         <option {% if interval-filter.selected-year = year %}selected{% endif %} value="{{year}}">{{year}}</option>
         {% endfor %}
       </select>
     </div>
-    <button class="rounded-none ml-3 px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white"  type="submit">Apply</button>
+    <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm"  type="submit">Apply</button>
   </div>
 </form>
 

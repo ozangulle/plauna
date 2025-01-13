@@ -6,7 +6,7 @@
 
 <form action="/metadata/languages" id="detect" method="post">
   <input type="hidden" name="redirect-url" value="/admin/languages"</input>
-  <button class="rounded-none ml-3 px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit" form="detect">Detect Languages</button>
+  <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit" form="detect">Detect Languages</button>
 </form>
 
 <h3 class="uppercase text-lg my-8">Language Preferences</h3>
@@ -25,7 +25,7 @@
     {% for preference in language-preferences %}
     <tr><td>{{preference.language}}</td><td><input {% if preference.use_in_training = 1 %}checked{% endif %} form="preferences" name="use" type="checkbox" value="{{preference.language}}"></td></tr>
     {% endfor %}
-    <tr><th><button class="rounded-none ml-3 px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white"  form="preferences">Send</button></th></tr>
+    <tr><th><button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg"  form="preferences">Send</button></th></tr>
 </tbody></table>
 
 </form>

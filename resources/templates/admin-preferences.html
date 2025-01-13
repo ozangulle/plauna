@@ -9,13 +9,13 @@
     <input type="hidden" name="redirect-url" value="/admin/preferences"</input>
     <div>
       <label class="block mb-2 text-sm font-medium text-gray-900"  for="language-detection-threshold">Language Detection Threshold</label>
-      <input class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-purple-900 focus:border-purple-900 block p-2.5" name="language-detection-threshold" value="{{language-detection-threshold}}">
+      <input class="mr-4 text-gray-700 focus:text-gray-700 focus:border-gray-200 focus:ring-gray-200" name="language-detection-threshold" value="{{language-detection-threshold}}">
     </div>
     <div>
       <label class="block mb-2 text-sm font-medium text-gray-900" for="categorization-threshold">Categorization Threshold</label>
-      <input class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-purple-900 focus:border-purple-900 block p-2.5" name="categorization-threshold" value="{{categorization-threshold}}">
+      <input class="mr-4 text-gray-700 focus:text-gray-700 focus:border-gray-200 focus:ring-gray-200" name="categorization-threshold" value="{{categorization-threshold}}">
     </div>
   </div>
-  <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="send">Save</button>
+  <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm" type="send">Save</button>
  </form>
 {% endblock %}

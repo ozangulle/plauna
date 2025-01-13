@@ -16,27 +16,27 @@
     <form action="emails/parse" enctype="multipart/form-data" method="POST">
       <input name="redirect-url" type="hidden" value="/admin" />
       <input name="filename" type="file" />
-      <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Parse Mbox</button>
+      <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Parse Mbox</button>
     </form>
   </div>
 </div>
 
   <h4 class="text-l mt-16 mb-2">Danger Zone</h4>
-  <div class="flex-container">
+  <div class="flex-wrap flex gap-4">
     <form action="/admin/database" id="db-delete" method="DELETE">
       <input name="method" type="hidden" value="DELETE" />
-      <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Delete Database</button>
+      <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Delete Database</button>
     </form>
     <form action="/admin/database" method="POST" value="post">
-      <button class="rounded-none mx-3 px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Create Database</button>
+      <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Create Database</button>
     </form>
     <form action="/admin/training" id="training-delete" method="DELETE">
       <input name="method" type="hidden" value="DELETE" />
-      <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Delete Training Data</button>
+      <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Delete Training Data</button>
     </form>
     <form action="/admin/models" id="models-delete" method="DELETE">
       <input name="method" type="hidden" value="DELETE" />
-      <button class="rounded-none ml-3 px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Delete Models</button>
+      <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Delete Models</button>
     </form>
   </div>
 

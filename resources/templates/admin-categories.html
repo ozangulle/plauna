@@ -12,7 +12,7 @@
       <td>
         <form action="/admin/categories/{{category.id}}" id="{{category.id}}" method="DELETE">
           <input name="method" type="hidden" value="DELETE">
-          <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">X</button>
+          <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">X</button>
         </form>
       </td>
 
@@ -27,7 +27,7 @@
 </table>
 <h3 class="uppercase text-lg my-8">New Category</h3>
 <form action="/admin/categories" method="POST">
-  <input class="pr-4" name="name" value="">
-  <button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" type="submit">Add category</button></form>
+  <input class="mr-4 border-2 ring-1 text-gray-700 focus:text-gray-700 focus:border-gray-200 focus:ring-gray-200" name="name" value="">
+  <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Add category</button></form>
 
 {% endblock %}
