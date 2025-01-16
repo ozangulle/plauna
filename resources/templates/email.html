@@ -15,10 +15,11 @@
   <input form="email" hidden="true" name="language-confidence" type="text" value="1">
   <input form="email" hidden="true" name="category-confidence" type="text" value="1">
   <input form="email" hidden="true" name="redirect-url" type="text" value="/emails">
-  <p><strong>Language: </strong><input form="email" name="language" type="text" value="{{email.metadata.language}}"></p>
+  <p><strong>Language: </strong>
+    <input form="email" class="mr-4 text-gray-700 focus:text-gray-700 focus:border-gray-200 focus:ring-gray-200" name="language" type="text" value="{{email.metadata.language}}"></p>
   <p><strong>Language Confidence: </strong>{{email.metadata.language-confidence}}</p>
   <p><strong>Category: </strong>
-    <select class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" form="email" name="category" autocomplete="off">
+    <select class="block mr-4 bg-gray-50 border border-gray-200 text-gray-700 focus:bg-gray-700 focus:ring-gray-200 focus:border-gray-200 focus:text-white text-sm rounded-lg block w-full p-2.5 w-full" form="email" name="category" autocomplete="off">
       {% for category in categories %}
       <option value="{{category.id}}" {% if category.id = email.metadata.category-id %}selected{% endif %}>{{category.name}}</option>
       {% endfor %}
@@ -26,7 +27,7 @@
   </p>
   <p><strong>Category Confidence: </strong>{{email.metadata.category-confidence}}</p>
 </form>
-<button class="rounded-none px-4 py-2 ring-2 ring-purple-900 hover:bg-purple-900 hover:text-white" form="email">Update Metadata</button>
+<button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm" form="email">Update Metadata</button>
 <h3 class="uppercase text-lg my-8">Contents</h3>
 
 {% for body-part in email.body %}
