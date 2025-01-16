@@ -96,9 +96,10 @@
       (when (some? event)
         (when (true? (:refolder (:options event)))
           (t/log! :info (str "Moving email: " (-> event :payload :header :subject) " categorized as: " (-> event :payload :metadata :category)))
-          (let [message-id (-> event :payload :header :message-id)]
-            (move-messages-by-id (-> event :options :store) message-id (-> event :options :original-folder) (-> event :payload :metadata :category))
-            )))
+          (let [message-id (-> event :payload :header :message-id)
+                category-name (-> event :payload :metadata :category)]
+            (when (some? category-name)
+              (move-messages-by-id (-> event :options :store) message-id (-> event :options :original-folder) category-name)))))
       (recur (async/<! local-chan)))))
 
 (defn create-folders

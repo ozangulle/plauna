@@ -84,7 +84,6 @@
         allowed-languages (map :language (filter #(= 1 (:use_in_training %)) (db/get-language-preferences)))
         language-result (detect-language training-content)
         category-result (when (some #(= (:code language-result) %) allowed-languages) (categorize training-content (files/model-file (:code language-result))))
-        ;(categorize training-content (files/model-file (:code language-result)))
         category-id (:id (db/category-by-name (:name category-result)))]
     (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category (:name category-result) :category-confidence (:confidence category-result) :category-id category-id})))
 
