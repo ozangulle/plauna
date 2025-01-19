@@ -72,9 +72,12 @@
       (catch Exception e (t/log! :error (.getMessage e))))))
 
 (defn categorize [text ^File model-file]
-  (let [doccat (DocumentCategorizerME. (DoccatModel. model-file))
-        probabilities (.categorize doccat (into-array String (cs/split text #" ")))]
-    {:name (.getBestCategory doccat probabilities) :confidence (get probabilities 0)}))
+  (if (.exists model-file)
+    (let [doccat (DocumentCategorizerME. (DoccatModel. model-file))
+          probabilities (.categorize doccat (into-array String (cs/split text #" ")))]
+      {:name (.getBestCategory doccat probabilities) :confidence (get probabilities 0)})
+    {:name nil :confidence 0}
+    ))
 
 
 ;; TODO handle errors
@@ -84,7 +87,7 @@
         allowed-languages (map :language (filter #(= 1 (:use_in_training %)) (db/get-language-preferences)))
         language-result (detect-language training-content)
         category-result (when (some #(= (:code language-result) %) allowed-languages) (categorize training-content (files/model-file (:code language-result))))
-        category-id (:id (db/category-by-name (:name category-result)))]
+        category-id (if (nil? (:name category-result)) nil (:id (db/category-by-name (:name category-result))))]
     (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category (:name category-result) :category-confidence (:confidence category-result) :category-id category-id})))
 
 (defn detect-language-event [event]

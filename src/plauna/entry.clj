@@ -27,26 +27,13 @@
 (defmulti parse-cli-arg (fn [arg] (first (s/split arg #"="))))
 (defmethod parse-cli-arg "--config-file" [arg-string] {:config-file (second (s/split arg-string #"="))})
 
-(defn check-if-ml-models-exist
-  "Checks whether the ML models for categorization exist. Returns true, if they do.
-  If it fails to find any models, returns false."
-  []
-  (let [ml-models-exist (not-empty (files/model-files))]
-    (cond
-      (nil? ml-models-exist) (do (telemere/log! :error "No ml models exist for categorization. E-mails cannot be categorized.") false)
-      :else true)))
-
 (defn start-imap-client
-  "Starts the imap clients in order to listen to incoming e-mails, categorize them and refile them.
-  It does not start, if 'check-if-ml-models-exist' check fails."
   [config]
-  (if (= (check-if-ml-models-exist) true)
-    (let [listen-channel (chan 10)]
-      (doseq [client-config (:clients (:email config))]
-        (client/initialize-client-setup! client-config)
-        (client/create-folder-monitor client-config listen-channel))
-      (telemere/log! :debug "Listening to new emails from listen-channel"))
-    (telemere/log! :info "Not starting imap client due to missing files.")))
+  (let [listen-channel (chan 10)]
+    (doseq [client-config (:clients (:email config))]
+      (client/initialize-client-setup! client-config)
+      (client/create-folder-monitor client-config listen-channel))
+    (telemere/log! :debug "Listening to new emails from listen-channel")))
 
 (defn -main
   [& args]
