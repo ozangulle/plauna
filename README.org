@@ -2,7 +2,7 @@
 
 ** Overview
 
-Plauna is a service that helps organize e-mails. It can parse e-mails from mbox files or directly by connecting to IMAP folders and show statistics about them. The e-mail data in the database can be then categorized and trained to automatically categorize and refile incoming e-mails.
+Plauna is a service that helps organize e-mails. It can parse e-mails from mbox files or directly by connecting to IMAP folders, and show statistics about them. The e-mail data in the database can be then enriched and trained to automatically categorize and refile incoming e-mails.
 
 ** Installation - How to Download
 
@@ -14,18 +14,57 @@ The second way to getting plauna is fetching it from the git repository and comp
 clj -T:build uber
 #+END_SRC
 
+This will produce a plauna uberjar in ./target which you can run.
 
 ** How to use
 
 *** Configuration
 
 #+BEGIN_SRC clojure
-{:data-folder "/home/myhome/exmaple-directory" ; the location for the db, training files and models
- :server {:port 8080} ; if port is not set in config, the server uses a random port
- :email {:addresses ["me@example.com", "anotheraccount@secondexample.com"]
-         :clients [{:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox"}]}}
+    {:data-folder "/home/myhome/example-directory" ; the location for the db, training files and models
+     :server {:port 80} ; if port is not set in config, the server uses 8080
+     :email {
+             :clients [{:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox"}] ; the clients are optional
+             }}
 #+END_SRC
 
 *** Starting
 
 The application requires a configuration file to start. The configuration file can be explicitly named as an argument when starting the application using the flag "--config-file=/absolute/path/to/location". If no config file argument is used, it defaults to "~/.config/plauna.edn".
+
+*** Getting Started
+
+When you start plauna, it starts a web server on the port which you specified (defaults to 8080) and connects to the IMAP servers that you configured. You can use plauna without configuring any IMAP servers, too, but you would be missing out on the "refile" functionality. On your very first start, the database is empty. You need to fill it with e-mails. There are three non-exclusive ways of doing this:
+
+1. Go to Admin -> under the header Parse E-mails select an mbox file and click on the button "Parse Mbox". Your e-mails will be visible under the "Emails" tab shortly thereafter.
+
+2. Go to "Watchers", click on any IMAP account name, select a folder you want to parse the e-mails in, make sure "Move e-mails after categorization" is unchecked and click on the button "Parse E-mails". This will read all the e-mails in the selected folder.
+
+3. Just leave plauna running and watch it save your e-mails. Beware: Depending on how many e-mails you receive on any given day, this method may be very slow.
+
+   
+*** Language Detection
+
+Plauna automatically detects the language of an e-mail upon parsing it. Under Admin -> Manage Languages you can also force the language detection process. Here, you can also select the languages that you want to use in training - therefore the languages you want to use in categorization.
+
+*** Categorization
+
+**** Create Categories
+
+Go to Admin -> Manage Categories in order to create and delete categories.
+
+**** Categorize E-mails
+
+Under the tab "E-mails" you can edit the language and category of every e-mail; either as a batch operation or by clicking on an e-mail and changing it at the details page.
+
+**** Data Training
+
+Under the tab "E-mails" there is an accordion tab called "Data Training". Click on the button "Train with Existing Data" to train your data. Important: You must have more than one category saved for each language you want to train in.
+
+**** Automatic Categorization
+
+Under E-mails -> Data Training, you can click on the button "Generate new data" in order to let plauna categorize up to 10 random e-mails. Also, if you have already trained your models, each incoming e-mail will be categorized automatically.
+
+**** Refile E-mails
+
+Plauna creates a folder in each IMAP server using the schema "Categories/<category-name>" on startup. After this step, each e-mail that comes via IMAP is categorized and refiled automatically.
