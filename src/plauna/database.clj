@@ -243,7 +243,7 @@
 
 (defmulti data->sql :entity)
 
-(defmethod data->sql :body-part [entity-clause sql-clause]
+(defmethod data->sql :body-part [_ sql-clause]
   (let [jdbc-sql (honey/format (postwalk change-important-keys sql-clause))]
     (flatten [(str (body-parts-for-options) " " (first jdbc-sql)) (rest jdbc-sql)])))
 
@@ -256,7 +256,7 @@
    (let [strict (:strict entity-clause)]
      [(headers-for-strict-options strict)])))
 
-(defmethod data->sql :participant [entity-clause sql-clause]
+(defmethod data->sql :participant [_ sql-clause]
   (let [first-part  {:select [:communications.contact-key :message-id :type :name :address] :from [:communications] :join [:contacts [:= :contacts.contact-key :communications.contact-key]]}]
     (->> (conj first-part sql-clause)
         honey/format)))
@@ -278,7 +278,7 @@
         participants (map core.email/construct-participants (fetch-participants message-id))]
     (core.email/->EnrichedEmail header bodies participants metadata)))
 
-(defmulti fetch-data (fn [options sql-clause] (:entity options)))
+(defmulti fetch-data (fn [options _] (:entity options)))
 
 (defmethod fetch-data :body-part [entity-clause sql-clause]
   (if (nil? (:page entity-clause))

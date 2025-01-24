@@ -1,9 +1,6 @@
 (ns plauna.core.email
   (:require [clojure.math :as math]
-            [clojure.string :as s]
-            [clojure.spec.alpha :as sp]
-            [plauna.specs :as email-specs]
-            ))
+            [clojure.string :as s]))
 
 (set! *warn-on-reflection* true)
 

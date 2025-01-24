@@ -75,8 +75,8 @@
 
 (defn model-files [] (files-with-type :model))
 
-(defn ^File model-file "Returns the model file for the language specified."
-  [language] (io/file (file-dir) (str "train-" language ".bin")))
+(defn model-file "Returns the model file for the language specified."
+  [^String language] ^File (io/file (file-dir) (str "train-" language ".bin")))
 
 (defn delete-files-with-type [type]
   (case type

@@ -1,5 +1,5 @@
 (ns plauna.messaging
-  (:require [clojure.core.async :refer [chan pub sub >! <! go go-loop close!] :as async]))
+  (:require [clojure.core.async :refer [chan pub sub <! go-loop] :as async]))
 
 (set! *warn-on-reflection* true)
 

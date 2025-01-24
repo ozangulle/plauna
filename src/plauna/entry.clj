@@ -8,21 +8,15 @@
    [plauna.database :as database]
    [plauna.messaging :as messaging]
    [plauna.analysis :as analysis]
-   [taoensso.telemere :as telemere]
+   [taoensso.telemere :as t]
    [plauna.parser :as parser])
   (:gen-class))
 
-(telemere/streams->telemere!)
-(telemere/set-min-level! :info)
-(telemere/set-min-level! :slf4j "org.eclipse.jetty.server.*" :error)
+(t/streams->telemere!)
+(t/set-min-level! :info)
+(t/set-min-level! :slf4j "org.eclipse.jetty.server.*" :error)
 
 (set! *warn-on-reflection* true)
-
-(comment
-  (require '[clojure.pprint :as pp]
-           '[clojure.main :as main])
-  (add-tap (bound-fn* pp/pprint))
-  ,)
 
 (defmulti parse-cli-arg (fn [arg] (first (s/split arg #"="))))
 (defmethod parse-cli-arg "--config-file" [arg-string] {:config-file (second (s/split arg-string #"="))})
@@ -33,7 +27,7 @@
     (doseq [client-config (:clients (:email config))]
       (client/initialize-client-setup! client-config)
       (client/create-folder-monitor client-config listen-channel))
-    (telemere/log! :debug "Listening to new emails from listen-channel")))
+    (t/log! :debug "Listening to new emails from listen-channel")))
 
 (defn -main
   [& args]

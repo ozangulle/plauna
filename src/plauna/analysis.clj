@@ -20,7 +20,7 @@
 
 (defn categorization-threshold [] (or (db/fetch-preference (name :categorization-threshold)) 0.65))
 
-(defn ^String categorization-algorithm [] (or (:categorization-algorithm (db/fetch-preference :categorization-algorithm)) NaiveBayesTrainer/NAIVE_BAYES_VALUE))
+(defn categorization-algorithm ^String [] (or (:categorization-algorithm (db/fetch-preference :categorization-algorithm)) NaiveBayesTrainer/NAIVE_BAYES_VALUE))
 
 (lang/default-init!)
 

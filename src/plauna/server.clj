@@ -6,13 +6,12 @@
             [plauna.util.page :as page]
             [plauna.client :as client]
             [plauna.core.email :as core-email]
+            [clojure.math :refer [ceil]]
             [compojure.core :as comp]
             [compojure.route :as route]
-            [compojure.coercions :refer [as-int]]
             [ring.middleware.params :refer [wrap-params]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
-            [ring.util.response :refer [redirect]]
             [taoensso.telemere :as t]
             [clojure.java.io :as io]
             [plauna.analysis :as analysis]
@@ -327,7 +326,7 @@
           result (db/fetch-data {:entity :enriched-email :strict false :page (page/page-request page page-size)} sql-clause)]
       {:status 200
        :header html-headers
-       :body   (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (clojure.math/ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories)}))
+       :body   (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories)}))
 
   (comp/GET "/emails/:id" [id]
     (let [decoded-id (url-decode id)
@@ -372,7 +371,7 @@
 
   (route/resources "/"))
 
-(defn upload-progress [request bytes-read content-length item-count]
+(defn upload-progress [_ bytes-read content-length item-count]
   (t/log! {:level       :info
            :sample-rate 0.5
            :rate-limit  {"1 per 10 sec" [1 10000]}}
@@ -399,7 +398,8 @@
 (defn stop-server []
   (if-some [s ^Server @server]
     (do
-      (t/log! {:level :info :let [port (.getPort (.getURI s))]} ["Stopping server on port" port])
+      (let [port (.getPort (.getURI s))]
+       (t/log! {:level :info} ["Stopping server on port" port]))
       (.stop s)
       (reset! server nil)
       nil)
