@@ -44,10 +44,14 @@
     (map (fn [vect] {:message-id (nth vect 0) :language (nth vect 1) :category (nth vect 2) :language-confidence (nth vect 3) :category-confidence (nth vect 4)}) (partition 5 (interleave-all message-ids languages categories language-confidence category-confidence)))))
 
 (defn params->update-request [params]
-  {:language   (:language params)
-   :category-id (Integer/parseInt (:category params))
-   :category-confidence  (Float/parseFloat (:category-confidence params))
-   :language-confidence (Float/parseFloat (:language-confidence params))})
+  (let [language (:language params)
+        category-id (:category params)
+        language-exists (and (some? language) (seq language))
+        category-exists (some? category-id)]
+   {:language   (when language-exists (:language params))
+    :category-id (when category-exists (Integer/parseInt (:category params)))
+    :category-confidence  (when category-exists (Float/parseFloat (:category-confidence params)))
+    :language-confidence (when language-exists (Float/parseFloat (:language-confidence params)))}))
 
 (defn save-metadata-form [params]
   (let [transformed (flatten-map params)]
@@ -203,7 +207,7 @@
   (comp/POST "/emails/parse" request
     (let [temp-file (:tempfile (:filename (:params request)))
           result (files/read-emails-from-mbox (io/input-stream temp-file) @messaging/main-chan)]
-      (success-html-with-body (str result))))
+      (redirect-request request)))
 
   (comp/GET "/admin/categories" {}
     (let [categories (db/get-categories)]
@@ -226,10 +230,10 @@
   (comp/POST "/admin/languages" {params :params}
     (let [langs-to-use (if (vector? (:use params)) (:use params) [(:use params)])]
       (doseq
-          [preference (map (fn [id language]
+          [preference (mapv (fn [id language]
                              {:id id :language language :use (some? (some #(= language %) langs-to-use))})
-                           (:id params)
-                           (:language params))]
+                           (vectorize (:id params))
+                           (vectorize (:language params)))]
           (db/update-language-preference preference)))
     (let [language-preferences (language-preferences)]
       (success-html-with-body (markup/languages-admin-page language-preferences))))
