@@ -156,7 +156,7 @@
         <td><a class="block mr-4" href="/emails/{{email.header.message-id|urlescape}}">{{email.metadata.language-confidence|double-format-nillable:10}}</a></td>
         <td><select class="block mr-4 bg-gray-50 border border-gray-200 text-gray-700 focus:bg-gray-700 focus:ring-gray-200 focus:border-gray-200 focus:text-white text-sm rounded-lg block w-full p-2.5 w-full" form="emails" name="category">
             {% for category in categories %}
-            <option value="{{category.id}}" {% if email.metadata.category = category.name %} selected {% endif %}>{{category.name}}</option>
+            <option value="{{category.id}}" {% if email.metadata.category-id = category.id %} selected {% endif %}>{{category.name}}</option>
             {% endfor %}
         </select></td>
         <td><a class="block mr-4" href="/emails/{{email.header.message-id|urlescape}}">{{email.metadata.category-confidence|double-format-nillable:10}}</a></td>

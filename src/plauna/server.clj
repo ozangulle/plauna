@@ -47,7 +47,7 @@
   (let [language (:language params)
         category-id (:category params)
         language-exists (and (some? language) (seq language))
-        category-exists (some? category-id)]
+        category-exists (and (some? category-id) (seq category-id))]
    {:language   (when language-exists (:language params))
     :category-id (when category-exists (Integer/parseInt (:category params)))
     :category-confidence  (when category-exists (Float/parseFloat (:category-confidence params)))
@@ -325,7 +325,7 @@
   (comp/GET "/emails" {params :params}
     (let [parse-fn (template->request-parameters emails-template)
           {page-size :page-size page :page filter :filter} (parse-fn params)
-          categories (conj (db/get-categories) {:id -1 :name "n/a"})
+          categories (conj (db/get-categories) {:id nil :name "n/a"})
           sql-clause (filter->sql-clause filter)
           result (db/fetch-data {:entity :enriched-email :strict false :page (page/page-request page page-size)} sql-clause)]
       {:status 200
@@ -335,7 +335,7 @@
   (comp/GET "/emails/:id" [id]
     (let [decoded-id (url-decode id)
           email-data (enriched-email-by-message-id decoded-id)
-          categories (db/get-categories)]
+          categories (conj (db/get-categories) {:id nil :name "n/a"})]
       {:status 200
        :header html-headers
        :body   (markup/list-email-contents email-data categories)}))

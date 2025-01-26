@@ -42,4 +42,3 @@
     (client/client-loop @messaging/main-publisher)
     (analysis/enrichment-loop @messaging/main-publisher @messaging/main-chan)
     (server/start-server (files/config))))
-
