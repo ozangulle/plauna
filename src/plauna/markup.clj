@@ -11,8 +11,7 @@
 (set-resource-path! (io/resource "templates"))
 
 (comment
-  (selmer.parser/cache-off!)
-  ,)
+  (selmer.parser/cache-off!))
 
 (defn timestamp->date [timestamp]
   (if (nil? timestamp)
@@ -53,8 +52,7 @@
                                          0
                                          (let [n (double n)]
                                            (format (str "%." (if decimal-places decimal-places "1") "f")
-                                                   n)))
-                                       ))
+                                                   n)))))
 
 (defn list-emails [emails page-info categories]
   (let [last-page {:last-page (quot (:total page-info) (:size page-info))}
@@ -107,8 +105,7 @@
                    :mark {:type "bar" :tooltip true}
                    :encoding {:y {:field :count :type "quantitative"}
                               :x {:field :interval :type "ordinal" :axis {:labelOverlap "parity" :labelSeparation 10}}
-                              :color {:field :language :type "nominal"}
-                              }}]
+                              :color {:field :language :type "nominal"}}}]
     (render-file "statistics.html" {:statistics [{:type :bar-chart :header "Yearly Languages" :id "languages" :json-data (json/write-str vega-data)}]})))
 
 (defn statistics-categories [yearly-categories intervals]

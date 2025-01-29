@@ -29,8 +29,8 @@
 
 (defn interleave-all [& seqs]
   (reduce (fn [acc index] (into acc (map #(get % index) seqs)))
-    []
-    (range (apply max (map count seqs)))))
+          []
+          (range (apply max (map count seqs)))))
 
 (defn vectorize [items]
   (if (vector? items) items [items]))
@@ -48,10 +48,10 @@
         category-id (:category params)
         language-exists (and (some? language) (seq language))
         category-exists (and (some? category-id) (seq category-id))]
-   {:language   (when language-exists (:language params))
-    :category-id (when category-exists (Integer/parseInt (:category params)))
-    :category-confidence  (when category-exists (Float/parseFloat (:category-confidence params)))
-    :language-confidence (when language-exists (Float/parseFloat (:language-confidence params)))}))
+    {:language   (when language-exists (:language params))
+     :category-id (when category-exists (Integer/parseInt (:category params)))
+     :category-confidence  (when category-exists (Float/parseFloat (:category-confidence params)))
+     :language-confidence (when language-exists (Float/parseFloat (:language-confidence params)))}))
 
 (defn save-metadata-form [params]
   (let [transformed (flatten-map params)]
@@ -74,18 +74,17 @@
 
 (defn language-preferences []
   (let [preferences (db/get-language-preferences)]
-        (if (empty? (db/get-languages))
-          []
-          (if (empty? preferences)
-            (do (db/add-language-preferences (map (comp #(conj % false) vector :language) (db/get-languages)))
-                (db/get-language-preferences))
-            preferences))))
+    (if (empty? (db/get-languages))
+      []
+      (if (empty? preferences)
+        (do (db/add-language-preferences (map (comp #(conj % false) vector :language) (db/get-languages)))
+            (db/get-language-preferences))
+        preferences))))
 
 (defn params->interval-request [params]
   (if (and (some? (:interval params)) (some? (:year params)))
     {:interval (keyword (:interval params)) :year (Integer/parseInt (get params :year))}
     {:interval :yearly}))
-
 
 (defn languages-to-use-in-training []
   (sequence (comp (filter #(= 1 (:use_in_training %))) (map :language)) (db/get-language-preferences)))
@@ -123,13 +122,13 @@
                 :group-by [:interval :bodies.mime-type]
                 :order-by [[:count :desc]]}))
 
-(defn email-type-statistics-overview [] 
+(defn email-type-statistics-overview []
   (db/query-db {:select [[[:count :headers.message-id] :count] :bodies.mime-type] :from [:bodies]
                 :join [:headers [:= :bodies.message-id :headers.message_id]]
                 :group-by [:bodies.mime-type]
                 :order-by [[:count :desc]]}))
 
-(defn language-statistics-by-period [period] 
+(defn language-statistics-by-period [period]
   (db/query-db {:select [[[:count :metadata.language] :count] :metadata.language [(db/interval-for-honey period) :interval]] :from [:metadata]
                 :join [:headers [:= :metadata.message-id :headers.message_id]]
                 :group-by [:language :interval]}))
@@ -141,7 +140,7 @@
                      (db/query-db {:select [[[:count :metadata.category] :count] :metadata.category [(db/interval-for-honey (:interval period)) :interval]] :from [:metadata]
                                    :join [:headers [:= :metadata.message-id :headers.message_id]]
                                    :where [:and [:<> :category nil] [:like :interval (str year "%")]]
-                                   :group-by [:category :interval]})                  
+                                   :group-by [:category :interval]})
                      (db/query-db {:select [[[:count :metadata.category] :count] :metadata.category [(db/interval-for-honey (:interval period)) :interval]] :from [:metadata]
                                    :join [:headers [:= :metadata.message-id :headers.message_id]]
                                    :where [:<> :category nil]
@@ -159,16 +158,16 @@
                     :limit 10
                     :order-by [[:count :desc]]}))
   ([year] (db/query-db {:select [[[:count :address] :count] :address [(db/interval-for-honey :yearly) :interval]] :from [:communications]
-                           :join [:contacts [:= :contacts.contact-key :communications.contact-key]
-                                  :headers [:= :communications.message-id :headers.message_id]]
-                           :group-by [:address]
-                           :where [:and [:= :type ":sender"] [:like :interval year] [:not-in :address @db/my-addresses]]
-                           :limit 10
-                           :order-by [[:count :desc]]})))
+                        :join [:contacts [:= :contacts.contact-key :communications.contact-key]
+                               :headers [:= :communications.message-id :headers.message_id]]
+                        :group-by [:address]
+                        :where [:and [:= :type ":sender"] [:like :interval year] [:not-in :address @db/my-addresses]]
+                        :limit 10
+                        :order-by [[:count :desc]]})))
 
 (defn email-from-statistics [interval-request]
-(let [where-clause (if (and (some? (:year interval-request)) (not (= (:interval interval-request) :yearly)))
-                     [:and [:= :type ":sender"] [:like :interval (str (:year interval-request) "%")] [:not-in :address @db/my-addresses] [:<> :interval nil]]
+  (let [where-clause (if (and (some? (:year interval-request)) (not (= (:interval interval-request) :yearly)))
+                       [:and [:= :type ":sender"] [:like :interval (str (:year interval-request) "%")] [:not-in :address @db/my-addresses] [:<> :interval nil]]
                        [:and [:= :type ":sender"] [:not-in :address @db/my-addresses]])]
     (db/query-db {:select [[[:count :address] :count] [(db/interval-for-honey (:interval interval-request)) :interval]] :from [:communications]
                   :join [:contacts [:= :contacts.contact-key :communications.contact-key]
@@ -185,9 +184,9 @@
 
 (defn template->request-parameters [template]
   (fn [rp] (reduce (fn [acc [k v]] (if (contains? rp k)
-                                               (conj acc {k ((:type-fn v) (get rp k))})
-                                               (conj acc {k (:default v)})))
-                                 {} template)))
+                                     (conj acc {k ((:type-fn v) (get rp k))})
+                                     (conj acc {k (:default v)})))
+                   {} template)))
 
 (defn filter->sql-clause [filter]
   (cond
@@ -230,11 +229,11 @@
   (comp/POST "/admin/languages" {params :params}
     (let [langs-to-use (if (vector? (:use params)) (:use params) [(:use params)])]
       (doseq
-          [preference (mapv (fn [id language]
-                             {:id id :language language :use (some? (some #(= language %) langs-to-use))})
-                           (vectorize (:id params))
-                           (vectorize (:language params)))]
-          (db/update-language-preference preference)))
+       [preference (mapv (fn [id language]
+                           {:id id :language language :use (some? (some #(= language %) langs-to-use))})
+                         (vectorize (:id params))
+                         (vectorize (:language params)))]
+        (db/update-language-preference preference)))
     (let [language-preferences (language-preferences)]
       (success-html-with-body (markup/languages-admin-page language-preferences))))
 
@@ -308,7 +307,7 @@
                                      {:years             years
                                       :selected-interval selected-interval
                                       :selected-year     (get params :year)}))))
-  
+
   (comp/POST "/metadata" request
     (save-metadata-form (:params request))
     (redirect-request request))
@@ -317,7 +316,7 @@
     (write-emails-to-training-files-and-train)
     (redirect-request request))
 
-  (comp/POST "/training/new" request 
+  (comp/POST "/training/new" request
     (let [n (get (:route-params request) :new 20)]
       (categorize-uncategorized-n-emails n)
       (redirect-request request)))
@@ -403,7 +402,7 @@
   (if-some [s ^Server @server]
     (do
       (let [port (.getPort (.getURI s))]
-       (t/log! {:level :info} ["Stopping server on port" port]))
+        (t/log! {:level :info} ["Stopping server on port" port]))
       (.stop s)
       (reset! server nil)
       nil)

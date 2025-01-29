@@ -57,8 +57,7 @@
 
 (comment NaiveBayesTrainer/NAIVE_BAYES_VALUE
          GISTrainer/MAXENT_VALUE
-         ""
-        ,)
+         "")
 
 (defn serialize-model! [^DoccatModel model ^OutputStream os]
   (when (some? model) (.serialize model os)))
@@ -76,9 +75,7 @@
     (let [doccat (DocumentCategorizerME. (DoccatModel. model-file))
           probabilities (.categorize doccat (into-array String (cs/split text #" ")))]
       {:name (.getBestCategory doccat probabilities) :confidence (get probabilities 0)})
-    {:name nil :confidence 0}
-    ))
-
+    {:name nil :confidence 0}))
 
 ;; TODO handle errors
 (defn detect-language-and-categorize-event [event]
@@ -94,8 +91,7 @@
   (let [email (:payload event)
         training-content (:training-content (core-email/training-content "text/html" email))
         language-result (try (detect-language training-content) (catch Exception e (t/log! :error [(.getMessage e) "\nText causing the exception:" training-content])))]
-    (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category (-> email :metadata :category) :category-confidence (-> email :metadata :category-confidence) :category-id (-> email :metadata :category-id)}))
-  )
+    (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category (-> email :metadata :category) :category-confidence (-> email :metadata :category-confidence) :category-id (-> email :metadata :category-id)})))
 
 (defmulti handle-enrichment :type)
 

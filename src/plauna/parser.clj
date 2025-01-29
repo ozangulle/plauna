@@ -149,7 +149,7 @@
         cc (flatten (map (partial parse-participants (message-id message) :cc) (.getCc message)))
         bcc (flatten (map (partial parse-participants (message-id message) :bcc) (.getBcc message)))
         participants (concat senders receivers cc bcc)]
-      (construct-email headers (flatten (parse-body (:message-id headers) [] message)) participants)))
+    (construct-email headers (flatten (parse-body (:message-id headers) [] message)) participants)))
 
 (defn with-message-id? [parsed-email]
   (let [message-id (-> parsed-email :header :message-id)]

@@ -1,21 +1,21 @@
 (ns plauna.client
   (:require
-    [clojure.core.async :as async]
-    [plauna.database :as db]
-    [clojure.string :as s]
-    [taoensso.telemere :as t]
-    [plauna.messaging :as messaging])
+   [clojure.core.async :as async]
+   [plauna.database :as db]
+   [clojure.string :as s]
+   [taoensso.telemere :as t]
+   [plauna.messaging :as messaging])
   (:import
-    (jakarta.mail Store Session Folder Message)
-    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
-    (jakarta.mail.search SearchTerm)
-    (jakarta.mail.event MessageCountAdapter MessageCountEvent)
-    (java.io ByteArrayOutputStream)
-    (java.lang AutoCloseable)
-    (java.util Properties)
-    (java.util.concurrent Executors)
-    (org.eclipse.angus.mail.imap IdleManager)
-    (java.util.concurrent Executors TimeUnit ScheduledExecutorService)))
+   (jakarta.mail Store Session Folder Message)
+   (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
+   (jakarta.mail.search SearchTerm)
+   (jakarta.mail.event MessageCountAdapter MessageCountEvent)
+   (java.io ByteArrayOutputStream)
+   (java.lang AutoCloseable)
+   (java.util Properties)
+   (java.util.concurrent Executors)
+   (org.eclipse.angus.mail.imap IdleManager)
+   (java.util.concurrent Executors TimeUnit ScheduledExecutorService)))
 
 ; Names
 ; Config without secret -> identifier
@@ -179,14 +179,14 @@
     (t/log! :debug "Closing store.")
     (.close store)
     (try
-       (t/log! :debug "Connecting to store.")
-       (.connect store)
-       (t/log! :debug "Starting to idle.")
-       (start-monitoring-and-change-state identifier monitor)
-       (catch Exception e
-         (do (t/log! :error (.getMessage e))
-             (Thread/sleep 5000)
-             (reconnect-to-store identifier))))))
+      (t/log! :debug "Connecting to store.")
+      (.connect store)
+      (t/log! :debug "Starting to idle.")
+      (start-monitoring-and-change-state identifier monitor)
+      (catch Exception e
+        (do (t/log! :error (.getMessage e))
+            (Thread/sleep 5000)
+            (reconnect-to-store identifier))))))
 
 (defn check-connection [identifier]
   (let [monitor (get @watchers identifier)
@@ -195,7 +195,6 @@
       (t/log! :debug "Store is still connected.")
       (do (t/log! :warn "Connection lost. Reconnecting to email server...")
           (reconnect-to-store identifier)))))
-
 
 (defn check-folder [identifier]
   (let [monitor (get @watchers identifier)

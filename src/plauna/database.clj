@@ -89,12 +89,12 @@
 
 (defn update-metadata-batch [metadata]
   (when (seq metadata)
-        (->> (builder/for-insert-multi
-              :metadata
-              [:message_id :language :language_confidence :category :category_confidence]
-              (mapv (juxt :message-id :language :language-confidence :category-id :category-confidence) metadata) {})
-             (insert->insert-update)
-             (jdbc/execute! (jdbc/get-connection (db))))))
+    (->> (builder/for-insert-multi
+          :metadata
+          [:message_id :language :language_confidence :category :category_confidence]
+          (mapv (juxt :message-id :language :language-confidence :category-id :category-confidence) metadata) {})
+         (insert->insert-update)
+         (jdbc/execute! (jdbc/get-connection (db))))))
 
 (def batch-size 500)
 
@@ -114,8 +114,7 @@
   (save-bodies (:bodies buffer))
   (save-contacts (:participants buffer))
   (save-communications (:participants buffer))
-  (when (seq (:metadata buffer)) (update-metadata-batch (:metadata buffer)))
-  )
+  (when (seq (:metadata buffer)) (update-metadata-batch (:metadata buffer))))
 
 (defn save-email-loop [publisher]
   (let [parsed-chan (async/chan)
@@ -259,7 +258,7 @@
 (defmethod data->sql :participant [_ sql-clause]
   (let [first-part  {:select [:communications.contact-key :message-id :type :name :address] :from [:communications] :join [:contacts [:= :contacts.contact-key :communications.contact-key]]}]
     (->> (conj first-part sql-clause)
-        honey/format)))
+         honey/format)))
 
 (defn fetch-headers [entity-clause sql-clause] (jdbc/execute! (ds) (data->sql entity-clause sql-clause) builder-function-kebab))
 

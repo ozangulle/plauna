@@ -87,7 +87,6 @@
   [language data]
   (spit (training-file language) data :append true))
 
-
 (defn email-start? [line]
   (and
    (not (nil? line))

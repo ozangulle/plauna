@@ -23,4 +23,4 @@
     bucket-channel))
 
 (comment (channel-limiter :test)
-         (async/<!! @main-chan),)
+         (async/<!! @main-chan))

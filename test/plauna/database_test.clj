@@ -24,8 +24,7 @@
     (doseq [test-event to-insert] (async/>!! test-channel test-event))
     (Thread/sleep 1000)
     (async/close! test-channel)
-    (println "Done")
-    ))
+    (println "Done")))
 
 (comment (files/delete-database-file))
 

@@ -27,7 +27,6 @@
       (is (= "text/plain" (:mime-type (first (:body parsed-mail)))))
       (is (= "Dear Test, Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ac justo vel odio efficitur consectetur. Integer nec urna vitae elit imperdiet ultrices. Fusce vel neque vel justo dapibus luctus a eget quam. Sincerely, Tester" (:sanitized-content (first (:body parsed-mail))))))))
 
-
 (deftest parse-test-2
   (let [test-chan (chan)
         test-pub (pub test-chan :type)
