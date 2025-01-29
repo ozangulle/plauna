@@ -112,13 +112,13 @@
   [mbox-is channel]
   (t/log! :info ["Starting to read from mbox"])
   (with-open [rdr (clojure.java.io/reader mbox-is)]
-    (let [limiter (messaging/channel-limiter :parsed-email)]
+    (let [limiter (messaging/channel-limiter :parsed-enrichable-email)]
       (read-mail-lines
        (fn [email-string]
          (async/>!! limiter :token)
          (async/>!! channel
                     ((comp
-                      (fn [mail-string] {:type :received-email :options {:batch true} :payload mail-string})
+                      (fn [mail-string] {:type :received-email :options {:batch true :enrich true} :payload mail-string})
                       #(.getBytes ^String %)
                       #(apply str %)) email-string)))
        (line-seq rdr)

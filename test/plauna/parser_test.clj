@@ -5,7 +5,8 @@
             [plauna.files :as files]
             [plauna.util.async :as async-utils]
             [plauna.parser :as parser]
-            [clojure.core.async :refer [pub sub chan >!!] :as async]))
+            [clojure.core.async :refer [pub sub chan >!!] :as async]
+            [plauna.analysis :as analysis]))
 
 (defn resource->is [resource-path]
   (io/input-stream (io/resource resource-path)))
@@ -53,7 +54,7 @@
     (parser/listen-to-events test-chan inner-chan)
     (files/read-emails-from-mbox (resource->is "test/email_corpus/weird-mbox.mbox") inner-chan)
     (let [results-chan (chan)]
-      (sub test-chan :parsed-email results-chan)
+      (sub test-chan :parsed-enrichable-email results-chan)
       (loop [event (async-utils/fetch-or-timeout!! results-chan 200) results []]
         (if (or (nil? event) (= :timed-out event))
           (is (= 3 (count results)))
