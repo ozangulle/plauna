@@ -62,39 +62,43 @@
                  {:batch true}))
 
 (defn save-bodies [bodies]
-  (->>
-   (builder/for-insert-multi
-    :bodies
-    [:original_content :sanitized_content :mime_type :charset :transfer_encoding :message_id]
-    (mapv (juxt :original-content :sanitized-content :mime-type :charset :transfer-encoding :message-id) bodies) {})
-   (insert->insert-ignore)
-   (jdbc/execute! (jdbc/get-connection (db)))))
+  (jdbc/execute! (jdbc/get-connection (db))
+                 (->>
+                  (builder/for-insert-multi
+                   :bodies
+                   [:original_content :sanitized_content :mime_type :charset :transfer_encoding :message_id]
+                   (mapv (juxt :original-content :sanitized-content :mime-type :charset :transfer-encoding :message-id) bodies) {})
+                  (insert->insert-ignore))
+                 {:batch true}))
 
 (defn save-contacts [contacts]
-  (->>
-   (builder/for-insert-multi
-    :contacts
-    [:contact_key :name :address]
-    (mapv (juxt :contact-key :name :address) contacts) {})
-   (insert->insert-ignore)
-   (jdbc/execute! (jdbc/get-connection (db)))))
+  (jdbc/execute! (jdbc/get-connection (db))
+                 (->>
+                  (builder/for-insert-multi
+                   :contacts
+                   [:contact_key :name :address]
+                   (mapv (juxt :contact-key :name :address) contacts) {})
+                  (insert->insert-ignore))
+                 {:batch true}))
 
 (defn save-communications [contacts]
-  (->> (builder/for-insert-multi
-        :communications
-        [:message_id :contact_key :type]
-        (mapv (juxt :message-id :contact-key :type) contacts) {})
-       (insert->insert-ignore)
-       (jdbc/execute! (jdbc/get-connection (db)))))
+  (jdbc/execute! (jdbc/get-connection (db))
+                 (->> (builder/for-insert-multi
+                       :communications
+                       [:message_id :contact_key :type]
+                       (mapv (juxt :message-id :contact-key :type) contacts) {})
+                      (insert->insert-ignore))
+                 {:batch true}))
 
 (defn update-metadata-batch [metadata]
   (when (seq metadata)
-    (->> (builder/for-insert-multi
-          :metadata
-          [:message_id :language :language_confidence :category :category_confidence]
-          (mapv (juxt :message-id :language :language-confidence :category-id :category-confidence) metadata) {})
-         (insert->insert-update)
-         (jdbc/execute! (jdbc/get-connection (db))))))
+    (jdbc/execute! (jdbc/get-connection (db))
+                   (->> (builder/for-insert-multi
+                         :metadata
+                         [:message_id :language :language_confidence :category :category_confidence]
+                         (mapv (juxt :message-id :language :language-confidence :category-id :category-confidence) metadata) {})
+                        (insert->insert-update))
+                   {:batch true})))
 
 (def batch-size 500)
 

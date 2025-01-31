@@ -4,7 +4,8 @@
             [clojure.core.async :as async]
             [clojure.string :as string]
             [taoensso.telemere :as t]
-            [plauna.messaging :as messaging])
+            [plauna.messaging :as messaging]
+            [plauna.core.events :as events])
   (:import [java.io File]))
 
 (set! *warn-on-reflection* true)
@@ -107,7 +108,9 @@
           (recur fn (rest sq) (conj acc line "\r\n")))))))
 
 (defn read-emails-from-mbox
-  "Reads the e-mails from an mbox (as input channel) and puts them in a :received-email event as byte arrays"
+  "Reads the e-mails from an mbox (as input channel) and puts them in a :received-email event as byte arrays.
+
+  Currently always adds the option :enrich"
   [mbox-is channel]
   (t/log! :info ["Starting to read from mbox"])
   (with-open [rdr (clojure.java.io/reader mbox-is)]
@@ -117,7 +120,7 @@
          (async/>!! limiter :token)
          (async/>!! channel
                     ((comp
-                      (fn [mail-string] {:type :received-email :options {:batch true :enrich true} :payload mail-string})
+                      (fn [mail-string] (events/create-event :received-email  mail-string {:enrich true}))
                       #(.getBytes ^String %)
                       #(apply str %)) email-string)))
        (line-seq rdr)

@@ -2,6 +2,7 @@
   (:require
    [clojure.core.async :as async]
    [plauna.database :as db]
+   [plauna.core.events :as events]
    [clojure.string :as s]
    [taoensso.telemere :as t]
    [plauna.messaging :as messaging])
@@ -89,7 +90,14 @@
               source-folder ^AutoCloseable (doto (.getFolder store source-name) (.open Folder/READ_WRITE))]
     (.moveMessages ^IMAPFolder source-folder (into-array Message (.search source-folder (message-id-search-term message-id))) target-folder)))
 
-(defn client-loop [publisher]
+(defn client-loop
+  "Listens to :enriched-email
+
+  Options:
+  :refolder - boolean
+
+  If :refolder is true, move the e-mail to the corresponding category folder."
+  [publisher]
   (let [local-chan (async/chan)]
     (async/sub publisher :enriched-email local-chan)
     (async/go-loop [event (async/<! local-chan)]
@@ -144,7 +152,7 @@
           (t/log! :debug "Created output stream")
           (.writeTo ^IMAPMessage message os)
           (t/log! :debug "Wrote to output stream")
-          (async/>!! @messaging/main-chan {:type :received-email :options {:enrich true :refolder true :store store :original-folder folder-name :message message} :payload (.toByteArray os)})
+          (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :refolder true :store store :original-folder folder-name :message message}))
           (try
             (.watch ^IdleManager @idle-manager folder)
             (catch Exception e

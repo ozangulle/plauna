@@ -16,12 +16,12 @@
     {% for watcher in watchers %}
     <tr class="border-btext-slate-700">
       <td class="text-left">
-        <a class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm" href="/watchers/{{watcher.id}}">{{watcher.string}}</a>
+        <a class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm" href="/connections/{{watcher.id}}">{{watcher.string}}</a>
       </td>
       <td class="text-center">{{watcher.logged-in}}</td>
       <td class="text-center">{{watcher.folder-open}}</td>
       <td class="text-center">
-        <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm"><a href="/watchers/{{watcher.id}}/restart">Restart</a></button>
+        <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm"><a href="/connections/{{watcher.id}}/restart">Restart</a></button>
       </td>
     </tr>
     {% endfor %}

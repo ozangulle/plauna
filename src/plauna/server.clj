@@ -339,18 +339,18 @@
        :header html-headers
        :body   (markup/list-email-contents email-data categories)}))
 
-  (comp/GET "/watchers" []
+  (comp/GET "/connections" []
     {:status 200
      :header html-headers
      :body   (markup/watcher-list (find-running-clients))})
 
-  (comp/GET "/watchers/:id" [id]
+  (comp/GET "/connections/:id" [id]
     {:status 200
      :header html-headers
      :body   (markup/watcher (first (client/find-by-id-in-watchers id))
                              (client/folders-in-store (:store (second (first (client/find-by-id-in-watchers id))))))})
 
-  (comp/POST "/watchers/:id" request
+  (comp/POST "/connections/:id" request
     (let [params (:params request)
           id (:id params)
           folder (:folder params)
@@ -358,10 +358,10 @@
       (client/read-all-emails id folder {:refolder refolder}))
     (redirect-request request))
 
-  (comp/GET "/watchers/:id/restart" request
+  (comp/GET "/connections/:id/restart" request
     (let [id (:id (:params request))]
       (client/connect-using-id id))
-    {:status 301 :headers {"Location" "/watchers"}})
+    {:status 301 :headers {"Location" "/connections"}})
 
   (comp/POST "/metadata/languages" request
     (let [limiter (messaging/channel-limiter :enriched-email)

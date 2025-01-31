@@ -29,6 +29,13 @@
       (client/create-folder-monitor client-config listen-channel))
     (t/log! :debug "Listening to new emails from listen-channel")))
 
+(defn start-event-loops [main-publisher main-channel]
+    (parser/listen-to-events main-publisher main-channel)
+    (database/save-email-loop main-publisher)
+    (client/client-loop main-publisher)
+    (analysis/enrichment-loop main-publisher main-channel)
+  )
+
 (defn -main
   [& args]
   (let [parsed-config (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} args)]
@@ -37,8 +44,5 @@
     (doseq [address (:addresses (:email (files/config)))] (database/add-to-my-addresses address))
     (database/create-db)
     (start-imap-client (files/config))
-    (parser/listen-to-events @messaging/main-publisher @messaging/main-chan)
-    (database/save-email-loop @messaging/main-publisher)
-    (client/client-loop @messaging/main-publisher)
-    (analysis/enrichment-loop @messaging/main-publisher @messaging/main-chan)
+    (start-event-loops @messaging/main-publisher @messaging/main-chan)
     (server/start-server (files/config))))

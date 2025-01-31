@@ -1,6 +1,7 @@
 (ns plauna.analysis
   (:require [clojure.string :as cs]
             [plauna.database :as db]
+            [plauna.core.events :as events]
             [clojure.core.async :as async]
             [taoensso.telemere :as t]
             [cld.core :as lang]
@@ -96,12 +97,17 @@
 (defmulti handle-enrichment :type)
 
 (defmethod handle-enrichment :parsed-enrichable-email [event]
-  {:type :enriched-email :options (:options event) :payload (detect-language-and-categorize-event event)})
+  (events/create-event :enriched-email (detect-language-and-categorize-event event) nil event))
 
 (defmethod handle-enrichment :language-detection-request [event]
-  {:type :enriched-email :options (:options event) :payload (detect-language-event event)})
+  (events/create-event :enriched-email (detect-language-event event) nil event))
 
-(defn enrichment-loop [publisher events-channel]
+(defn enrichment-loop
+  "Enriches the e-mails. Listens to two events:
+
+  :parsed-enrichable-email    - Detects both the language and the category
+  :language-detection-request - Only detects the language"
+  [publisher events-channel]
   (let [parsed-enrichable-email-chan (async/chan)
         language-detection-request-chan (async/chan)
         local-chan (async/merge [parsed-enrichable-email-chan language-detection-request-chan])]

@@ -1,6 +1,7 @@
 (ns plauna.parser
   (:require
    [plauna.core.email :refer [construct-email]]
+   [plauna.core.events :as events]
    [clojure.string :as st]
    [clojure.java.io :refer [input-stream copy]]
    [clojure.core.async :refer [chan sub] :as async]
@@ -160,10 +161,17 @@
 
 (defn parsed-email-event [original-event parsed-email]
   (if (true? (:enrich (:options original-event)))
-    {:type :parsed-enrichable-email :options (:options original-event) :payload parsed-email}
-    {:type :parsed-email :options (:options original-event) :payload parsed-email}))
+    (events/create-event :parsed-enrichable-email parsed-email nil original-event)
+    (events/create-event :parsed-email parsed-email nil original-event)))
 
-(defn listen-to-events [publisher events-channel]
+(defn listen-to-events
+  "Listens to :received-email.
+
+  Options:
+  :enrich - boolean
+
+  If :enrich is true, emits a :parsed-enrichable-email event. Otherwise emits a :parsed-email event."
+  [publisher events-channel]
   (let [local-channel (chan 256)]
     (sub publisher :received-email local-channel)
     (async/pipeline 4

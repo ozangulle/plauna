@@ -4,7 +4,7 @@
 
 <h3 class="uppercase text-lg my-8">Imap Watcher for {{host}} - {{user}}</h3>
 <div class="flex flex-nowrap">
-  <form id="parse" action="/watchers/{{id}}" method="POST">
+  <form id="parse" action="/connections/{{id}}" method="POST">
     <label for="move">Move e-mails after categorization</label>
     <input class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-200 rounded focus:ring-blue-500 focus:ring-2" name="move" type="checkbox">
     <select class="block mr-4 my-2 bg-gray-50 border border-gray-200 text-gray-700 focus:bg-gray-700 focus:ring-gray-200 focus:border-gray-200 focus:text-white text-sm rounded-lg block w-full p-2.5 w-full" name="folder">
