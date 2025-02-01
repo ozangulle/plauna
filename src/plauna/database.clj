@@ -197,7 +197,7 @@
   (jdbc/execute! (ds) ["select language from metadata group by language"] builder-function))
 
 (defn get-language-preferences []
-  (jdbc/execute! (ds) ["select * from category_training_preferences"] builder-function))
+  (jdbc/execute! (ds) ["select * from category_training_preferences where language is not 'n/a'"] builder-function))
 
 (defn get-activated-language-preferences []
   (jdbc/execute! (ds) ["select * from category_training_preferences where use_in_training = 1"] builder-function))

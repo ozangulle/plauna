@@ -66,7 +66,7 @@
                            :let [message ^Message (.getMessage ^Folder inbox message-num)]]
                      (with-open [os (ByteArrayOutputStream.)]
                        (.writeTo message os)
-                       (async/>!! @messaging/main-chan {:type :received-email :options {:enrich true :refolder (:refolder options) :store store :original-folder folder-name} :payload (.toByteArray os)})))))))
+                       (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :refolder (:refolder options) :store store :original-folder folder-name}))))))))
 
 (defn stop-subscription [host user folder-name]
   (let [key {:host host :user user :folder-name folder-name}
@@ -102,7 +102,7 @@
     (async/sub publisher :enriched-email local-chan)
     (async/go-loop [event (async/<! local-chan)]
       (when (some? event)
-        (when (true? (:refolder (:options event)))
+        (when (and (true? (:refolder (:options event))) (some? (:category (:metadata (:payload event)))))
           (t/log! :info (str "Moving email: " (-> event :payload :header :subject) " categorized as: " (-> event :payload :metadata :category)))
           (let [message-id (-> event :payload :header :message-id)
                 category-name (-> event :payload :metadata :category)]

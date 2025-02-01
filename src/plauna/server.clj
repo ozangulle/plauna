@@ -73,11 +73,12 @@
       {:status 301 :headers {"Location" (-> request :uri)}})))
 
 (defn language-preferences []
-  (let [preferences (db/get-language-preferences)]
-    (if (empty? (db/get-languages))
+  (let [preferences (db/get-language-preferences)
+        languages (filterv #(not (= "n/a" %)) (mapv :language (db/get-languages)))]
+    (if (empty? languages)
       []
       (if (empty? preferences)
-        (do (db/add-language-preferences (map (comp #(conj % false) vector :language) (db/get-languages)))
+        (do (db/add-language-preferences (map (comp #(conj % false) vector) languages))
             (db/get-language-preferences))
         preferences))))
 
