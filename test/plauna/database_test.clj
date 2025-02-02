@@ -20,7 +20,7 @@
         to-insert (repeatedly 6 (fn [] example))
         test-channel (async/chan)
         test-publisher (async/pub test-channel :type)]
-    (db/save-email-loop test-publisher)
+    (db/database-event-loop test-publisher)
     (doseq [test-event to-insert] (async/>!! test-channel test-event))
     (Thread/sleep 1000)
     (async/close! test-channel)

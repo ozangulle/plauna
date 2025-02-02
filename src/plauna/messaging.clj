@@ -1,5 +1,5 @@
 (ns plauna.messaging
-  (:require [clojure.core.async :refer [chan pub sub <! go-loop] :as async]))
+  (:require [clojure.core.async :refer [chan pub sub <! go-loop close!] :as async]))
 
 (set! *warn-on-reflection* true)
 
@@ -7,7 +7,8 @@
 
 (def main-publisher (ref (pub @main-chan :type)))
 
-(defn restart-main-chan [] (dosync (alter main-chan (fn [_] (chan 1000)))
+(defn restart-main-chan [] (dosync (alter main-chan (fn [old-chan] (close! old-chan)))
+                                   (alter main-chan (fn [_] (chan 1000)))
                                    (alter main-publisher (fn [_] (pub @main-chan :type)))))
 
 (def limiter-limit (ref 300))
@@ -23,4 +24,5 @@
     bucket-channel))
 
 (comment (channel-limiter :test)
-         (async/<!! @main-chan))
+         (async/<!! @main-chan)
+         (restart-main-chan))

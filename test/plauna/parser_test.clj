@@ -17,7 +17,7 @@
   (let [test-chan (chan)
         test-pub (pub test-chan :type)
         email-bytes (.getBytes ^String (slurp (io/resource "test/email_corpus/simple-lorem-ipsum.eml")))]
-    (parser/listen-to-events test-pub test-chan)
+    (parser/parser-event-loop test-pub test-chan)
     (>!! test-chan {:type :received-email :options {} :payload email-bytes})
     (let [results-chan (chan)
           _ (sub test-pub :parsed-email results-chan)
@@ -31,7 +31,7 @@
   (let [test-chan (chan)
         test-pub (pub test-chan :type)
         email-bytes (.getBytes ^String (slurp (io/resource "test/email_corpus/greek-text.mbox")))]
-    (parser/listen-to-events test-pub test-chan)
+    (parser/parser-event-loop test-pub test-chan)
     (>!! test-chan {:type :received-email :options {} :payload email-bytes})
     (let [results-chan (chan)
           _ (sub test-pub :parsed-email results-chan)
@@ -50,7 +50,7 @@
     ;; The mbox contains more than 3 e-mails. The expectation is that only the ones with proper message-id will get through.
   (let [inner-chan (chan 20)
         test-chan (pub inner-chan :type)]
-    (parser/listen-to-events test-chan inner-chan)
+    (parser/parser-event-loop test-chan inner-chan)
     (files/read-emails-from-mbox (resource->is "test/email_corpus/weird-mbox.mbox") inner-chan)
     (let [results-chan (chan)]
       (sub test-chan :parsed-enrichable-email results-chan)

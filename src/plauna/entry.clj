@@ -9,10 +9,11 @@
    [plauna.messaging :as messaging]
    [plauna.analysis :as analysis]
    [taoensso.telemere :as t]
+   [taoensso.telemere.streams :as tstreams]
    [plauna.parser :as parser])
   (:gen-class))
 
-(t/streams->telemere!)
+(tstreams/streams->telemere!)
 (t/set-min-level! :info)
 (t/set-min-level! :slf4j "org.eclipse.jetty.server.*" :error)
 
@@ -30,11 +31,10 @@
     (t/log! :debug "Listening to new emails from listen-channel")))
 
 (defn start-event-loops [main-publisher main-channel]
-    (parser/listen-to-events main-publisher main-channel)
-    (database/save-email-loop main-publisher)
-    (client/client-loop main-publisher)
-    (analysis/enrichment-loop main-publisher main-channel)
-  )
+  (parser/parser-event-loop main-publisher main-channel)
+  (database/database-event-loop main-publisher)
+  (client/client-event-loop main-publisher)
+  (analysis/enrichment-event-loop main-publisher main-channel))
 
 (defn -main
   [& args]

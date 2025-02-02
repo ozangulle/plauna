@@ -205,8 +205,8 @@
     (success-html-with-body (markup/administration)))
 
   (comp/POST "/emails/parse" request
-    (let [temp-file (:tempfile (:filename (:params request)))
-          result (files/read-emails-from-mbox (io/input-stream temp-file) @messaging/main-chan)]
+    (let [temp-file (:tempfile (:filename (:params request)))]
+      (files/read-emails-from-mbox (io/input-stream temp-file) @messaging/main-chan)
       (redirect-request request)))
 
   (comp/GET "/admin/categories" {}
@@ -229,17 +229,18 @@
 
   (comp/POST "/admin/languages" {params :params}
     (let [langs-to-use (if (vector? (:use params)) (:use params) [(:use params)])]
-      (doseq
-       [preference (mapv (fn [id language]
-                           {:id id :language language :use (some? (some #(= language %) langs-to-use))})
-                         (vectorize (:id params))
-                         (vectorize (:language params)))]
+      (doseq [preference (mapv (fn [id language]
+                                 {:id id :language language :use (some? (some #(= language %) langs-to-use))})
+                               (vectorize (:id params))
+                               (vectorize (:language params)))]
         (db/update-language-preference preference)))
     (let [language-preferences (language-preferences)]
       (success-html-with-body (markup/languages-admin-page language-preferences))))
 
   (comp/POST "/admin/categories" {params :params}
     (db/create-category (:name params))
+    (doseq [client-config (:clients (:email (files/config)))]
+      (client/initialize-client-setup! client-config))
     {:status  301
      :headers {"Location" "/admin/categories"}
      :body    (markup/administration)})

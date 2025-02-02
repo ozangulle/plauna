@@ -114,13 +114,15 @@
       updated-buffer)))
 
 (defn save-emails-in-buffer [buffer]
-  (save-headers (:headers buffer))
-  (save-bodies (:bodies buffer))
-  (save-contacts (:participants buffer))
-  (save-communications (:participants buffer))
-  (when (seq (:metadata buffer)) (update-metadata-batch (:metadata buffer))))
+  (try
+    (save-headers (:headers buffer))
+    (save-bodies (:bodies buffer))
+    (save-contacts (:participants buffer))
+    (save-communications (:participants buffer))
+    (when (seq (:metadata buffer)) (update-metadata-batch (:metadata buffer)))
+    (catch Exception e (t/log! :error (.getMessage e)))))
 
-(defn save-email-loop [publisher]
+(defn database-event-loop [publisher]
   (let [parsed-chan (async/chan)
         enriched-chan (async/chan)
         local-chan (async/merge [parsed-chan enriched-chan] batch-size)]

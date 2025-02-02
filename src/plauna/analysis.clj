@@ -102,7 +102,7 @@
 (defmethod handle-enrichment :language-detection-request [event]
   (events/create-event :enriched-email (detect-language-event event) nil event))
 
-(defn enrichment-loop
+(defn enrichment-event-loop
   "Enriches the e-mails. Listens to two events:
 
   :parsed-enrichable-email    - Detects both the language and the category
@@ -116,4 +116,6 @@
     (async/pipeline 4
                     events-channel
                     (map handle-enrichment)
-                    local-chan)))
+                    local-chan
+                    true
+                    (fn [^Throwable th] (t/log! :error (.getMessage th))))))

@@ -164,7 +164,7 @@
     (events/create-event :parsed-enrichable-email parsed-email nil original-event)
     (events/create-event :parsed-email parsed-email nil original-event)))
 
-(defn listen-to-events
+(defn parser-event-loop
   "Listens to :received-email.
 
   Options:
@@ -180,4 +180,6 @@
                           (map (fn [[original-event payload]] [original-event (parse-email (input-stream payload))]))
                           (filter (fn [[_ parsed-email]] (with-message-id? parsed-email)))
                           (map (fn [[original-event parsed-email]] (parsed-email-event original-event parsed-email))))
-                    local-channel)))
+                    local-channel
+                    true
+                    (fn [^Throwable th] (t/log! :error (.getMessage th))))))

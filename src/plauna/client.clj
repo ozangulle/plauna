@@ -90,7 +90,7 @@
               source-folder ^AutoCloseable (doto (.getFolder store source-name) (.open Folder/READ_WRITE))]
     (.moveMessages ^IMAPFolder source-folder (into-array Message (.search source-folder (message-id-search-term message-id))) target-folder)))
 
-(defn client-loop
+(defn client-event-loop
   "Listens to :enriched-email
 
   Options:
@@ -103,11 +103,12 @@
     (async/go-loop [event (async/<! local-chan)]
       (when (some? event)
         (when (and (true? (:refolder (:options event))) (some? (:category (:metadata (:payload event)))))
-          (t/log! :info (str "Moving email: " (-> event :payload :header :subject) " categorized as: " (-> event :payload :metadata :category)))
           (let [message-id (-> event :payload :header :message-id)
                 category-name (-> event :payload :metadata :category)]
             (when (some? category-name)
-              (move-messages-by-id (-> event :options :store) message-id (-> event :options :original-folder) category-name)))))
+              (t/log! :info (str "Moving email: " (-> event :payload :header :subject) " categorized as: " (-> event :payload :metadata :category)))
+              (try (move-messages-by-id (-> event :options :store) message-id (-> event :options :original-folder) category-name)
+                   (catch Exception e (t/log! :error (.getMessage e))))))))
       (recur (async/<! local-chan)))))
 
 (defn create-folders
