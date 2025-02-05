@@ -1,7 +1,7 @@
 (ns plauna.entry
   (:require
    [clojure.string :as s]
-   [clojure.core.async :refer [chan]]
+   [clojure.core.async :refer [chan] :as async]
    [plauna.files :as files]
    [plauna.server :as server]
    [plauna.client :as client]
@@ -10,7 +10,8 @@
    [plauna.analysis :as analysis]
    [taoensso.telemere :as t]
    [taoensso.telemere.streams :as tstreams]
-   [plauna.parser :as parser])
+   [plauna.parser :as parser]
+   [plauna.core.events :as events])
   (:gen-class))
 
 (tstreams/streams->telemere!)
@@ -22,6 +23,11 @@
 (defmulti parse-cli-arg (fn [arg] (first (s/split arg #"="))))
 (defmethod parse-cli-arg "--config-file" [arg-string] {:config-file (second (s/split arg-string #"="))})
 
+(def event-register {:enrichment-event-loop (fn [] (analysis/enrichment-event-loop @messaging/main-publisher @messaging/main-chan))
+                     :client-event-loop (fn [] (client/client-event-loop @messaging/main-publisher))
+                     :database-event-loop (fn [] (database/database-event-loop @messaging/main-publisher))
+                     :parser-event-loop (fn [] (parser/parser-event-loop @messaging/main-publisher @messaging/main-chan))})
+
 (defn start-imap-client
   [config]
   (let [listen-channel (chan 10)]
@@ -29,12 +35,6 @@
       (client/initialize-client-setup! client-config)
       (client/create-folder-monitor client-config listen-channel))
     (t/log! :debug "Listening to new emails from listen-channel")))
-
-(defn start-event-loops [main-publisher main-channel]
-  (parser/parser-event-loop main-publisher main-channel)
-  (database/database-event-loop main-publisher)
-  (client/client-event-loop main-publisher)
-  (analysis/enrichment-event-loop main-publisher main-channel))
 
 (defn -main
   [& args]
@@ -44,5 +44,5 @@
     (doseq [address (:addresses (:email (files/config)))] (database/add-to-my-addresses address))
     (database/create-db)
     (start-imap-client (files/config))
-    (start-event-loops @messaging/main-publisher @messaging/main-chan)
+    (events/start-event-loops event-register)
     (server/start-server (files/config))))
