@@ -1,4 +1,4 @@
-(ns plauna.database_test
+(ns plauna.database-test
   (:require [clojure.test :refer :all]
             [clojure.core.async :as async]
             [plauna.database :as db]

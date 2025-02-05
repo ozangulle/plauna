@@ -5,8 +5,7 @@
             [plauna.files :as files]
             [plauna.util.async :as async-utils]
             [plauna.parser :as parser]
-            [clojure.core.async :refer [pub sub chan >!!] :as async]
-            [plauna.analysis :as analysis]))
+            [clojure.core.async :refer [pub sub chan >!!] :as async]))
 
 (defn resource->is [resource-path]
   (io/input-stream (io/resource resource-path)))

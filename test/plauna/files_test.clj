@@ -2,8 +2,7 @@
   (:require [clojure.test :refer :all]
             [clojure.java.io :as io]
             [plauna.files :as files]
-            [plauna.messaging :refer [main-chan restart-main-chan]]
-            [clojure.core.async :refer [go <!! chan close!]]))
+            [clojure.core.async :refer [<!! chan close!]]))
 
 (defn resource->is [resource-path]
   (io/input-stream (io/resource resource-path)))

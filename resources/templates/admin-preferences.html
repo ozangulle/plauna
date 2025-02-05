@@ -5,7 +5,7 @@
 <h3 class="uppercase text-lg my-10">Preferences</h3>
 
 <form action="/admin/preferences" method="POST">
-  <div class="grid gap-6 mb-6 md:grid-cols-2">
+  <div class="grid gap-4 mb-6 md:grid-cols-2">
     <input type="hidden" name="redirect-url" value="/admin/preferences"</input>
     <div>
       <label class="block mb-2 text-sm font-medium text-gray-900"  for="language-detection-threshold">Language Detection Threshold</label>
@@ -14,6 +14,14 @@
     <div>
       <label class="block mb-2 text-sm font-medium text-gray-900" for="categorization-threshold">Categorization Threshold</label>
       <input class="mr-4 text-gray-700 focus:text-gray-700 focus:border-gray-200 focus:ring-gray-200" name="categorization-threshold" value="{{categorization-threshold}}">
+    </div>
+    <div>
+      <label class="block mb-2 text-sm font-medium text-gray-900" for="categorization-threshold">Log Level</label>
+      <select class="block mr-4 bg-gray-50 border border-gray-200 text-gray-700 focus:bg-gray-700 focus:ring-gray-200 focus:border-gray-200 focus:text-white text-sm rounded-lg block w-full p-2.5 w-full" name="log-level">
+            {% for option in log-level-options %}
+            <option value="{{option.key}}" {% if option.key = log-level %} selected="true" {% endif %}>{{option.name}}</option>
+            {% endfor %}
+        </select>
     </div>
   </div>
   <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm" type="send">Save</button>

@@ -14,9 +14,8 @@
    [plauna.core.events :as events])
   (:gen-class))
 
-(tstreams/streams->telemere!)
-(t/set-min-level! :info)
 (t/set-min-level! :slf4j "org.eclipse.jetty.server.*" :error)
+(tstreams/streams->telemere!)
 
 (set! *warn-on-reflection* true)
 
@@ -39,6 +38,7 @@
 (defn -main
   [& args]
   (let [parsed-config (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} args)]
+    (t/set-min-level! (or (database/fetch-preference (name :log-level)) :info))
     (files/set-custom-config-location! (:config-file parsed-config))
     (files/check-and-create-database-file)
     (doseq [address (:addresses (:email (files/config)))] (database/add-to-my-addresses address))

@@ -219,12 +219,15 @@
 
   (comp/GET "/admin/preferences" {}
     (let [language-datection-threshold (analysis/language-detection-threshold)
-          categorization-threshold (analysis/categorization-threshold)]
-      (success-html-with-body (markup/preferences-page {:language-detection-threshold language-datection-threshold :categorization-threshold categorization-threshold}))))
+          categorization-threshold (analysis/categorization-threshold)
+          log-level (or (db/fetch-preference (name :log-level)) :info)]
+      (success-html-with-body (markup/preferences-page {:language-detection-threshold language-datection-threshold :categorization-threshold categorization-threshold :log-level log-level}))))
 
   (comp/POST "/admin/preferences" request
+
     (doseq [param (dissoc (:params request) :redirect-url)]
       (db/update-preference (first param) (second param)))
+    (t/set-min-level! (db/fetch-preference (name :log-level)))
     (redirect-request request))
 
   (comp/POST "/admin/languages" {params :params}

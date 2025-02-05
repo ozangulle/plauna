@@ -126,17 +126,6 @@
                               :tooltip {:field :count :type "quantitative"}}}]
     (render-file "statistics.html" {:statistics [{:type :bar-chart :header "Yearly Emails" :id "emails" :json-data (json/write-str vega-data)}]})))
 
-(defn email-training-page [emails categories languages page-info]
-  (let [page-size (:size page-info)
-        last-page {:last-page (if (= 0 page-size) 1 (quot (:total page-info) page-size))}
-        modified-emails (map #(update-in % [:header :date] timestamp->date) emails)]
-    (render-file "training-review.html" {:emails modified-emails :languages languages :categories categories :page (conj page-info last-page)})))
-
-(defn email-new-training-page [emails categories languages page-info]
-  (let [last-page {:last-page (quot (:total page-info) (:size page-info))}
-        modified-emails (map #(update-in % [:header :date] timestamp->date) emails)]
-    (render-file "training-review.html" {:emails modified-emails :languages languages :categories categories :page (conj page-info last-page)})))
-
 (defn categories-page [categories] (render-file "admin-categories.html" {:categories categories}))
 
 (defn languages-admin-page [language-preferences]
@@ -148,4 +137,6 @@
 
 (defn watcher [client folders] (render-file "watcher.html" {:id (-> client first :id) :host (:host (first client)) :user (:user (first client)) :folders folders}))
 
-(defn preferences-page [data] (render-file "admin-preferences.html" data))
+(defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}]}]
+                                (println (conj data log-levels))
+                                (render-file "admin-preferences.html" (conj data log-levels))))
