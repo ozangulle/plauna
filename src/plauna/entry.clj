@@ -39,11 +39,12 @@
 (defn -main
   [& args]
   (let [parsed-config (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} args)]
-    (t/set-min-level! (preferences/log-level))
     (files/set-custom-config-location! (:config-file parsed-config))
     (files/check-and-create-database-file)
     (doseq [address (:addresses (:email (files/config)))] (database/add-to-my-addresses address))
     (database/create-db)
+    (t/log! :info "Setting log level according to preferences.")
+    (t/set-min-level! (preferences/log-level))
     (start-imap-client (files/config))
     (events/start-event-loops event-register)
     (server/start-server (files/config))))
