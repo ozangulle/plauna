@@ -2,6 +2,7 @@
   (:require [clojure.string :as cs]
             [plauna.database :as db]
             [plauna.core.events :as events]
+            [plauna.preferences :as p]
             [clojure.core.async :as async]
             [taoensso.telemere :as t]
             [cld.core :as lang]
@@ -17,10 +18,6 @@
 
 (set! *warn-on-reflection* true)
 
-(defn language-detection-threshold [] (or (db/fetch-preference (name :language-detection-threshold)) 0.65))
-
-(defn categorization-threshold [] (or (db/fetch-preference (name :categorization-threshold)) 0.65))
-
 (defn categorization-algorithm ^String [] (or (:categorization-algorithm (db/fetch-preference :categorization-algorithm)) NaiveBayesTrainer/NAIVE_BAYES_VALUE))
 
 (lang/default-init!)
@@ -33,7 +30,7 @@
     (let [result (second (lang/detect text))
           confidence (Double/parseDouble (first (vals result)))
           lang-code (lang-code-set3 (first (keys result)))]
-      {:code (if (< confidence (language-detection-threshold)) "n/a" lang-code)
+      {:code (if (< confidence (p/language-detection-threshold)) "n/a" lang-code)
        :confidence confidence})
     {:code "n/a" :confidence 0.0}))
 
@@ -75,7 +72,9 @@
   (if (.exists model-file)
     (let [doccat (DocumentCategorizerME. (DoccatModel. model-file))
           probabilities (.categorize doccat (into-array String (cs/split text #" ")))]
-      {:name (.getBestCategory doccat probabilities) :confidence (get probabilities 0)})
+      (if (> (.getBestCategory doccat probabilities) (p/categorization-threshold))
+        {:name (.getBestCategory doccat probabilities) :confidence (get probabilities 0)}
+        {:name nil :confidence 0}))
     {:name nil :confidence 0}))
 
 ;; TODO handle errors

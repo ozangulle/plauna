@@ -26,8 +26,6 @@
     (async/close! test-channel)
     (println "Done")))
 
-(comment (files/delete-database-file))
-
 (deftest enriched-email-simple
   (let [sql (db/data->sql {:entity :enriched-email :strict false})]
     (is (=  "SELECT headers.message_id, in_reply_to, subject, mime_type, date FROM headers LEFT JOIN metadata ON headers.message_id = metadata.message_id"

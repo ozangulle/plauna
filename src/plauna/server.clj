@@ -5,6 +5,7 @@
             [plauna.files :as files]
             [plauna.util.page :as page]
             [plauna.client :as client]
+            [plauna.preferences :as p]
             [plauna.core.email :as core-email]
             [clojure.math :refer [ceil]]
             [compojure.core :as comp]
@@ -218,16 +219,16 @@
      (markup/languages-admin-page (language-preferences))))
 
   (comp/GET "/admin/preferences" {}
-    (let [language-datection-threshold (analysis/language-detection-threshold)
-          categorization-threshold (analysis/categorization-threshold)
-          log-level (or (db/fetch-preference (name :log-level)) :info)]
+    (let [language-datection-threshold (p/language-detection-threshold)
+          categorization-threshold (p/categorization-threshold)
+          log-level (p/log-level)]
       (success-html-with-body (markup/preferences-page {:language-detection-threshold language-datection-threshold :categorization-threshold categorization-threshold :log-level log-level}))))
 
   (comp/POST "/admin/preferences" request
 
     (doseq [param (dissoc (:params request) :redirect-url)]
       (db/update-preference (first param) (second param)))
-    (t/set-min-level! (db/fetch-preference (name :log-level)))
+    (t/set-min-level! (p/log-level))
     (redirect-request request))
 
   (comp/POST "/admin/languages" {params :params}
