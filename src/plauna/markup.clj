@@ -138,5 +138,4 @@
 (defn watcher [client folders] (render-file "watcher.html" {:id (-> client first :id) :host (:host (first client)) :user (:user (first client)) :folders folders}))
 
 (defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}]}]
-                                (println (conj data log-levels))
                                 (render-file "admin-preferences.html" (conj data log-levels))))

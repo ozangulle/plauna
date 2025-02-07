@@ -23,6 +23,5 @@
       (recur))
     bucket-channel))
 
-(comment (channel-limiter :test)
-         (async/<!! @main-chan)
-         (restart-main-chan))
+(comment
+  (restart-main-chan))

@@ -18,6 +18,8 @@
 (t/set-min-level! :slf4j "org.eclipse.jetty.server.*" :error)
 (tstreams/streams->telemere!)
 
+(comment (t/set-min-level! :debug))
+
 (set! *warn-on-reflection* true)
 
 (defmulti parse-cli-arg (fn [arg] (first (s/split arg #"="))))

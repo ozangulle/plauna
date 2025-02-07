@@ -20,7 +20,7 @@
     (Thread/sleep 100)
     (swap! test-chan (fn [old] (async/close! old) (async/chan)))
     (Thread/sleep 100)
-    (test/is (= 2 @test-atom))))
+    (test/is (= 3 @test-atom))))
 
 (test/deftest event-register-works
   (let [test-atom (atom 0)

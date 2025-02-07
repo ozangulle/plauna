@@ -2,7 +2,6 @@
   (:require [plauna.preferences :as sut]
             [clojure.test :as t]))
 
-
 (defn return-fn-for-preferences [returns] (swap! sut/fetch-fn (fn [_] (fn [_] returns))))
 
 (t/deftest fetch-returns-default

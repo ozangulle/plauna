@@ -108,8 +108,8 @@
             (when (some? category-name)
               (t/log! :info (str "Moving email: " (-> event :payload :header :subject) " categorized as: " (-> event :payload :metadata :category)))
               (try (move-messages-by-id (-> event :options :store) message-id (-> event :options :original-folder) category-name)
-                   (catch Exception e (t/log! :error (.getMessage e))))))))
-      (recur (async/<! local-chan)))))
+                   (catch Exception e (t/log! :error (.getMessage e)))))))
+        (recur (async/<! local-chan))))))
 
 (defn create-folders
   ([store folder-names]

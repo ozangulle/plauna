@@ -20,9 +20,16 @@
          key)))
 
 (defn keep-track [active-register event-register]
-  (go-loop [merged (async/merge (vals active-register))]
-    (when-let [event-key (<! merged)]
-      (recur (async/merge (vals (conj active-register {event-key (return-key-on-complete event-key (get event-register event-key))})))))))
+  (let [event-chan (chan 10)
+        event-mix (async/mix event-chan)]
+    (doseq [val (vals active-register)] (async/admix event-mix val))
+    (go-loop [mix event-mix
+              register active-register]
+      (when-let [event-key (<! event-chan)]
+        (async/unmix mix (event-key register))
+        (let [new-chan (return-key-on-complete event-key (get event-register event-key))]
+          (async/admix mix new-chan)
+          (recur mix (conj register {event-key new-chan})))))))
 
 (defn start-event-loops
   "Start event loops which restart by themselves if they somehow complete.
