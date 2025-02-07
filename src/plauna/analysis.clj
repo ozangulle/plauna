@@ -72,7 +72,7 @@
   (if (.exists model-file)
     (let [doccat (DocumentCategorizerME. (DoccatModel. model-file))
           probabilities (.categorize doccat (into-array String (cs/split text #" ")))]
-      (if (> (.getBestCategory doccat probabilities) (p/categorization-threshold))
+      (if (> (get probabilities 0) (p/categorization-threshold))
         {:name (.getBestCategory doccat probabilities) :confidence (get probabilities 0)}
         {:name nil :confidence 0}))
     {:name nil :confidence 0}))
@@ -117,4 +117,4 @@
                     (map handle-enrichment)
                     local-chan
                     true
-                    (fn [^Throwable th] (t/log! :error (.getMessage th))))))
+                    (fn [^Throwable th] (t/log! :error (.getMessage th)) (t/log! :debug (.printStackTrace th))))))
