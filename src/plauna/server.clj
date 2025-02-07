@@ -18,7 +18,8 @@
             [plauna.analysis :as analysis]
             [plauna.database :as db]
             [plauna.messaging :as messaging]
-            [clojure.core.async :as async])
+            [clojure.core.async :as async]
+            [clojure.data :as cd])
   (:import [java.net ServerSocket]
            [org.eclipse.jetty.server Server]))
 
@@ -78,9 +79,12 @@
         languages (filterv #(not (= "n/a" %)) (mapv :language (db/get-languages)))]
     (if (empty? languages)
       []
-      (if (empty? preferences)
-        (do (db/add-language-preferences (map (comp #(conj % false) vector) languages))
-            (db/get-language-preferences))
+      (if (< (count preferences) (count languages))
+        (let [existing-languages-in-pref (mapv :language preferences)
+              diff (cd/diff (set existing-languages-in-pref) (set languages))]
+          (db/add-language-preferences
+           (mapv vector (second diff) (repeat (count (second diff)) false)))
+          (db/get-language-preferences))
         preferences))))
 
 (defn params->interval-request [params]
