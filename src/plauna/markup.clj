@@ -18,7 +18,25 @@
     nil
     (. LocalDateTime ofEpochSecond timestamp 0 ZoneOffset/UTC)))
 
-(defn administration [] (render-file "admin.html" {}))
+(defn type->toast-role [message]
+  (cond
+    (= :alert (:type message)) (conj message {:path "M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 11.793a1 1 0 1 1-1.414 1.414L10 11.414l-2.293 2.293a1 1 0 0 1-1.414-1.414L8.586 10 6.293 7.707a1 1 0 0 1 1.414-1.414L10 8.586l2.293-2.293a1 1 0 0 1 1.414 1.414L11.414 10l2.293 2.293Z"
+                                              :color "text-red-500"
+                                              :bg-color "bg-red-100"
+                                              :id (str "toast-" (hash message))})
+    (= :success (:type message)) (conj message {:path "M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5Zm3.707 8.207-4 4a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L9 10.586l3.293-3.293a1 1 0 0 1 1.414 1.414Z"
+                                                :color "text-green-500"
+                                                :bg-color "bg-green-100"
+                                                :id (str "toast-" (hash message))})
+    (= :info (:type message)) (conj message {:path "M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM10 15a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-4a1 1 0 0 1-2 0V6a1 1 0 0 1 2 0v5Z"
+                                             :color "text-orange-500"
+                                             :bg-color "bg-orange-100"
+                                             :id (str "toast-" (hash message))})
+    :else message))
+
+(defn administration
+  ([] (render-file "admin.html" {}))
+  ([messages] (render-file "admin.html" {:messages (mapv type->toast-role messages)})))
 
 (defn concat-string [contact]
   (if (nil? (:name contact))
@@ -54,10 +72,15 @@
                                            (format (str "%." (if decimal-places decimal-places "1") "f")
                                                    n)))))
 
-(defn list-emails [emails page-info categories]
-  (let [last-page {:last-page (quot (:total page-info) (:size page-info))}
-        emails-with-java-date (map #(update-in % [:header :date] timestamp->date) emails)]
-    (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories})))
+(defn list-emails
+  ([emails page-info categories]
+   (let [last-page {:last-page (quot (:total page-info) (:size page-info))}
+         emails-with-java-date (map #(update-in % [:header :date] timestamp->date) emails)]
+     (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories})))
+  ([emails page-info categories messages]
+   (let [last-page {:last-page (quot (:total page-info) (:size page-info))}
+         emails-with-java-date (map #(update-in % [:header :date] timestamp->date) emails)]
+     (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories :messages (mapv type->toast-role messages)}))))
 
 (defn list-email-contents [email-data categories]
   (render-file "email.html" {:email (update-in email-data [:header :date] timestamp->date) :categories categories}))
@@ -135,7 +158,9 @@
   (let [watchers (map (fn [client] {:id (-> client first first :id) :logged-in (-> client first second :connected) :folder-open (-> client first second :folder) :string (str (-> client first first :host) " - " (-> client first first :user))}) clients)]
     (render-file "watchers.html" {:watchers watchers})))
 
-(defn watcher [client folders] (render-file "watcher.html" {:id (-> client first :id) :host (:host (first client)) :user (:user (first client)) :folders folders}))
+(defn watcher
+  ([client folders] (render-file "watcher.html" {:id (-> client first :id) :host (:host (first client)) :user (:user (first client)) :folders folders}))
+  ([client folders messages] (println messages) (render-file "watcher.html" {:id (-> client first :id) :host (:host (first client)) :user (:user (first client)) :folders folders :messages (mapv type->toast-role messages)})))
 
 (defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}]}]
                                 (render-file "admin-preferences.html" (conj data log-levels))))

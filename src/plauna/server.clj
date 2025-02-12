@@ -29,6 +29,8 @@
 
 (def html-headers {"Content-Type" "text/html; charset=UTF-8"})
 
+(defonce global-messages (atom []))
+
 (defn interleave-all [& seqs]
   (reduce (fn [acc index] (into acc (map #(get % index) seqs)))
           []
@@ -68,11 +70,18 @@
 (defn find-running-clients []
   (map (fn [watcher] {(first watcher) (client/monitor->map (second watcher))}) @client/watchers))
 
-(defn redirect-request [request]
-  (let [redirect-url (-> request :params :redirect-url)]
-    (if (some? redirect-url)
-      {:status 301 :headers {"Location" redirect-url}}
-      {:status 301 :headers {"Location" (-> request :uri)}})))
+(defn redirect-request
+  ([request]
+   (let [redirect-url (-> request :params :redirect-url)]
+     (if (some? redirect-url)
+       {:status 301 :headers {"Location" redirect-url}}
+       {:status 301 :headers {"Location" (-> request :uri)}})))
+  ([request messages]
+   (swap! global-messages (fn [m] (conj m messages)))
+   (let [redirect-url (-> request :params :redirect-url)]
+     (if (some? redirect-url)
+       {:status 301 :headers {"Location" redirect-url}}
+       {:status 301 :headers {"Location" (-> request :uri)}}))))
 
 (defn language-preferences []
   (let [preferences (db/get-language-preferences)
@@ -104,10 +113,12 @@
     (core-email/iterate-over-all-pages db/fetch-data write-func entity-query sql-query false)))
 
 (defn write-emails-to-training-files-and-train []
-  (write-all-categorized-emails-to-training-files)
-  (doseq [training-model (analysis/train-data (files/training-files))]
-    (let [os (io/output-stream (files/model-file (:language training-model)))]
-      (analysis/serialize-model! (:model training-model) os))))
+  (if (seq (languages-to-use-in-training))
+    (do (write-all-categorized-emails-to-training-files)
+        (doseq [training-model (analysis/train-data (files/training-files))]
+          (let [os (io/output-stream (files/model-file (:language training-model)))]
+            (analysis/serialize-model! (:model training-model) os))))
+    {:type :alert :content "There are no selected languages to train in. Cannot proceed."}))
 
 (defn categorize-content [content language] ;; FIXME This kills the process if content is nil
   (let [category (analysis/categorize content (files/model-file language))]
@@ -207,12 +218,16 @@
   (comp/GET "/" {} (success-html-with-body (markup/administration)))
 
   (comp/GET "/admin" {}
-    (success-html-with-body (markup/administration)))
+    (if (seq @global-messages)
+      (let [messages @global-messages]
+        (swap! global-messages (fn [_] []))
+        (success-html-with-body (markup/administration messages)))
+      (success-html-with-body (markup/administration))))
 
   (comp/POST "/emails/parse" request
     (let [temp-file (:tempfile (:filename (:params request)))]
       (files/read-emails-from-mbox (io/input-stream temp-file) @messaging/main-chan)
-      (redirect-request request)))
+      (redirect-request request {:type :success :content (str "Starting to parse file: " temp-file)})))
 
   (comp/GET "/admin/categories" {}
     (let [categories (db/get-categories)]
@@ -229,7 +244,6 @@
       (success-html-with-body (markup/preferences-page {:language-detection-threshold language-datection-threshold :categorization-threshold categorization-threshold :log-level log-level}))))
 
   (comp/POST "/admin/preferences" request
-
     (doseq [param (dissoc (:params request) :redirect-url)]
       (db/update-preference (first param) (second param)))
     (t/set-min-level! (p/log-level))
@@ -323,8 +337,9 @@
     (redirect-request request))
 
   (comp/POST "/training" request
-    (write-emails-to-training-files-and-train)
-    (redirect-request request))
+    (let [result (write-emails-to-training-files-and-train)]
+      (when (some? result) (swap! global-messages (fn [mess] (conj mess result))))
+      (redirect-request request)))
 
   (comp/POST "/training/new" request
     (let [n (get (:route-params request) :new 20)]
@@ -337,9 +352,11 @@
           categories (conj (db/get-categories) {:id nil :name "n/a"})
           sql-clause (filter->sql-clause filter)
           result (db/fetch-data {:entity :enriched-email :strict false :page (page/page-request page page-size)} sql-clause)]
-      {:status 200
-       :header html-headers
-       :body   (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories)}))
+      (if (seq @global-messages)
+        (let [messages @global-messages]
+          (swap! global-messages (fn [_] []))
+          (success-html-with-body (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories messages)))
+        (success-html-with-body (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories)))))
 
   (comp/GET "/emails/:id" [id]
     (let [decoded-id (url-decode id)
@@ -355,17 +372,21 @@
      :body   (markup/watcher-list (find-running-clients))})
 
   (comp/GET "/connections/:id" [id]
-    {:status 200
-     :header html-headers
-     :body   (markup/watcher (first (client/find-by-id-in-watchers id))
-                             (client/folders-in-store (:store (second (first (client/find-by-id-in-watchers id))))))})
+    (if (seq @global-messages)
+      (let [messages @global-messages]
+        (swap! global-messages (fn [_] []))
+        (success-html-with-body (markup/watcher (first (client/find-by-id-in-watchers id))
+                                                (client/folders-in-store (:store (second (first (client/find-by-id-in-watchers id))))) messages)))
+      (success-html-with-body (markup/watcher (first (client/find-by-id-in-watchers id))
+                                              (client/folders-in-store (:store (second (first (client/find-by-id-in-watchers id)))))))))
 
   (comp/POST "/connections/:id" request
     (let [params (:params request)
           id (:id params)
           folder (:folder params)
           refolder (some? (:move params))]
-      (client/read-all-emails id folder {:refolder refolder}))
+      (client/read-all-emails id folder {:refolder refolder})
+      (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " refolder)}))))
     (redirect-request request))
 
   (comp/GET "/connections/:id/restart" request
