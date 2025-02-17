@@ -1,12 +1,14 @@
+#+OPTIONS: ^:nil
+
 * Plauna
 
-IMPORTANT: Plauna is still unstable at the moment. The features and the DB structure is subject to change.
-
-Plauna is a privacy first service that helps organize e-mails. All of its data is stored on your computer.
+Plauna is a privacy first service that helps you organize your e-mails. All of its data is stored only on your computer.
 
 It can parse e-mails from mbox files or directly by connecting to IMAP folders, and show statistics about them. The e-mail data in the database can be then enriched and trained to automatically categorize and refile incoming e-mails.
 
-* Installation - How to Download
+IMPORTANT: Plauna is still in heavy development at the moment. The features and the DB structure is subject to change.
+
+* Installation
 
 The easiest way to get plauna is using the [[https://hub.docker.com/repository/docker/ozangulle/plauna/general][docker image]].
 
@@ -16,18 +18,36 @@ The second way to getting plauna is fetching it from the git repository and comp
 clj -T:build uber
 #+END_SRC
 
-This will produce a plauna uberjar in ./target which you can run.
+This will produce a plauna uberjar in ./target which you can run using a Java Runtime Environment.
 
 * How to use
 
+** How to run
+
+Plauna looks for a configuration file after starting. By default, the configuration is expected to be at ~/.config/plauna.edn. You can modify the location of the config by passing the parameter --config-file. This method would be useful when running Plauna from the command line, e.g. java -jar plauna.jar --config-file=/opt/plauna/plauna.edn.
+
+If you're using Docker, you can put the parameters in the environment variable PLAUNA_ARGS. A docker-compose example would be:
+
+#+BEGIN_SRC docker-compose
+services:
+  plauna:
+    container_name: plauna
+    image: ozangulle/plauna:dev
+    environment:
+      - 'PLAUNA_ARGS=--config-file=/opt/plauna/plauna.edn'
+    restart: unless-stopped
+#+END_SRC
+
 ** Configuration
+
+The following is the configuration file with all of the possible settings. The default value for data-folder is "~/.local/state/plaune" whereas the default value for the server port is 8080. The e-mail configurations have no default settings. Plauna can be run without any e-mail credentials, even though the key point of Plauna is having it automatically categorize your e-mails.
 
 #+BEGIN_SRC clojure
     {:data-folder "/home/myhome/example-directory" ; the location for the db, training files and models
-     :server {:port 80} ; if port is not set in config, the server uses 8080
+     :server {:port 80}
      :email {
-             :clients [{:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox"}] ; the clients are optional
-             }}
+             :clients [{:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox"}]
+    }}
 #+END_SRC
 
 ** Starting
@@ -67,6 +87,6 @@ Under the tab "E-mails" there is an accordion tab called "Data Training". Click 
 
 Under E-mails -> Data Training, you can click on the button "Generate new data" in order to let plauna categorize up to 10 random e-mails. Also, if you have already trained your models, each incoming e-mail will be categorized automatically.
 
-*** Refile E-mails
+*** Move E-mails
 
-Plauna creates a folder in each IMAP server using the schema "Categories/<category-name>" on startup. After this step, each e-mail that comes via IMAP is categorized and refiled automatically.
+Plauna creates a folder in each IMAP server using the schema "Categories/<category-name>" on startup. After this step, each e-mail that comes via IMAP is categorized and moved automatically to the corresponding folder.
