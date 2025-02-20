@@ -27,6 +27,7 @@ jobs:
             # set dev tag for master branch
             type=raw,value=dev,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=ref,event=branch
+            type=ref,event=tag
       -
         name: Login to DockerHub
         uses: docker/login-action@v2
