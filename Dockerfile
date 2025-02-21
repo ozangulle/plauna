@@ -1,4 +1,4 @@
-FROM clojure:temurin-23-tools-deps-1.12.0.1479-bookworm-slim as build
+FROM clojure:temurin-23-tools-deps-bookworm-slim as build
 COPY . /usr/src/app/
 WORKDIR /usr/src/app
 RUN clojure -T:build uber
