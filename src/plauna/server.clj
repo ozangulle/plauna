@@ -72,13 +72,13 @@
 
 (defn redirect-request
   ([request]
-   (let [redirect-url (-> request :params :redirect-url)]
+   (let [redirect-url (get-in request [:params :redirect-url])]
      (if (some? redirect-url)
        {:status 301 :headers {"Location" redirect-url}}
        {:status 301 :headers {"Location" (-> request :uri)}})))
   ([request messages]
    (swap! global-messages (fn [m] (conj m messages)))
-   (let [redirect-url (-> request :params :redirect-url)]
+   (let [redirect-url (get-in request [:params :redirect-url])]
      (if (some? redirect-url)
        {:status 301 :headers {"Location" redirect-url}}
        {:status 301 :headers {"Location" (-> request :uri)}}))))
@@ -117,7 +117,7 @@
     (do (write-all-categorized-emails-to-training-files)
         (doseq [training-model (analysis/train-data (files/training-files))]
           (let [os (io/output-stream (files/model-file (:language training-model)))]
-            (analysis/serialize-model! (:model training-model) os))))
+            (analysis/serialize-and-write-model! (:model training-model) os))))
     {:type :alert :content "There are no selected languages to train in. Cannot proceed."}))
 
 (defn categorize-content [content language] ;; FIXME This kills the process if content is nil
@@ -225,7 +225,7 @@
       (success-html-with-body (markup/administration))))
 
   (comp/POST "/emails/parse" request
-    (let [temp-file (:tempfile (:filename (:params request)))]
+    (let [temp-file (get-in request [:params :filename :tempfile])]
       (files/read-emails-from-mbox (io/input-stream temp-file) @messaging/main-chan)
       (redirect-request request {:type :success :content (str "Starting to parse file: " temp-file)})))
 
@@ -261,7 +261,7 @@
 
   (comp/POST "/admin/categories" {params :params}
     (db/create-category (:name params))
-    (doseq [client-config (:clients (:email (files/config)))]
+    (doseq [client-config (get-in (files/config) [:email :clients])]
       (client/initialize-client-setup! client-config))
     {:status  301
      :headers {"Location" "/admin/categories"}

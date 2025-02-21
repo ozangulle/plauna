@@ -57,7 +57,7 @@
          GISTrainer/MAXENT_VALUE
          "")
 
-(defn serialize-model! [^DoccatModel model ^OutputStream os]
+(defn serialize-and-write-model! [^DoccatModel model ^OutputStream os]
   (when (some? model) (.serialize model os)))
 
 (defn train-data [training-files]
@@ -71,9 +71,11 @@
 (defn categorize [text ^File model-file]
   (if (.exists model-file)
     (let [doccat (DocumentCategorizerME. (DoccatModel. model-file))
-          probabilities (.categorize doccat (into-array String (cs/split text #" ")))]
-      (if (> (get probabilities 0) (p/categorization-threshold))
-        {:name (.getBestCategory doccat probabilities) :confidence (get probabilities 0)}
+          cat-results (.categorize doccat (into-array String (cs/split text #" ")))
+          best-category (.getBestCategory doccat cat-results)
+          best-probability (get cat-results (.getIndex doccat best-category))]
+      (if (> best-probability (p/categorization-threshold))
+        {:name best-category :confidence best-probability}
         {:name nil :confidence 0}))
     {:name nil :confidence 0}))
 

@@ -153,7 +153,7 @@
     (construct-email headers (flatten (parse-body (:message-id headers) [] message)) participants)))
 
 (defn with-message-id? [parsed-email]
-  (let [message-id (-> parsed-email :header :message-id)]
+  (let [message-id (get-in parsed-email [:header :message-id])]
     (if (or (nil? message-id) (empty? message-id))
       (do (t/log! :error ["Dropping parsed-email with headers" (into {} (:header parsed-email)) "Reason: message-id is empty"])
           false)

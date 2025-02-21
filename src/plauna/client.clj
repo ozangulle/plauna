@@ -103,11 +103,11 @@
     (async/go-loop [event (async/<! local-chan)]
       (when (some? event)
         (when (and (true? (:refolder (:options event))) (some? (:category (:metadata (:payload event)))))
-          (let [message-id (-> event :payload :header :message-id)
-                category-name (-> event :payload :metadata :category)]
+          (let [message-id (get-in event [:payload :header :message-id])
+                category-name (get-in event [:payload :metadata :category])]
             (when (some? category-name)
-              (t/log! :info (str "Moving email: " (-> event :payload :header :subject) " categorized as: " (-> event :payload :metadata :category)))
-              (try (move-messages-by-id (-> event :options :store) message-id (-> event :options :original-folder) category-name)
+              (t/log! :info (str "Moving email: " (get-in event [:payload :header :subject]) " categorized as: " (get-in event [:payload :metadata :category])))
+              (try (move-messages-by-id (get-in event [:options :store]) message-id (get-in event [:options :original-folder]) category-name)
                    (catch Exception e (t/log! :error (.getMessage e)))))))
         (recur (async/<! local-chan))))))
 
