@@ -7,5 +7,6 @@ pkgs.mkShell {
     pkgs.clojure-lsp
     pkgs.clj-kondo
     pkgs.cljfmt
-    pkgs.jdk23];
+    pkgs.jdk23
+    pkgs.git-cliff];
 }
