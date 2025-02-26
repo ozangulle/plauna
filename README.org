@@ -10,7 +10,7 @@ You can parse your e-mails from mbox files or directly by connecting to your IMA
 
 * Installation
 
-The easiest way to get Plauna is using the [[https://hub.docker.com/repository/docker/ozangulle/plauna/general][Docker image]].
+The easiest way to get Plauna is using the [[https://hub.docker.com/r/ozangulle/plauna][Docker image]].
 
 The second way to get Plauna is fetching it from the git repository and compiling using Clojure CLI with the command:
 
