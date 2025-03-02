@@ -1,6 +1,6 @@
 (ns plauna.parser
   (:require
-   [plauna.core.email :refer [construct-email]]
+   [plauna.core.email :refer [construct-email] :as core-email]
    [plauna.core.events :as events]
    [clojure.string :as st]
    [clojure.java.io :refer [input-stream copy]]
@@ -8,46 +8,13 @@
    [taoensso.telemere :as t])
   (:gen-class)
   (:import
-   (java.io InputStream)
-   (org.jsoup Jsoup)
-   (opennlp.tools.util.normalizer AggregateCharSequenceNormalizer EmojiCharSequenceNormalizer NumberCharSequenceNormalizer ShrinkCharSequenceNormalizer TwitterCharSequenceNormalizer CharSequenceNormalizer)
+   (java.io InputStream Reader)
    (org.apache.james.mime4j.stream MimeConfig$Builder Field)
-   (org.apache.james.mime4j.message MessageImpl MultipartImpl DefaultMessageBuilder)
-   (org.apache.james.mime4j.dom SingleBody Entity Message Multipart Header)
-   (org.apache.james.mime4j.dom.address Group Mailbox)
-   (javax.swing.text.rtf RTFEditorKit)))
+   (org.apache.james.mime4j.message MessageImpl MultipartImpl DefaultMessageBuilder BodyPart)
+   (org.apache.james.mime4j.dom Message Header TextBody BinaryBody Multipart)
+   (org.apache.james.mime4j.dom.address Group Mailbox)))
 
 (set! *warn-on-reflection* true)
-
-(defn html->text [^String html] (.text (Jsoup/parse html "UTF-8")))
-
-(def BracketsNormalizer (reify CharSequenceNormalizer
-                          (normalize [_ text] ((comp st/trim #(st/replace % #"\( \)" "")) text))))
-
-(def MailtoNormalizer (reify CharSequenceNormalizer
-                        (normalize [_ text] ((comp st/trim #(st/replace % #"(mailto:)?(?<![-+_.0-9A-Za-z])[-+_.0-9A-Za-z]+@[-0-9A-Za-z]+[-.0-9A-Za-z]+" "")) text))))
-
-(def BetterURLNormalizer (reify CharSequenceNormalizer
-                           (normalize [_ text] ((comp st/trim #(st/replace % #"https?://[-_.?&~%;+=/#0-9A-Za-z]+" "")) text))))
-
-(def ^CharSequenceNormalizer normalizer (new AggregateCharSequenceNormalizer
-                                             (into-array CharSequenceNormalizer
-                                                         [BetterURLNormalizer
-                                                          MailtoNormalizer
-                                                          (EmojiCharSequenceNormalizer/getInstance)
-                                                          (TwitterCharSequenceNormalizer/getInstance)
-                                                          (NumberCharSequenceNormalizer/getInstance)
-                                                          (ShrinkCharSequenceNormalizer/getInstance)
-                                                          BracketsNormalizer
-                                                          (ShrinkCharSequenceNormalizer/getInstance)])))
-
-(defn rtf->string [^String rtf]
-  (let [rtf-parser (new RTFEditorKit)
-        document (.createDefaultDocument rtf-parser)]
-    (.read rtf-parser (input-stream (.getBytes rtf)) document 0)
-    (.getText document 0 (.getLength document))))
-
-(defn normalize [^String text] (.normalize normalizer text))
 
 (defn stream->bytes [is]
   (let [baos (java.io.ByteArrayOutputStream.)]
@@ -73,11 +40,6 @@
       (st/trim message-id)
       "")))
 
-(defn clean-text-content [content html? rtf?]
-  (cond html? (html->text content)
-        rtf? (rtf->string content)
-        :else (html->text content)))
-
 (defn detect-utf8
   "Some emails have the charset uft-8 in quotation marks or escaped like \\UTF-8
   which throws UnsupportedEncodingException. This function tries to 'sanitize'
@@ -88,36 +50,51 @@
                                "utf-8"
                                charset-string)))
 
-(defn decode-body [^SingleBody body ^String charset]
-  (try (new String ^bytes (stream->bytes (.getInputStream body)) ^String (detect-utf8 charset))
+(defn decode-body [^BinaryBody body]
+  (try (new String ^bytes (stream->bytes (.getInputStream body)))
        (catch java.io.UnsupportedEncodingException e (t/log! :error e) (new String ^bytes (stream->bytes (.getInputStream body))))))
 
-(defn parse-body [message-id bodies ^Message message]
-  (t/log! :debug "Parsing body.")
-  (when (nil? message) bodies)
-  (cond
-    (instance? MultipartImpl (.getBody message))
-    (let [body-parts (.getBodyParts ^Multipart (.getBody message))
-          results (conj bodies (map #(parse-body message-id bodies %) body-parts))]
-      results)
+(defn reader->string [^Reader reader]
+  (with-open [r reader] (slurp r)))
 
-    (instance? MessageImpl (.getBody message))
-    (parse-body message-id bodies (.getBody message))
+(defmulti parse-body-content (fn [body] (type body)))
 
-    :else
-    (let [content (decode-body (.getBody message) (.getCharset message))
-          transfer-encoding (try (.getContentTransferEncoding ^Entity message) (catch Exception _ ""))
-          text? (.startsWith ^String (.getMimeType message) "text")
-          rtf? (.endsWith ^String (.getMimeType message) "rtf")
-          html? (.contains ^String (.getMimeType message) "html")]
+(defmethod parse-body-content TextBody [^TextBody text-body] (reader->string (.getReader text-body)))
+
+(defmethod parse-body-content BinaryBody [^BinaryBody binary-body] (decode-body binary-body))
+
+(defmulti parse-body (fn [_ _ message] (type message)))
+
+(defmethod parse-body MessageImpl [message-id bodies ^Message message]
+  (let [body (.getBody message)]
+    (if (instance? MultipartImpl body)
+      (parse-body message-id bodies body)
       (conj bodies
             {:mime-type (.getMimeType message)
              :charset (.getCharset message)
              :message-id message-id
-             :transfer-encoding transfer-encoding
-             :original-content (when text? content)
-             :sanitized-content (when text? (normalize (clean-text-content content html? rtf?)))
-             :name (when (instance? Entity (.getBody message)) (.getFilename ^Entity (.getBody message)))}))))
+             :transfer-encoding (.getContentTransferEncoding message)
+             :content (when (core-email/text-content? (.getMimeType message)) (parse-body-content body))
+             :content-disposition (.getDispositionType message)
+             :filename (.getFilename message)}))))
+
+(defmethod parse-body MultipartImpl [message-id bodies ^Multipart message]
+  (let [body-parts (.getBodyParts message)
+        results (conj bodies (mapv #(parse-body message-id bodies %) body-parts))]
+    results))
+
+(defmethod parse-body BodyPart [message-id bodies ^BodyPart body-part]
+  (let [body (.getBody body-part)]
+    (if (or (instance? MultipartImpl body) (instance? MessageImpl body))
+      (parse-body message-id bodies body)
+      (conj bodies
+            {:mime-type (.getMimeType body-part)
+             :charset (.getCharset body-part)
+             :message-id message-id
+             :transfer-encoding (.getContentTransferEncoding body-part)
+             :content (when (core-email/text-content? (.getMimeType body-part)) (parse-body-content (.getBody body-part)))
+             :content-disposition (.getDispositionType body-part)
+             :filename (.getFilename body-part)}))))
 
 (defn parse-date [^MessageImpl message]
   (let [date (.getDate message)]
@@ -182,4 +159,6 @@
                           (map (fn [[original-event parsed-email]] (parsed-email-event original-event parsed-email))))
                     local-channel
                     true
-                    (fn [^Throwable th] (t/log! :error (.getMessage th))))))
+                    (fn [^Throwable th]
+                      (t/log! :error (.getMessage th))
+                      (.printStackTrace th)))))

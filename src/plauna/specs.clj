@@ -24,7 +24,7 @@
 
 (s/def ::transfer-encoding string?)
 
-(s/def ::text-content (s/or :string string? :nil nil?))
+(s/def ::content (s/or :string string? :nil nil?))
 
 (s/def ::name (s/or :string string? :nil nil?))
 
@@ -43,7 +43,7 @@
 (s/def ::headers (s/keys :req-un [::message-id ::in-reply-to ::subject ::senders ::recipients ::mime-type ::date]))
 
 (s/def ::body-part (s/keys :req-un [::message-id ::charset ::mime-type ::transfer-encoding
-                                    ::original-content ::sanitized-content ::name]))
+                                    ::content ::filename]))
 
 (s/def ::body (s/coll-of ::body-part :min-count 1))
 

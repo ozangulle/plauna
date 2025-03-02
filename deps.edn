@@ -22,9 +22,10 @@
         org.apache.opennlp/opennlp-tools {:mvn/version "2.5.0"}
         org.clj-commons/claypoole {:mvn/version "1.2.2"}
         org.clojure/clojure {:mvn/version "1.12.0"}
-        org.clojure/java.data {:mvn/version "1.2.107"}
         org.clojure/core.async {:mvn/version "1.6.681"}
+        org.clojure/core.cache {:mvn/version "1.1.234"}
         org.clojure/data.json {:mvn/version "2.5.0"}
+        org.clojure/java.data {:mvn/version "1.2.107"}
         org.eclipse.angus/angus-mail {:mvn/version "2.0.3"}
         org.flywaydb/flyway-core {:mvn/version "11.0.0"}
         org.jsoup/jsoup {:mvn/version "1.18.2"}

@@ -126,3 +126,8 @@
        (line-seq rdr)
        [])))
   (t/log! :info ["Finished reading mbox."]))
+
+(comment
+  (t/set-min-level! :debug)
+  (read-emails-from-mbox (io/input-stream "/home/ozan/gmail-backups/Archived-003.mbox") @messaging/main-chan)
+  (messaging/restart-main-chan))

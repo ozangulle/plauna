@@ -36,8 +36,15 @@
   <p><strong>Mime Type: </strong>{{body-part.mime-type}}</p>
   <p><strong>Charset: </strong>{{body-part.charset}}</p>
   <p><strong>Transfer Encoding: </strong>{{body-part.transfer-encoding}}</p>
-  {% if body-part.name %}<p><strong>File Name: </strong>{{body-part.name}}</p> {% endif %}
-  {{body-part.sanitized-content}}
+  {% if body-part.filename %}<p><strong>File Name: </strong>{{body-part.filename}}</p> {% endif %}
+  {% if body-part.content-disposition %}<p><strong>Content Disposition: </strong>{{body-part.content-disposition}}</p> {% endif %}
+  {% if body-part.mime-type = "text/plain" %}
+    {{body-part.content}}
+  {% elif body-part.mime-type = "text/html" %}
+    {{body-part.content}}
+  {% else %}
+    Non-text content
+  {% endif %}
 </div>
 <br/>
 {% endfor %}

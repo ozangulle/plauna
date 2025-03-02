@@ -160,7 +160,7 @@
 
 (defn watcher
   ([client folders] (render-file "watcher.html" {:id (-> client first :id) :host (:host (first client)) :user (:user (first client)) :folders folders}))
-  ([client folders messages] (println messages) (render-file "watcher.html" {:id (-> client first :id) :host (:host (first client)) :user (:user (first client)) :folders folders :messages (mapv type->toast-role messages)})))
+  ([client folders messages] (render-file "watcher.html" {:id (-> client first :id) :host (:host (first client)) :user (:user (first client)) :folders folders :messages (mapv type->toast-role messages)})))
 
 (defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}]}]
                                 (render-file "admin-preferences.html" (conj data log-levels))))

@@ -35,7 +35,9 @@
   (swap! my-addresses (fn [cur new] (conj cur new)) address))
 
 (defn create-db []
-  (.migrate ^Flyway (flyway)))
+  (.migrate ^Flyway (flyway))
+  (jdbc/execute! (ds) ["PRAGMA foreign_keys = ON;"])
+  (jdbc/execute! (ds) ["PRAGMA journal_mode = WAL;"]))
 
 (def builder-function {:builder-fn as-unqualified-lower-maps})
 
@@ -66,8 +68,8 @@
                  (->>
                   (builder/for-insert-multi
                    :bodies
-                   [:original_content :sanitized_content :mime_type :charset :transfer_encoding :message_id]
-                   (mapv (juxt :original-content :sanitized-content :mime-type :charset :transfer-encoding :message-id) bodies) {})
+                   [:content :mime_type :charset :transfer_encoding :message_id :filename :content_disposition]
+                   (mapv (juxt :content :mime-type :charset :transfer-encoding :message-id :filename :content-disposition) bodies) {})
                   (insert->insert-ignore))
                  {:batch true}))
 

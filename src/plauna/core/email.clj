@@ -6,7 +6,7 @@
 
 (defrecord Header [message-id in-reply-to subject mime-type date])
 
-(defrecord Body-Part [message-id charset mime-type transfer-encoding original-content sanitized-content name])
+(defrecord Body-Part [message-id charset mime-type transfer-encoding content filename content-disposition])
 
 (defrecord Participant [address name contact-key type message-id])
 
@@ -58,23 +58,28 @@
       (recur call-with-pagination fun (if mutates? query (update-in query [:page :page] inc)) sql-query mutates?)
       nil)))
 
-(defn training-content
+(defn attachment? [body-part] (or (= "attachment" (:content-disposition body-part)) (some? (:filename body-part))))
+
+(defn text-content? [mime-type] (.startsWith ^String mime-type "text"))
+
+(defn body-text-content? [body-part] (text-content? (:mime-type body-part)))
+
+(defn text-content-type [body-part]
+  (let [mime-type (:mime-type body-part)]
+    (cond (.endsWith ^String mime-type "html") :html
+          (.endsWith ^String mime-type "rtf") :rtf
+          :else :plain)))
+
+(defn body-part-for-mime-type
   "When supplied with an e-mail, select a mime-type and extract its contents for training purposes.
   If the selected mime-type does not exist, it returns the text content of the first mime-type available.
   If the e-mail has no body, returns nil."
   [mime-type email]
-  (let [body-parts (filter #(or (= (:mime-type %) "text/html") (= (:mime-type %) "text/plain")) (:body email))]
-    (cond (empty? (:body email))
+  (let [body-parts (filter #(and (not (attachment? %)) (body-text-content? %)) (:body email))]
+    (cond (empty? (:body email)) ;; is this possible?
           nil
           (= 1 (count body-parts))
-          {:message-id (-> email :header :message-id)
-           :training-content (:sanitized-content (first body-parts))
-           :language (-> email :metadata :language)
-           :category (-> email :metadata :category)
-           :subject (-> email :header :subject)}
+          (first body-parts)
           :else
-          {:message-id (-> email :header :message-id)
-           :training-content (:sanitized-content (first (filter #(.equals ^String (:mime-type %) mime-type) body-parts)))
-           :language (-> email :metadata :language)
-           :category (-> email :metadata :category)
-           :subject (-> email :header :subject)})))
+          (let [first-match (first (filter #(.equals ^String (:mime-type %) mime-type) body-parts))]
+            (if (some? first-match) first-match (first body-parts))))))

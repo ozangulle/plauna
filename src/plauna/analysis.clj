@@ -1,14 +1,16 @@
 (ns plauna.analysis
-  (:require [clojure.string :as cs]
+  (:require [clojure.string :as st]
             [plauna.database :as db]
             [plauna.core.events :as events]
+            [plauna.core.email :as core-email]
             [plauna.preferences :as p]
+            [plauna.util.text-transform :as tt]
             [clojure.core.async :as async]
             [taoensso.telemere :as t]
             [cld.core :as lang]
-            [plauna.core.email :as core-email]
             [plauna.files :as files])
   (:import
+   (opennlp.tools.util.normalizer AggregateCharSequenceNormalizer EmojiCharSequenceNormalizer NumberCharSequenceNormalizer ShrinkCharSequenceNormalizer TwitterCharSequenceNormalizer CharSequenceNormalizer)
    (opennlp.tools.util MarkableFileInputStreamFactory PlainTextByLineStream TrainingParameters)
    (opennlp.tools.doccat DocumentSampleStream DocumentCategorizerME DoccatFactory DoccatModel)
    (opennlp.tools.ml.naivebayes NaiveBayesTrainer)
@@ -18,6 +20,28 @@
 
 (set! *warn-on-reflection* true)
 
+(def BracketsNormalizer (reify CharSequenceNormalizer
+                          (normalize [_ text] ((comp st/trim #(st/replace % #"\( \)" "")) text))))
+
+(def MailtoNormalizer (reify CharSequenceNormalizer
+                        (normalize [_ text] ((comp st/trim #(st/replace % #"(mailto:)?(?<![-+_.0-9A-Za-z])[-+_.0-9A-Za-z]+@[-0-9A-Za-z]+[-.0-9A-Za-z]+" "")) text))))
+
+(def BetterURLNormalizer (reify CharSequenceNormalizer
+                           (normalize [_ text] ((comp st/trim #(st/replace % #"https?://[-_.?&~%;+=/#0-9A-Za-z]+" "")) text))))
+
+(def ^CharSequenceNormalizer normalizer (new AggregateCharSequenceNormalizer
+                                             (into-array CharSequenceNormalizer
+                                                         [BetterURLNormalizer
+                                                          MailtoNormalizer
+                                                          (EmojiCharSequenceNormalizer/getInstance)
+                                                          (TwitterCharSequenceNormalizer/getInstance)
+                                                          (NumberCharSequenceNormalizer/getInstance)
+                                                          (ShrinkCharSequenceNormalizer/getInstance)
+                                                          BracketsNormalizer
+                                                          (ShrinkCharSequenceNormalizer/getInstance)])))
+
+(defn normalize [^String text] (.normalize normalizer text))
+
 (defn categorization-algorithm ^String [] (or (:categorization-algorithm (db/fetch-preference :categorization-algorithm)) NaiveBayesTrainer/NAIVE_BAYES_VALUE))
 
 (lang/default-init!)
@@ -26,23 +50,30 @@
   (.getISO3Language (new Locale language)))
 
 (defn detect-language [^String text]
-  (if (> (count text) 3)
-    (let [result (second (lang/detect text))
-          confidence (Double/parseDouble (first (vals result)))
-          lang-code (lang-code-set3 (first (keys result)))]
-      {:code (if (< confidence (p/language-detection-threshold)) "n/a" lang-code)
-       :confidence confidence})
-    {:code "n/a" :confidence 0.0}))
+  (when (some? text)
+    (if (> (count text) 3)
+      (let [result (second (lang/detect text))
+            confidence (Double/parseDouble (first (vals result)))
+            lang-code (lang-code-set3 (first (keys result)))]
+        {:code (if (< confidence (p/language-detection-threshold)) "n/a" lang-code)
+         :confidence confidence})
+      {:code "n/a" :confidence 0.0})))
 
 (defn training-data-stream [file]
   (-> (MarkableFileInputStreamFactory. file)
       (PlainTextByLineStream. "UTF-8")
       (DocumentSampleStream.)))
 
+(defn training-body-part [email] (core-email/body-part-for-mime-type "text/html" email))
+
 (defn format-training-data [data]
   (transduce
-   (comp (map #(core-email/training-content "text/html" %))
-         (map #(str (:category %) " " (if (some? (:subject %)) (cs/trim (:subject %)) "") " " (:training-content %) "\n")))
+   (comp (map (fn [email] [(get-in email [:metadata :category]) (training-body-part email)]))
+         (map (fn [[category body-part]] [category
+                                          (if (some? (:subject body-part)) (st/trim (:subject body-part)) "")
+                                          (tt/clean-text-content (:content body-part) (core-email/text-content-type body-part))]))
+         (map (fn [[category subject text-content]] [category subject (normalize text-content)]))
+         (map (fn [[category subject normalized-content]] (str category " " subject " " normalized-content "\n"))))
    str
    ""
    data))
@@ -71,7 +102,7 @@
 (defn categorize [text ^File model-file]
   (if (.exists model-file)
     (let [doccat (DocumentCategorizerME. (DoccatModel. model-file))
-          cat-results (.categorize doccat (into-array String (cs/split text #" ")))
+          cat-results (.categorize doccat (into-array String (st/split text #" ")))
           best-category (.getBestCategory doccat cat-results)
           best-probability (get cat-results (.getIndex doccat best-category))]
       (if (> best-probability (p/categorization-threshold))
@@ -79,19 +110,28 @@
         {:name nil :confidence 0}))
     {:name nil :confidence 0}))
 
-;; TODO handle errors
+(defn normalize-body-part [body-part]
+  (when (some? body-part)
+    (normalize (tt/clean-text-content (:content body-part) (core-email/text-content-type body-part)))))
+
+(defn category-for-text [text language-code]
+  (when (and (some? text) (some? language-code))
+    (let [allowed-languages (mapv :language (filter #(= 1 (:use_in_training %)) (db/get-language-preferences)))]
+      (when (some #(= language-code %) allowed-languages) (categorize text (files/model-file language-code))))))
+
 (defn detect-language-and-categorize-event [event]
   (let [email (:payload event)
-        training-content (:training-content (core-email/training-content "text/html" email))
-        allowed-languages (map :language (filter #(= 1 (:use_in_training %)) (db/get-language-preferences)))
+        body-part-to-train-on (core-email/body-part-for-mime-type "text/html" email)
+        training-content (normalize-body-part body-part-to-train-on)
         language-result (detect-language training-content)
-        category-result (when (some #(= (:code language-result) %) allowed-languages) (categorize training-content (files/model-file (:code language-result))))
+        category-result (category-for-text training-content (:code language-result))
         category-id (if (nil? (:name category-result)) nil (:id (db/category-by-name (:name category-result))))]
     (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category (:name category-result) :category-confidence (:confidence category-result) :category-id category-id})))
 
 (defn detect-language-event [event]
   (let [email (:payload event)
-        training-content (:training-content (core-email/training-content "text/html" email))
+        body-part-to-train-on (core-email/body-part-for-mime-type "text/html" email)
+        training-content (normalize-body-part body-part-to-train-on)
         language-result (try (detect-language training-content) (catch Exception e (t/log! :error [(.getMessage e) "\nText causing the exception:" training-content])))]
     (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category (-> email :metadata :category) :category-confidence (-> email :metadata :category-confidence) :category-id (-> email :metadata :category-id)})))
 
@@ -119,4 +159,7 @@
                     (map handle-enrichment)
                     local-chan
                     true
-                    (fn [^Throwable th] (t/log! :error (.getMessage th)) (t/log! :debug (.printStackTrace th))))))
+                    (fn [^Throwable th]
+                      (t/log! :error (.getMessage th))
+                      ;(.printStackTrace th)
+                      ))))
