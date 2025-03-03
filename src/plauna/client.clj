@@ -3,6 +3,7 @@
    [clojure.core.async :as async]
    [plauna.database :as db]
    [plauna.core.events :as events]
+   [plauna.preferences :as p]
    [clojure.string :as s]
    [taoensso.telemere :as t]
    [plauna.messaging :as messaging])
@@ -222,7 +223,7 @@
                                                #(do
                                                   (check-connection identifier)
                                                   (check-folder identifier))
-                                               1 1 TimeUnit/MINUTES)]
+                                               60 (p/client-health-check-interval) TimeUnit/SECONDS)]
     (swap-new-period-check identifier scheduled-future)))
 
 (defn config-id [something]

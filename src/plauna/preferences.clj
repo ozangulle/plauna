@@ -8,7 +8,8 @@
 (def fetch-fn (atom db/fetch-preference))
 
 (def converters {clojure.lang.Keyword (fn [^String s] (keyword (.substring s 1)))
-                 java.lang.Double Double/parseDouble})
+                 java.lang.Double Double/parseDouble
+                 java.lang.Long Long/parseLong})
 
 (defmacro preference-with-default [property pred default]
   `(let [value# (~pred (@fetch-fn ~property) ~default)
@@ -33,3 +34,7 @@
 (defn categorization-threshold [] (w/lookup-or-miss cache
                                                     :categorization-threshold
                                                     (fn [key] (preference-with-default key or 0.65))))
+
+(defn client-health-check-interval [] (w/lookup-or-miss cache
+                                                        :client-health-check-interval
+                                                        (fn [key] (preference-with-default key or 60))))

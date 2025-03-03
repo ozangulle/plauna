@@ -23,6 +23,10 @@
             {% endfor %}
         </select>
     </div>
+    <div>
+      <label class="block mb-2 text-sm font-medium text-gray-900" for="categorization-threshold">IMAP Client Watcher Health Check Interval</label>
+      <input class="mr-4 text-gray-700 focus:text-gray-700 focus:border-gray-200 focus:ring-gray-200" name="client-health-check-interval" value="{{client-health-check-interval}}">
+    </div>
   </div>
   <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm" type="send">Save</button>
  </form>

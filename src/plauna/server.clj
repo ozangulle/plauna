@@ -240,8 +240,13 @@
   (comp/GET "/admin/preferences" {}
     (let [language-datection-threshold (p/language-detection-threshold)
           categorization-threshold (p/categorization-threshold)
+          client-health-check-interval (p/client-health-check-interval)
           log-level (p/log-level)]
-      (success-html-with-body (markup/preferences-page {:language-detection-threshold language-datection-threshold :categorization-threshold categorization-threshold :log-level log-level}))))
+      (success-html-with-body (markup/preferences-page
+                               {:language-detection-threshold language-datection-threshold
+                                :categorization-threshold categorization-threshold
+                                :log-level log-level
+                                :client-health-check-interval client-health-check-interval}))))
 
   (comp/POST "/admin/preferences" request
     (doseq [param (dissoc (:params request) :redirect-url)]
