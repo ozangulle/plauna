@@ -273,27 +273,9 @@
      :headers {"Location" "/admin/categories"}
      :body    (markup/administration)})
 
-  (comp/DELETE "/admin/database" {}
-    (files/delete-database-file)
-    {:status  301
-     :headers {"Location" "/admin"}
-     :body    (markup/administration)})
-
   (comp/POST "/admin/database" {}
     (files/check-and-create-database-file)
     (db/create-db)
-    {:status  301
-     :headers {"Location" "/admin"}
-     :body    (markup/administration)})
-
-  (comp/DELETE "/admin/training" {}
-    (files/delete-files-with-type :train)
-    {:status  301
-     :headers {"Location" "/admin"}
-     :body    (markup/administration)})
-
-  (comp/DELETE "/admin/models" {}
-    (files/delete-files-with-type :model)
     {:status  301
      :headers {"Location" "/admin"}
      :body    (markup/administration)})

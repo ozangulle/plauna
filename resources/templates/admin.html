@@ -21,42 +21,4 @@
   </div>
 </div>
 
-  <h4 class="text-l mt-16 mb-2">Danger Zone</h4>
-  <div class="flex-wrap flex gap-4">
-    <form action="/admin/database" id="db-delete" method="DELETE">
-      <input name="method" type="hidden" value="DELETE" />
-      <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Delete Database</button>
-    </form>
-    <form action="/admin/database" method="POST" value="post">
-      <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Create Database</button>
-    </form>
-    <form action="/admin/training" id="training-delete" method="DELETE">
-      <input name="method" type="hidden" value="DELETE" />
-      <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Delete Training Data</button>
-    </form>
-    <form action="/admin/models" id="models-delete" method="DELETE">
-      <input name="method" type="hidden" value="DELETE" />
-      <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Delete Models</button>
-    </form>
-  </div>
-
-
-<script>const deleteForm = document.getElementById('db-delete');
-                             deleteForm.addEventListener('submit', (e) => {
-                                e.preventDefault();
-                                fetch('/admin/database', {method: 'DELETE'})
-                                .then(() => window.location.href = '/admin')
-                             });</script><script>const deleteTraining = document.getElementById('training-delete');
-                             deleteTraining.addEventListener('submit', (e) => {
-                                e.preventDefault();
-                                fetch('/admin/training', {method: 'DELETE'})
-                                .then(() => window.location.href = '/admin')
-                             });</script><script>const deleteModels = document.getElementById('models-delete');
-                             deleteModels.addEventListener('submit', (e) => {
-                                e.preventDefault();
-                                fetch('/admin/models', {method: 'DELETE'})
-                                .then(() => window.location.href = '/admin')
-                             });
-</script>
-
 {% endblock %}
