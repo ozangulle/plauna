@@ -245,7 +245,7 @@
 
   (comp/POST "/admin/preferences" request
     (doseq [param (dissoc (:params request) :redirect-url)]
-      (db/update-preference (first param) (second param)))
+      (p/update-preference (first param) (second param)))
     (t/set-min-level! (p/log-level))
     (redirect-request request))
 

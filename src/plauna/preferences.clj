@@ -18,6 +18,10 @@
        value#
        ((get converters default-type#) value#))))
 
+(defn update-preference [key value]
+  (db/update-preference key value)
+  (w/evict cache key))
+
 (defn log-level [] (w/lookup-or-miss cache
                                      :log-level
                                      (fn [key] (preference-with-default key or :info))))
