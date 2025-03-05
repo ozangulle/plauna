@@ -8,15 +8,43 @@ You can parse your e-mails from mbox files or directly by connecting to your IMA
 
 *IMPORTANT:* Plauna is still under heavy development at the moment. The features and the DB structure are subject to change.
 
+** Features
+
+- You own 100% of your data. Everything is on your machine.
+
+- You define your categories: Use as many or few as you like
+
+- Multi-language support.
+
+- Statistics about your emails and metadata (very basic, still under development).
+
+- Upload data from mbox archives.
+
+- Read emails directly from IMAP folders.
+
+** Screenshots
+
+#+CAPTION: List emails and edit metadata
+[[./docs/resources/plauna1.png]]
+List emails and edit metadata
+
+#+CAPTION: See details of an email and edit metadata
+[[./docs/resources/plauna3.png]]
+See details of an email and edit metadata
+
+#+CAPTION: Admin panel
+[[./docs/resources/plauna2.png]]
+Admin panel
+
 * Installation
 
 The easiest way to get Plauna is using the [[https://hub.docker.com/r/ozangulle/plauna][Docker image]].
 
 The second way to get Plauna is fetching it from the git repository and compiling using Clojure CLI with the command:
 
-#+BEGIN_SRC
+#+begin_src 
 clj -T:build uber
-#+END_SRC
+#+end_src
 
 This will produce a Plauna uberjar in the ./target directory which you can run using a Java Runtime Environment.
 
@@ -28,7 +56,7 @@ You must provide a configuration file to start Plauna. By default, the configura
 
 If you are using Docker, you can put the parameters in the environment variable PLAUNA_ARGS. A docker-compose example would look like this:
 
-#+BEGIN_SRC docker-compose
+#+begin_src docker-compose
 services:
   plauna:
     container_name: plauna
@@ -36,19 +64,19 @@ services:
     environment:
       - 'PLAUNA_ARGS=--config-file=/opt/plauna/plauna.edn'
     restart: unless-stopped
-#+END_SRC
+#+end_src
 
 ** Configuration
 
 The following is a configuration file with all of the possible settings. The default value for data-folder is "~/.local/state/plauna" and the default value for the server port is 8080. The e-mail configurations have no default settings. Plauna can be run without any e-mail credentials, even though the key point of Plauna is having it automatically categorize your e-mails.
 
-#+BEGIN_SRC clojure
-    {:data-folder "/home/myhome/example-directory" ; the location for the db, training files and models
-     :server {:port 80}
-     :email {
-             :clients [{:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox"}]
-    }}
-#+END_SRC
+#+begin_src clojure
+{:data-folder "/home/myhome/example-directory" ; the location for the db, training files and models
+ :server {:port 80}
+ :email {
+         :clients [{:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox"}]
+}}
+#+end_src
 
 ** Getting Started
 
