@@ -10,7 +10,7 @@
             [cld.core :as lang]
             [plauna.files :as files])
   (:import
-   (opennlp.tools.util.normalizer AggregateCharSequenceNormalizer EmojiCharSequenceNormalizer NumberCharSequenceNormalizer ShrinkCharSequenceNormalizer TwitterCharSequenceNormalizer CharSequenceNormalizer)
+   (opennlp.tools.util.normalizer AggregateCharSequenceNormalizer EmojiCharSequenceNormalizer NumberCharSequenceNormalizer ShrinkCharSequenceNormalizer TwitterCharSequenceNormalizer CharSequenceNormalizer UrlCharSequenceNormalizer)
    (opennlp.tools.util MarkableFileInputStreamFactory PlainTextByLineStream TrainingParameters)
    (opennlp.tools.doccat DocumentSampleStream DocumentCategorizerME DoccatFactory DoccatModel)
    (opennlp.tools.ml.naivebayes NaiveBayesTrainer)
@@ -33,6 +33,7 @@
                                              (into-array CharSequenceNormalizer
                                                          [BetterURLNormalizer
                                                           MailtoNormalizer
+                                                          (UrlCharSequenceNormalizer/getInstance)
                                                           (EmojiCharSequenceNormalizer/getInstance)
                                                           (TwitterCharSequenceNormalizer/getInstance)
                                                           (NumberCharSequenceNormalizer/getInstance)

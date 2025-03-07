@@ -211,6 +211,14 @@
     (= filter "without-category") {:where [:= :metadata.category nil] :order-by [[:date :desc]]}
     :else {:order-by [[:date :desc]]}))
 
+(defn add-sanitized-text-to-enriched-email [email]
+  {:header (:header email)
+   :metadata (:metadata email)
+   :participants (:participants email)
+   :body (map (fn [body-part] (if (core-email/body-text-content? body-part)
+                                (conj body-part {:sanitized-content (analysis/normalize-body-part body-part)})
+                                body-part)) (:body email))})
+
 (comp/defroutes routes
 
   (route/resources "/")
@@ -347,7 +355,7 @@
 
   (comp/GET "/emails/:id" [id]
     (let [decoded-id (url-decode id)
-          email-data (enriched-email-by-message-id decoded-id)
+          email-data (add-sanitized-text-to-enriched-email (enriched-email-by-message-id decoded-id))
           categories (conj (db/get-categories) {:id nil :name "n/a"})]
       {:status 200
        :header html-headers
