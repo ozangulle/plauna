@@ -99,8 +99,25 @@
                   [{:type :table :header "Top 10 Senders of E-Mails" :data {:headers ["Count" "Address"] :values (map vals top-from)}}
                    {:type :bar-chart :header "Number of Senders per Interval" :id "senders" :json-data (json/write-str vega-interval-from)}]})))
 
+(defmacro pie-chart [data-values key key-label description]
+  `{:data {:values ~data-values}
+    :description ~description
+    :transform [{:joinaggregate [{:op "sum" :field :count :as :total}]}
+                {:calculate (str "datum.count / datum.total < 0.1 ? 'others' : datum['" ~key "']") :as (keyword ~key)}
+                {:aggregate [{:op :sum :field :count :as :count}] :groupby [(keyword ~key)]}]
+    :layer [{:mark {:type :arc :outerRadius 10 :stroke "#fff"}}
+            {:mark {:type :text :radiusOffset 30}
+             :encoding {:text {:field (keyword ~key) :type "nominal"}}}]
+    :encoding {:theta {:field :count :type "quantitative" :stack true}
+               :radius {:field :count :scale {:type :sqrt :zero true :rangeMin 15}}
+               :color {:field (keyword ~key) :legend nil}
+               :tooltip [{:field (keyword ~key) :type "nominal" :title ~key-label}
+                         {:field :count :type "nominal" :title "Count"}]}})
+
 (defn statistics-types [overview-map yearly-mime-types]
-  (let [vega-most-common {:data {:values yearly-mime-types}
+  (let [overall-pie (pie-chart overview-map 'mime-type "MIME TYPE" "MIME Types Overview")
+
+        vega-most-common {:data {:values yearly-mime-types}
                           :description "Most common mime types"
                           :mark "bar"
                           :transform [{:aggregate [{:op "sum" :field :count :as :sum}] :groupby [:mime-type]}
@@ -119,26 +136,32 @@
                                       :tooltip [{:field :sum :type "quantitative"} {:field :mime-type :type "nominal"}]}}]
     (render-file "statistics.html"
                  {:statistics
-                  [{:type :table :header "All MIME Types" :data {:headers ["Count" "Mime Type"] :values (map vals overview-map)}}
+                  [{:type :bar-chart :header "MIME Types Overview" :id "overview" :json-data (json/write-str overall-pie)}
                    {:type :bar-chart :header "Most Common MIME Types" :id "most-common" :json-data (json/write-str vega-most-common)}
                    {:type :bar-chart :header "Least Common MIME Types" :id "least-common" :json-data (json/write-str vega-least-common)}]})))
 
-(defn statistics-languages [yearly-languages]
-  (let [vega-data {:data {:values yearly-languages}
-                   :mark {:type "bar" :tooltip true}
-                   :encoding {:y {:field :count :type "quantitative"}
-                              :x {:field :interval :type "ordinal" :axis {:labelOverlap "parity" :labelSeparation 10}}
-                              :color {:field :language :type "nominal"}}}]
-    (render-file "statistics.html" {:statistics [{:type :bar-chart :header "Yearly Languages" :id "languages" :json-data (json/write-str vega-data)}]})))
+(defn statistics-languages [languages-overall yearly-languages]
+  (let [overall-languages (pie-chart languages-overall 'language "Language" "Languages Overview")
+        yearly-data {:data {:values yearly-languages}
+                     :mark {:type "bar" :tooltip true}
+                     :encoding {:y {:field :count :type "quantitative"}
+                                :x {:field :interval :type "ordinal" :axis {:labelOverlap "parity" :labelSeparation 10}}
+                                :color {:field :language :type "nominal" :scale {:scheme "category20c"}}
+                                :text {:field :language :type "nominal" :scale {:scheme "category20c"}}}}]
+    (render-file "statistics.html"
+                 {:statistics [{:type :bar-chart :header "Languages Overview" :id "languages-overview" :json-data (json/write-str overall-languages)}
+                               {:type :bar-chart :header "Yearly Languages" :id "languages" :json-data (json/write-str yearly-data)}]})))
 
-(defn statistics-categories [yearly-categories intervals]
-  (let [vega-data {:data {:values yearly-categories}
+(defn statistics-categories [categories-overall yearly-categories]
+  (let [overall-categories (pie-chart categories-overall 'category "Category" "Categories Overview")
+        vega-data {:data {:values yearly-categories}
                    :mark {:type "bar" :tooltip true}
                    :transform [{:filter "datum.interval != null"}]
                    :encoding {:y {:field :count :type "quantitative"}
                               :x {:field :interval :type "ordinal" :axis {:labelOverlap "parity" :labelSeparation 10}}
                               :color {:field :category :type "nominal"}}}]
-    (render-file "statistics.html" {:interval-filter (conj {:url "/statistics/categories"} intervals) :statistics [{:type :bar-chart :header "Categories" :id "emails" :json-data (json/write-str vega-data)}]})))
+    (render-file "statistics.html" {:statistics [{:type :bar-chart :header "Categories Overview" :id "cat-overview" :json-data (json/write-str overall-categories)}
+                                                 {:type :bar-chart :header "Yearly Categories" :id "categories" :json-data (json/write-str vega-data)}]})))
 
 (defn statistics-overall [yearly-emails]
   (let [vega-data {:data {:values yearly-emails}

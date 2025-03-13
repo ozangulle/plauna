@@ -145,6 +145,17 @@
                 :group-by [:bodies.mime-type]
                 :order-by [[:count :desc]]}))
 
+(defn statistics-overall-for-language []
+  (db/query-db {:select [[[:count :language] :count] :language] :from [:metadata]
+                :group-by [:language]
+                :order-by [[:count :desc]]}))
+
+(defn statistics-overall-for-categories []
+  (db/query-db {:select [[[:count :category] :count] [:categories.name :category]] :from [:metadata]
+                :join [:categories [:= :metadata.category :categories.id]]
+                :group-by [:category]
+                :order-by [[:count :desc]]}))
+
 (defn language-statistics-by-period [period]
   (db/query-db {:select [[[:count :metadata.language] :count] :metadata.language [(db/interval-for-honey period) :interval]] :from [:metadata]
                 :join [:headers [:= :metadata.message-id :headers.message_id]]
@@ -313,19 +324,19 @@
                                    contact-count contacts-over-interval))))
 
   (comp/GET "/statistics/languages" {}
-    (let [yearly-languages (language-statistics-by-period :yearly)]
+    (let [yearly-languages (language-statistics-by-period :yearly)
+          languages-overall (statistics-overall-for-language)]
       (success-html-with-body
-       (markup/statistics-languages yearly-languages))))
+       (markup/statistics-languages languages-overall yearly-languages))))
 
-  (comp/GET "/statistics/categories" {params :params}
-    (let [selected-interval (params->interval-request params)
-          categories-stats (category-statistics-by-period selected-interval)
-          years (db/years-of-data)]
+  (comp/GET "/statistics/categories" {}
+    (let [;selected-interval (params->interval-request params)
+          categories-stats (category-statistics-by-period {:interval :yearly})
+          categories-overall (statistics-overall-for-categories)
+          ;years (db/years-of-data)
+          ]
       (success-html-with-body
-       (markup/statistics-categories categories-stats
-                                     {:years             years
-                                      :selected-interval selected-interval
-                                      :selected-year     (get params :year)}))))
+       (markup/statistics-categories categories-overall categories-stats))))
 
   (comp/POST "/metadata" request
     (save-metadata-form (:params request))
