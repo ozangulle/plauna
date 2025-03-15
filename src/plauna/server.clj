@@ -286,7 +286,7 @@
   (comp/POST "/admin/categories" {params :params}
     (db/create-category (:name params))
     (doseq [client-config (get-in (files/config) [:email :clients])]
-      (client/initialize-client-setup! client-config))
+      (client/create-imap-directories! client-config))
     {:status  301
      :headers {"Location" "/admin/categories"}
      :body    (markup/administration)})

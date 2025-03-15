@@ -125,7 +125,7 @@
   (with-open [store ^Store (connect connection-config)]
     (create-folders store category-names)))
 
-(defn initialize-client-setup! [connection-config]
+(defn create-imap-directories! [connection-config]
   (let [category-names (mapv :name (db/get-categories))]
     (t/log! :info ["Creating directories from category names" category-names])
     (t/log! {:level :info
