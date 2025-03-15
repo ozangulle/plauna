@@ -5,7 +5,8 @@
             [clojure.string :as string]
             [taoensso.telemere :as t]
             [plauna.messaging :as messaging]
-            [plauna.core.events :as events])
+            [plauna.core.events :as events]
+            [plauna.files :as files])
   (:import [java.io File]))
 
 (set! *warn-on-reflection* true)
@@ -126,3 +127,23 @@
        (line-seq rdr)
        [])))
   (t/log! :info ["Finished reading mbox."]))
+
+(defn file-exists? [path] (.exists ^File (io/file path)))
+
+(defn config-from-file [path] (if (file-exists? path)
+                                (do (files/set-custom-config-location! path)
+                                    (edn/read-string (slurp path)))
+                                (throw (t/error! (ex-info "Provided config file at does not exist. Exiting application." {:path path})))))
+
+(defn config-from-default-location []
+  (if (file-exists? (config-location))
+    (config)
+    (throw (t/error! (ex-info "Tried reading config from default location but result was nil." {:path (config-location)})))))
+
+(defmulti parse-cli-arg (fn [arg] (first (string/split arg #"="))))
+(defmethod parse-cli-arg "--config-file" [arg-string] {:config-file (second (string/split arg-string #"="))})
+
+(defn parse-config-from-cli-arguments [cli-args]
+  (let [arguments (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} cli-args)]
+    (cond (some? (:config-file arguments)) (config-from-file (:config-file arguments))
+          (nil? (:config-file arguments)) (config-from-default-location))))
