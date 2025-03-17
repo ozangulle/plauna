@@ -37,13 +37,28 @@
 
 (defonce health-checks (atom {}))
 
-(defn properties ^Properties []
+(defn default-properties ^Properties [port]
   (doto (new Properties)
-    (.setProperty "mail.imap.ssl.enable", "true")
-    (.setProperty "mail.imaps.usesocketchannels" "true")
-    (.setProperty "mail.imaps.timeout" "5000")
-    (.setProperty "mail.imaps.partialfetch" "false")
+    (.setProperty "mail.imap.port" port)
+    (.setProperty "mail.imap.usesocketchannels" "true")
+    (.setProperty "mail.imap.timeout" "5000")
+    (.setProperty "mail.imap.partialfetch" "false")
     (.setProperty "mail.imap.fetchsize" "1048576")))
+
+(defn ssl-properties ^Properties [port]
+  (doto (default-properties port)
+    (.setProperty "mail.imap.ssl.enable", "true")))
+
+(defn starttls-properties ^Properties [port]
+  (doto (default-properties port)
+    (.setProperty "mail.imap.starttls.enable", "true")))
+
+(defn plain-properties ^Properties [port]
+  (default-properties port))
+
+(defn disable-cert-checking [^Properties properties]
+  (.setProperty properties "mail.imap.ssl.trust", "*")
+  properties)
 
 (defn find-by-id-in-watchers [id]
   (filter #(= id (:id (first %))) @watchers))
@@ -52,9 +67,46 @@
   (proxy [SearchTerm] [] (match [^Message message]
                            (= message-id (first (.getHeader message "Message-ID"))))))
 
-(defn connect [connection-config]
-  (let [session (Session/getInstance (properties))
-        store (.getStore session "imaps")]
+(defn security [connection-config]
+  (let [security (get connection-config :security :ssl)]
+    (if (some #(= security %) [:ssl :starttls :plain])
+      security
+      :ssl)))
+
+(defn check-ssl-certs? [connection-config] (get connection-config :check-ssl-certs true))
+
+(defn default-port-for-security [security]
+  (if (= security :ssl) 993 143))
+
+(defn port [connection-config]
+  (str (get connection-config :port (default-port-for-security (security connection-config)))))
+
+(defn get-properties-for-security [security port]
+  (cond (= security :starttls) (starttls-properties port)
+        (= security :plain) (plain-properties port)
+        :else (ssl-properties port)))
+
+(defn debug-mode? [connection-config] (get connection-config :debug false))
+
+(defn config->session [connection-config]
+  (let [security (security connection-config)
+        port (port connection-config)
+        debug-mode? (debug-mode? connection-config)
+        check-ssl-certs? (check-ssl-certs? connection-config)
+        properties (get-properties-for-security security port)
+        session (Session/getInstance (if check-ssl-certs? properties (disable-cert-checking properties)))]
+    (if debug-mode?
+      (doto session (.setDebug true))
+      session)))
+
+(defn connection-config->store [connection-config]
+  (let [session ^Session (config->session connection-config)]
+    (if (= security :ssl)
+      (.getStore session "imaps")
+      (.getStore session "imap"))))
+
+(defn login [connection-config]
+  (let [store ^Store (connection-config->store connection-config)]
     (.connect store (:host connection-config) (:user connection-config) (:secret connection-config))
     store))
 
@@ -122,7 +174,7 @@
        (recur store (rest folder-names) result)))))
 
 (defn setup-folders! [connection-config category-names]
-  (with-open [store ^Store (connect connection-config)]
+  (with-open [store ^Store (login connection-config)]
     (create-folders store category-names)))
 
 (defn create-imap-directories! [connection-config]
@@ -215,8 +267,10 @@
           (reconnect-to-store identifier)))))
 
 (defn create-idle-manager [session]
-  (let [es (Executors/newCachedThreadPool)]
-    (reset! idle-manager (IdleManager. session es))))
+  (if (nil? @idle-manager)
+    (let [es (Executors/newCachedThreadPool)]
+      (reset! idle-manager (IdleManager. session es)))
+    nil))
 
 (defn health-check-for-identifier [identifier]
   (let [scheduled-future (.scheduleAtFixedRate ^ScheduledExecutorService executor-service
@@ -237,8 +291,8 @@
   (first (filter #(= id (:id %)) (keys @watchers))))
 
 (defn create-folder-monitor [connection-config channel]
-  (let [store (connect connection-config)
-        _ (create-idle-manager (Session/getInstance (properties)))
+  (let [store (login connection-config)
+        _ (create-idle-manager (config->session connection-config))
         identifier (connection-config->identifier connection-config)
         folder (start-monitoring store (:folder connection-config))]
     (swap! watchers (fn [subs new-data]

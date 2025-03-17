@@ -71,12 +71,29 @@ services:
 The following is a configuration file with all of the possible settings. The default value for data-folder is "~/.local/state/plauna" and the default value for the server port is 8080. The e-mail configurations have no default settings. Plauna can be run without any e-mail credentials, even though the key point of Plauna is having it automatically categorize your e-mails.
 
 #+begin_src clojure
-{:data-folder "/home/myhome/example-directory" ; the location for the db, training files and models
- :server {:port 80}
- :email {
-         :clients [{:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox"}]
-}}
+  {:data-folder "/home/myhome/example-directory" ; The location for the db, training files and models. Refers to the path in the container
+   :server {:port 80} ; The port Plauna's web server listens to in the container. Defaults to 8080.
+   :email {
+           :clients [{:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox"}]
+  }}
 #+end_src
+
+Additionally, you can adjust the IMAP connection security and port by using the keys :security and :port. Possible values for :security are :ssl (default), :starttls, and :plain. The default values for these keys are :ssl and 993, respectively. The IMAP client configuration with the optional keys would look like this:
+
+#+begin_src clojure
+  ;; Specify connection security only
+  {:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox" :security :starttls}
+
+  ;; Port 143 is default for starttls so you only need to set port explicitely if you are using a non-standard port.
+  {:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox" :security :starttls :port 155} 
+#+end_src
+
+Currently, Plauna only supports the AUTHENTICATION PLAIN method, i.e. authentication using username and password. Other authentication mechanisms like OAUTH are not supported yet.
+
+Other optional keys are:
+- :debug = Set to true to see the IMAP communication with the server in debug mode. Usage: ~{... :debug true}~ Defaults to false.
+
+- :check-ssl-certs = Set to false if you are using a self signed certificate on a server. Usage ~{... :check-ssl-certs false}~ Defaults to true.
 
 ** Getting Started
 

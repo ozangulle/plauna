@@ -142,6 +142,9 @@
 
 (defmulti parse-cli-arg (fn [arg] (first (string/split arg #"="))))
 (defmethod parse-cli-arg "--config-file" [arg-string] {:config-file (second (string/split arg-string #"="))})
+(defmethod parse-cli-arg :default [arg-string]
+  (t/log! :info ["Received non Plauna specific argument" arg-string "- Doing nothing."])
+  nil)
 
 (defn parse-config-from-cli-arguments [cli-args]
   (let [arguments (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} cli-args)]
