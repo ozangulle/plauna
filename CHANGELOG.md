@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2025-03-22.0] - 2025-03-22
+
+### 🚀 Features
+
+- Health check interval for IMAP client watcher is configurable
+- Show sanitized text next to the original on the email details page
+- *(ui)* Add pie charts to statistics pages for better data overview
+- Add optional config parameters for the email client
+
+### 🐛 Bug Fixes
+
+- Choose correct text content to train on when text attachments present
+- Evict preferences cache after updating a value
+- Throw an exception if no config file can be found during startup
+
+### 📚 Documentation
+
+- Fix the link to the Docker image in README
+- Add 'features' and 'screenshots' subsections
+
+### 🎨 Styling
+
+- Remove the delete buttons from admin ui
+
+### ⚙️ Miscellaneous Tasks
+
+- Update JRE 23 Docker image
+
 ## [2025-02-23.0] - 2025-02-23
 
 ### 🚀 Features
