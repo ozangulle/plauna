@@ -10,12 +10,13 @@
             [cld.core :as lang]
             [plauna.files :as files])
   (:import
-   (opennlp.tools.util.normalizer AggregateCharSequenceNormalizer EmojiCharSequenceNormalizer NumberCharSequenceNormalizer ShrinkCharSequenceNormalizer TwitterCharSequenceNormalizer CharSequenceNormalizer UrlCharSequenceNormalizer)
+   (opennlp.tools.util.normalizer AggregateCharSequenceNormalizer NumberCharSequenceNormalizer ShrinkCharSequenceNormalizer CharSequenceNormalizer)
    (opennlp.tools.util MarkableFileInputStreamFactory PlainTextByLineStream TrainingParameters)
    (opennlp.tools.doccat DocumentSampleStream DocumentCategorizerME DoccatFactory DoccatModel)
    (opennlp.tools.ml.naivebayes NaiveBayesTrainer)
    (opennlp.tools.ml.maxent GISTrainer)
    (java.util Locale)
+   (java.util.regex Pattern)
    (java.io File OutputStream)))
 
 (set! *warn-on-reflection* true)
@@ -29,17 +30,21 @@
 (def BetterURLNormalizer (reify CharSequenceNormalizer
                            (normalize [_ text] ((comp st/trim #(st/replace % #"https?://[-_.?&~%;+=/#0-9A-Za-z]+" "")) text))))
 
+(def NonCharNormalizer (reify CharSequenceNormalizer
+                         (normalize [_ text] (#(st/replace % (Pattern/compile "[^\\s\\w]" Pattern/UNICODE_CHARACTER_CLASS) " ") text))))
+
+(def NonPrintableCharNormalizer (reify CharSequenceNormalizer
+                                 (normalize [_ text] (#(st/replace % (Pattern/compile "\\p{C}") " ") text))))
+
 (def ^CharSequenceNormalizer normalizer (new AggregateCharSequenceNormalizer
                                              (into-array CharSequenceNormalizer
                                                          [BetterURLNormalizer
                                                           MailtoNormalizer
-                                                          (UrlCharSequenceNormalizer/getInstance)
-                                                          (EmojiCharSequenceNormalizer/getInstance)
-                                                          (TwitterCharSequenceNormalizer/getInstance)
                                                           (NumberCharSequenceNormalizer/getInstance)
                                                           (ShrinkCharSequenceNormalizer/getInstance)
+                                                          NonCharNormalizer
                                                           BracketsNormalizer
-                                                          (ShrinkCharSequenceNormalizer/getInstance)])))
+                                                          NonPrintableCharNormalizer])))
 
 (defn normalize [^String text] (.normalize normalizer text))
 
@@ -160,7 +165,4 @@
                     (map handle-enrichment)
                     local-chan
                     true
-                    (fn [^Throwable th]
-                      (t/log! :error (.getMessage th))
-                      ;(.printStackTrace th)
-                      ))))
+                    (fn [^Throwable th] (t/log! :error (.getMessage th))))))
