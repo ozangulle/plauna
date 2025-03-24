@@ -34,17 +34,18 @@
                          (normalize [_ text] (#(st/replace % (Pattern/compile "[^\\s\\w]" Pattern/UNICODE_CHARACTER_CLASS) " ") text))))
 
 (def NonPrintableCharNormalizer (reify CharSequenceNormalizer
-                                 (normalize [_ text] (#(st/replace % (Pattern/compile "\\p{C}") " ") text))))
+                                  (normalize [_ text] (#(st/replace % (Pattern/compile "\\p{C}") " ") text))))
 
 (def ^CharSequenceNormalizer normalizer (new AggregateCharSequenceNormalizer
                                              (into-array CharSequenceNormalizer
                                                          [BetterURLNormalizer
                                                           MailtoNormalizer
                                                           (NumberCharSequenceNormalizer/getInstance)
-                                                          (ShrinkCharSequenceNormalizer/getInstance)
-                                                          NonCharNormalizer
+
                                                           BracketsNormalizer
-                                                          NonPrintableCharNormalizer])))
+                                                          NonPrintableCharNormalizer
+                                                          NonCharNormalizer
+                                                          (ShrinkCharSequenceNormalizer/getInstance)])))
 
 (defn normalize [^String text] (.normalize normalizer text))
 
