@@ -428,7 +428,7 @@
 
 (defn start-server [config]
   (let [port (if (some? (-> (:server config) :port)) (-> (:server config) :port) (get-random-port))]
-    (t/log! :info [(str "Starting server: http://localhost:" port)])
+    (t/log! :info [(str "Starting server: http://0.0.0.0:" port)])
     (reset! server
             (jetty/run-jetty (fn [req] (app req))
                              {:port        port

@@ -38,8 +38,8 @@
         org.flywaydb/flyway-core {:mvn/version "11.0.0"}
         org.jsoup/jsoup {:mvn/version "1.18.2"}
         org.xerial/sqlite-jdbc {:mvn/version "3.47.1.0"}
-        ring/ring-core {:mvn/version "1.13.0"}
-        ring/ring-jetty-adapter {:mvn/version "1.13.0"}
+        ring/ring-core {:mvn/version "1.14.1"}
+        ring/ring-jetty-adapter {:mvn/version "1.14.1"}
         selmer/selmer {:mvn/version "1.12.61"}}}
 
     
