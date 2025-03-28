@@ -14,8 +14,7 @@
             [plauna.database :as db]
             [taoensso.telemere :as t]
             [clojure.core.async :as async])
-  (:import (org.flywaydb.core Flyway))
-  (:gen-class))
+  (:import (org.flywaydb.core Flyway)))
 
 (set! *warn-on-reflection* true)
 
