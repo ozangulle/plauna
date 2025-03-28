@@ -37,28 +37,40 @@
 
 (defonce health-checks (atom {}))
 
-(defn default-properties ^Properties [port]
+(defn default-port-for-security [security]
+  (if (= security :ssl) 993 143))
+
+(defn security [connection-config]
+  (let [security (get connection-config :security :ssl)]
+    (if (some #(= security %) [:ssl :starttls :plain])
+      security
+      :ssl)))
+
+(defn port [connection-config]
+  (str (get connection-config :port (default-port-for-security (security connection-config)))))
+
+(defn check-ssl-certs? [connection-config] (get connection-config :check-ssl-certs true))
+
+(defn default-imap-properties ^Properties [connection-config]
   (doto (new Properties)
-    (.setProperty "mail.imap.port" port)
+    (.setProperty "mail.imap.port" (port connection-config))
     (.setProperty "mail.imap.usesocketchannels" "true")
     (.setProperty "mail.imap.timeout" "5000")
     (.setProperty "mail.imap.partialfetch" "false")
     (.setProperty "mail.imap.fetchsize" "1048576")))
 
-(defn ssl-properties ^Properties [port]
-  (doto (default-properties port)
-    (.setProperty "mail.imap.ssl.enable", "true")))
+(defn security-properties [connection-config]
+  (let [security-key (security connection-config)]
+    (fn [^Properties properties]
+      (cond (= security-key :ssl) (doto properties (.setProperty "mail.imap.ssl.enable", "true"))
+            (= security-key :starttls) (doto properties (.setProperty "mail.imap.starttls.enable", "true"))
+            (= security-key :plain) properties
+            :else (doto properties (.setProperty "mail.imap.ssl.enable", "true"))))))
 
-(defn starttls-properties ^Properties [port]
-  (doto (default-properties port)
-    (.setProperty "mail.imap.starttls.enable", "true")))
-
-(defn plain-properties ^Properties [port]
-  (default-properties port))
-
-(defn disable-cert-checking [^Properties properties]
-  (.setProperty properties "mail.imap.ssl.trust", "*")
-  properties)
+(defn certification-check-properties [connection-config]
+  (if (not (check-ssl-certs? connection-config))
+    (fn [^Properties properties] (doto properties (.setProperty "mail.imap.ssl.trust", "*")))
+    (fn [^Properties properties] properties)))
 
 (defn find-by-id-in-watchers [id]
   (filter #(= id (:id (first %))) @watchers))
@@ -67,37 +79,17 @@
   (proxy [SearchTerm] [] (match [^Message message]
                            (= message-id (first (.getHeader message "Message-ID"))))))
 
-(defn security [connection-config]
-  (let [security (get connection-config :security :ssl)]
-    (if (some #(= security %) [:ssl :starttls :plain])
-      security
-      :ssl)))
-
-(defn check-ssl-certs? [connection-config] (get connection-config :check-ssl-certs true))
-
-(defn default-port-for-security [security]
-  (if (= security :ssl) 993 143))
-
-(defn port [connection-config]
-  (str (get connection-config :port (default-port-for-security (security connection-config)))))
-
-(defn get-properties-for-security [security port]
-  (cond (= security :starttls) (starttls-properties port)
-        (= security :plain) (plain-properties port)
-        :else (ssl-properties port)))
-
-(defn debug-mode? [connection-config] (get connection-config :debug false))
+(defn set-debug-mode [connection-config]
+  (let [debug? (get connection-config :debug false)]
+    (fn [^Session session]
+      (if debug? (doto session (.setDebug true)) session))))
 
 (defn config->session [connection-config]
-  (let [security (security connection-config)
-        port (port connection-config)
-        debug-mode? (debug-mode? connection-config)
-        check-ssl-certs? (check-ssl-certs? connection-config)
-        properties (get-properties-for-security security port)
-        session (Session/getInstance (if check-ssl-certs? properties (disable-cert-checking properties)))]
-    (if debug-mode?
-      (doto session (.setDebug true))
-      session)))
+  (-> (default-imap-properties connection-config)
+      ((security-properties connection-config))
+      ((certification-check-properties connection-config))
+      Session/getInstance
+      ((set-debug-mode connection-config))))
 
 (defn connection-config->store [connection-config]
   (let [session ^Session (config->session connection-config)]
