@@ -10,13 +10,12 @@
   (:import
    (jakarta.mail Store Session Folder Message)
    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
-   (jakarta.mail.search SearchTerm)
    (jakarta.mail.event MessageCountAdapter MessageCountEvent)
    (java.io ByteArrayOutputStream)
    (java.lang AutoCloseable)
    (java.util Properties)
    (java.util.concurrent Executors)
-   (org.eclipse.angus.mail.imap IdleManager)
+   (org.eclipse.angus.mail.imap IdleManager IMAPStore)
    (java.util.concurrent Executors TimeUnit ScheduledExecutorService)))
 
 ; Names
@@ -75,10 +74,6 @@
 (defn find-by-id-in-watchers [id]
   (filter #(= id (:id (first %))) @watchers))
 
-(defn message-id-search-term [message-id]
-  (proxy [SearchTerm] [] (match [^Message message]
-                           (= message-id (first (.getHeader message "Message-ID"))))))
-
 (defn set-debug-mode [connection-config]
   (let [debug? (get connection-config :debug false)]
     (fn [^Session session]
@@ -105,13 +100,14 @@
 (defn folder-separator [^Store store] (.getSeparator (.getDefaultFolder store)))
 
 (defn read-all-emails [id ^String folder-name options]
+  (t/log! :info ["Read all e-mails from:" folder-name "with options:" options])
   (async/go (let [store (:store (second (first (find-by-id-in-watchers id))))
-                  inbox ^Folder (doto (.getFolder ^Store store folder-name) (.open Folder/READ_WRITE))]
-              (vec (doseq [message-num (range 1 (inc (.getMessageCount ^Folder inbox)))
-                           :let [message ^Message (.getMessage ^Folder inbox message-num)]]
+                  folder ^Folder (doto (.getFolder ^Store store folder-name) (.open Folder/READ_WRITE))]
+              (vec (doseq [message-num (range 1 (inc (.getMessageCount ^Folder folder)))
+                           :let [message ^Message (.getMessage ^Folder folder message-num)]]
                      (with-open [os (ByteArrayOutputStream.)]
                        (.writeTo message os)
-                       (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :refolder (:refolder options) :store store :original-folder folder-name}))))))))
+                       (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :move (:move options) :store store :folder folder :original-folder folder-name :message message}))))))))
 
 (defn stop-subscription [host user folder-name]
   (let [key {:host host :user user :folder-name folder-name}
@@ -130,30 +126,28 @@
 (defn structured-folder-name [store lower-case-folder-name]
   (str parent-folder-name (folder-separator store) (s/capitalize lower-case-folder-name)))
 
-(defn move-messages-by-id [^Store store message-id ^String source-name ^String target-name]
-  (with-open [target-folder ^IMAPFolder (doto (.getFolder ^Store store ^String (structured-folder-name store target-name)) (.open Folder/READ_WRITE))
-              source-folder ^AutoCloseable (doto (.getFolder store source-name) (.open Folder/READ_WRITE))]
-    (.moveMessages ^IMAPFolder source-folder (into-array Message (.search source-folder (message-id-search-term message-id))) target-folder)))
+(defn move-message-from-folder-by-id [^Store store ^Message message ^Folder source-folder ^String target-name]
+  (let [target-folder ^IMAPFolder (.getFolder ^Store store ^String (structured-folder-name store target-name))]
+    (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder)))
 
 (defn client-event-loop
   "Listens to :enriched-email
 
   Options:
-  :refolder - boolean
+  :move - boolean
 
-  If :refolder is true, move the e-mail to the corresponding category folder."
+  If :move is true, move the e-mail to the corresponding category folder."
   [publisher]
   (let [local-chan (async/chan)]
     (async/sub publisher :enriched-email local-chan)
     (async/go-loop [event (async/<! local-chan)]
       (when (some? event)
-        (when (and (true? (:refolder (:options event))) (some? (:category (:metadata (:payload event)))))
-          (let [message-id (get-in event [:payload :header :message-id])
-                category-name (get-in event [:payload :metadata :category])]
+        (when (and (true? (:move (:options event))) (some? (:category (:metadata (:payload event)))))
+          (let [category-name (get-in event [:payload :metadata :category])]
             (when (some? category-name)
               (t/log! :info (str "Moving email: " (get-in event [:payload :header :subject]) " categorized as: " (get-in event [:payload :metadata :category])))
-              (try (move-messages-by-id (get-in event [:options :store]) message-id (get-in event [:options :original-folder]) category-name)
-                   (catch Exception e (t/log! :error (.getMessage e)))))))
+              (try (move-message-from-folder-by-id (get-in event [:options :store]) (get-in event [:options :message]) (get-in event [:options :folder]) category-name)
+                   (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))))))
         (recur (async/<! local-chan))))))
 
 (defn create-folders
@@ -165,16 +159,17 @@
      (let [result (create-folder store (structured-folder-name store (first folder-names)) result-map)]
        (recur store (rest folder-names) result)))))
 
-(defn setup-folders! [connection-config category-names]
-  (with-open [store ^Store (login connection-config)]
-    (create-folders store category-names)))
-
-(defn create-imap-directories! [connection-config]
-  (let [category-names (mapv :name (db/get-categories))]
+(defn create-imap-directories! [store]
+  (let [category-names (mapv :name (db/get-categories))
+        result (create-folders store category-names)]
     (t/log! :info ["Creating directories from category names" category-names])
     (t/log! {:level :info
-             :data  {:result (setup-folders! connection-config category-names)}}
+             :data  {:result result}}
             "Created the directories.")))
+
+(defn check-necessary-capabilities [^IMAPStore store]
+  (when (not (.hasCapability store "MOVE"))
+    (t/log! :warn ["The IMAP server" (.getURLName store) "does not have the capability: MOVE"])))
 
 (defrecord FolderMonitor [^Store store ^Folder folder listen-channel]
   AutoCloseable
@@ -192,17 +187,15 @@
     (messagesAdded [^MessageCountEvent event]
       (t/log! :info "Received new message event.")
       (doseq [message ^IMAPMessage (.getMessages event)]
-        (t/log! :debug "Processing message.")
+        (t/log! :debug ["Processing message:" (bean message)])
         (.setPeek ^IMAPMessage message true)
         (with-open [os ^OutputStream (ByteArrayOutputStream.)]
-          (t/log! :debug "Created output stream")
           (.writeTo ^IMAPMessage message os)
-          (t/log! :debug "Wrote to output stream")
-          (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :refolder true :store store :original-folder folder-name :message message}))
+          (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :move true :store store :folder folder :original-folder folder-name :message message}))
           (try
             (.watch ^IdleManager @idle-manager folder)
             (catch Exception e
-              (t/log! :error (.getMessage e)))))))))
+              (t/log! {:level :error :error e} (.getMessage e)))))))))
 
 (defn start-monitoring [^Store store ^String folder-name]
   (let [folder ^IMAPFolder (.getFolder store folder-name)]
@@ -213,7 +206,7 @@
       (.watch ^IdleManager @idle-manager folder)
       (t/log! :info ["Started monitoring for" folder-name "in" (.getURLName store)])
       (catch Exception e
-        (t/log! :error (.getMessage e))))
+        (t/log! {:level :error :error e} (.getMessage e))))
     folder))
 
 (defn swap-new-monitor [identifier monitor]
@@ -238,7 +231,7 @@
       (t/log! :debug "Starting to idle.")
       (start-monitoring-and-change-state identifier monitor)
       (catch Exception e
-        (do (t/log! :error (.getMessage e))
+        (do (t/log! {:level :error :error e} (.getMessage e))
             (Thread/sleep 5000)
             (reconnect-to-store identifier))))))
 
@@ -290,7 +283,8 @@
     (swap! watchers (fn [subs new-data]
                       (conj subs {identifier new-data}))
            (->FolderMonitor store folder channel))
-    (health-check-for-identifier identifier)))
+    (health-check-for-identifier identifier)
+    store))
 
 (defn connect-using-id [id]
   (let [config (identifier->connection-config id)

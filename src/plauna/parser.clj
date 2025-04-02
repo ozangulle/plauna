@@ -52,7 +52,7 @@
 
 (defn decode-body [^BinaryBody body]
   (try (new String ^bytes (stream->bytes (.getInputStream body)))
-       (catch java.io.UnsupportedEncodingException e (t/log! :error e) (new String ^bytes (stream->bytes (.getInputStream body))))))
+       (catch java.io.UnsupportedEncodingException e (t/log! {:level :error :error e} (.getMessage e)) (new String ^bytes (stream->bytes (.getInputStream body))))))
 
 (defn reader->string [^Reader reader]
   (with-open [r reader] (slurp r)))
@@ -132,7 +132,7 @@
 (defn with-message-id? [parsed-email]
   (let [message-id (get-in parsed-email [:header :message-id])]
     (if (or (nil? message-id) (empty? message-id))
-      (do (t/log! :error ["Dropping parsed-email with headers" (into {} (:header parsed-email)) "Reason: message-id is empty"])
+      (do (t/log! {:level :error} ["Dropping parsed-email with headers" (into {} (:header parsed-email)) "Reason: message-id is empty"])
           false)
       true)))
 
@@ -160,5 +160,5 @@
                     local-channel
                     true
                     (fn [^Throwable th]
-                      (t/log! :error (.getMessage th))
+                      (t/log! {:level :error :error th} (.getMessage th))
                       (.printStackTrace th)))))

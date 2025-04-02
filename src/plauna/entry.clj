@@ -30,8 +30,9 @@
   [config]
   (let [listen-channel (chan 10)]
     (doseq [client-config (:clients (:email config))]
-      (client/create-imap-directories! client-config)
-      (client/create-folder-monitor client-config listen-channel))
+      (let [store (client/create-folder-monitor client-config listen-channel)]
+        (client/create-imap-directories! store)
+        (client/check-necessary-capabilities store)))
     (t/log! :debug "Listening to new emails from listen-channel")))
 
 (defn -main

@@ -104,7 +104,7 @@
       {:model
        (DocumentCategorizerME/train (:language tf) (training-data-stream (:file tf)) (training-parameters) (DoccatFactory.))
        :language (:language tf)}
-      (catch Exception e (t/log! :error (.getMessage e))))))
+      (catch Exception e (t/log! {:level :error :error e} (.getMessage e))))))
 
 (defn categorize [text ^File model-file]
   (if (.exists model-file)
@@ -139,7 +139,7 @@
   (let [email (:payload event)
         body-part-to-train-on (core-email/body-part-for-mime-type "text/html" email)
         training-content (normalize-body-part body-part-to-train-on)
-        language-result (try (detect-language training-content) (catch Exception e (t/log! :error [(.getMessage e) "\nText causing the exception:" training-content])))]
+        language-result (try (detect-language training-content) (catch Exception e (t/log! {:level :error :error e} [(.getMessage e) "\nText causing the exception:" training-content])))]
     (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category (-> email :metadata :category) :category-confidence (-> email :metadata :category-confidence) :category-id (-> email :metadata :category-id)})))
 
 (defmulti handle-enrichment :type)
@@ -166,4 +166,4 @@
                     (map handle-enrichment)
                     local-chan
                     true
-                    (fn [^Throwable th] (t/log! :error (.getMessage th))))))
+                    (fn [^Throwable th] (t/log! {:level :error :error th} (.getMessage th))))))

@@ -121,7 +121,7 @@
     (save-contacts (:participants buffer))
     (save-communications (:participants buffer))
     (when (seq (:metadata buffer)) (update-metadata-batch (:metadata buffer)))
-    (catch Exception e (t/log! :error (.getMessage e)))))
+    (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))))
 
 (defn database-event-loop [publisher]
   (let [parsed-chan (async/chan)

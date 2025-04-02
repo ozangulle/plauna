@@ -390,9 +390,9 @@
     (let [params (:params request)
           id (:id params)
           folder (:folder params)
-          refolder (some? (:move params))]
-      (client/read-all-emails id folder {:refolder refolder})
-      (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " refolder)}))))
+          move (some? (:move params))]
+      (client/read-all-emails id folder {:move move})
+      (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)}))))
     (redirect-request request))
 
   (comp/GET "/connections/:id/restart" request
@@ -413,8 +413,8 @@
 
 (defn upload-progress [_ bytes-read content-length item-count]
   (t/log! {:level       :info
-           :sample-rate 0.5
-           :rate-limit  {"1 per 10 sec" [1 10000]}}
+           :sample 0.5
+           :limit  {"1 per 10 sec" [1 10000]}}
           ["Writing" item-count "files. Read" (* 100 (float (/ bytes-read content-length))) "% until now. Total length: " content-length]))
 
 (def app (-> (fn [req] (routes req))
