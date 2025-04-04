@@ -261,7 +261,7 @@
             (reconnect-to-store identifier))))))
 
 (defn check-connection [identifier]
-  (let [monitor (get @connections identifier)
+  (let [{monitor :monitor} (get @connections identifier)
         store (:store monitor)]
     (if (.isConnected ^Store store)
       (t/log! :debug "Store is still connected.")
@@ -269,7 +269,7 @@
           (reconnect-to-store identifier)))))
 
 (defn check-folder [identifier]
-  (let [monitor (get @connections identifier)
+  (let [{monitor :monitor} (get @connections identifier)
         folder (:folder monitor)]
     (if (.isOpen ^Folder folder)
       (t/log! :debug "Folder is still open.")
@@ -292,7 +292,7 @@
                                                         ^IdleManager im @idle-manager]
                                                     (t/log! :debug ["Resuming to watch folder:" (.getFullName folder)])
                                                     (.watch im (:folder monitor))))
-                                               300 (p/client-health-check-interval) TimeUnit/SECONDS)]
+                                               120 (p/client-health-check-interval) TimeUnit/SECONDS)]
     (swap-new-period-check identifier scheduled-future)))
 
 (defn config-id [something]
