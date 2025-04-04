@@ -178,12 +178,12 @@
   (render-file "admin-languages.html" {:language-preferences language-preferences}))
 
 (defn watcher-list [clients]
-  (let [watchers (map (fn [client] {:id (-> client first first :id) :logged-in (-> client first second :connected) :folder-open (-> client first second :folder) :string (str (-> client first first :host) " - " (-> client first first :user))}) clients)]
+  (let [watchers (mapv (fn [client] {:id (first client) :logged-in (-> client second :connected) :folder-open (-> client second :folder) :string (str (-> client (nth 2) :config :host) " - " (-> client (nth 2) :config :user))}) clients)]
     (render-file "watchers.html" {:watchers watchers})))
 
 (defn watcher
-  ([client folders] (render-file "watcher.html" {:id (-> client first :id) :host (:host (first client)) :user (:user (first client)) :folders folders}))
-  ([client folders messages] (render-file "watcher.html" {:id (-> client first :id) :host (:host (first client)) :user (:user (first client)) :folders folders :messages (mapv type->toast-role messages)})))
+  ([id config folders] (render-file "watcher.html" {:id id :host (:host config) :user (:user config) :folders folders}))
+  ([id client folders messages] (render-file "watcher.html" {:id id :host (:host client) :user (:user client) :folders folders :messages (mapv type->toast-role messages)})))
 
 (defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}]}]
                                 (render-file "admin-preferences.html" (conj data log-levels))))

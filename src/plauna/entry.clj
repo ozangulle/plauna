@@ -15,9 +15,8 @@
 
 (defn setup-logging []
   (t/set-min-level! :info)
-  (t/set-min-level! :slf4j "org.eclipse.jetty.server.*" :error))
-
-(comment (t/set-min-level! :debug))
+  ;; jetty is very noisy. Disable all jetty logs.
+  (t/set-ns-filter! {:disallow "org.eclipse.jetty.*"}))
 
 (set! *warn-on-reflection* true)
 
