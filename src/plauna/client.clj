@@ -131,6 +131,7 @@
 
 (defn copy-message [^Message message ^Folder source-folder ^Folder target-folder]
   (try
+    (.setPeek ^IMAPMessage message true)
     (.copyMessages source-folder (into-array Message [message]) target-folder)
     (t/log! :debug ["Copied" message])
     (.setFlag message Flags$Flag/DELETED true)
@@ -146,7 +147,8 @@
         target-folder ^IMAPFolder (.getFolder ^Store store ^String (structured-folder-name store target-name))]
     ;; Wrong key to force the use of copy and delete strategy
     (if (.contains capabilities :mlem)
-      (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder)
+      (do (.setPeek ^IMAPMessage message true)
+          (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder))
       (do (t/log! :debug "Server does not support the IMAP MOVE command. Using copy and delete as fallback.")
           (copy-message message source-folder target-folder)))))
 
