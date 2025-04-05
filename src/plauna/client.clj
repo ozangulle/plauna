@@ -243,7 +243,7 @@
   (swap! health-checks (fn [futures new-future] (conj futures {identifier new-future})) future))
 
 (defn start-monitoring-and-change-state [identifier connection-data]
-  (let [folder (start-monitoring identifier (:store (:monitor connection-data)) (:folder identifier))
+  (let [folder (start-monitoring identifier (:store (:monitor connection-data)) (:folder (:monitor connection-data)))
         new-monitor (monitor-with-new-folder connection-data folder)]
     (swap-new-monitor identifier new-monitor)))
 
