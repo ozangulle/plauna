@@ -285,15 +285,19 @@
 (defn health-check-for-identifier [identifier]
   (let [scheduled-future (.scheduleAtFixedRate ^ScheduledExecutorService executor-service
                                                #(do
-                                                  (t/log! :debug ["Checking if the connection for id" identifier "is open"])
-                                                  (check-connection identifier)
-                                                  (t/log! :debug ["Checking if the folder for id" identifier "is open"])
-                                                  (check-folder identifier)
-                                                  (let [{monitor :monitor} (get @connections identifier)
-                                                        ^Folder folder (:folder monitor)
-                                                        ^IdleManager im @idle-manager]
-                                                    (t/log! :debug ["Resuming to watch folder:" (.getFullName folder)])
-                                                    (.watch im (:folder monitor))))
+                                                  (try
+                                                    (t/log! :debug ["Checking if the connection for id" identifier "is open"])
+                                                    (check-connection identifier)
+                                                    (t/log! :debug ["Checking if the folder for id" identifier "is open"])
+                                                    (check-folder identifier)
+                                                    (let [{monitor :monitor} (get @connections identifier)
+                                                          ^Folder folder (:folder monitor)
+                                                          ^Store store (:store monitor)
+                                                          ^IdleManager im @idle-manager]
+                                                      (t/log! :debug ["Resuming to watch folder:" (.getURLName store) "-" (.getFullName folder) ])
+                                                      (.watch im (:folder monitor)))
+                                                    (catch Exception e (do (t/log! {:level :error :error e} "There was a problem during health check.")
+                                                                           (reconnect-to-store identifier)))))
                                                120 (p/client-health-check-interval) TimeUnit/SECONDS)]
     (swap-new-period-check identifier scheduled-future)))
 
