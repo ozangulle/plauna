@@ -68,7 +68,7 @@
    :body    body})
 
 (defn find-running-clients []
-  (map (fn [watcher] {(first watcher) (client/monitor->map (second watcher))}) @client/watchers))
+  (mapv (fn [connection] [(first connection) (client/monitor->map (:monitor (second connection))) (second connection)]) @client/connections))
 
 (defn redirect-request
   ([request]
@@ -381,10 +381,12 @@
     (if (seq @global-messages)
       (let [messages @global-messages]
         (swap! global-messages (fn [_] []))
-        (success-html-with-body (markup/watcher (first (client/find-by-id-in-watchers id))
-                                                (client/folders-in-store (:store (second (first (client/find-by-id-in-watchers id))))) messages)))
-      (success-html-with-body (markup/watcher (first (client/find-by-id-in-watchers id))
-                                              (client/folders-in-store (:store (second (first (client/find-by-id-in-watchers id)))))))))
+        (success-html-with-body (markup/watcher id
+                                                (:config (client/find-by-id-in-watchers id))
+                                                (client/folders-in-store (:store (:monitor (client/find-by-id-in-watchers id)))) messages)))
+      (success-html-with-body (markup/watcher id
+                                              (:config (client/find-by-id-in-watchers id))
+                                              (client/folders-in-store (:store (:monitor (client/find-by-id-in-watchers id))))))))
 
   (comp/POST "/connections/:id" request
     (let [params (:params request)

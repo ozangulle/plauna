@@ -8,7 +8,8 @@
    [taoensso.telemere :as t]
    [plauna.messaging :as messaging])
   (:import
-   (jakarta.mail Store Session Folder Message)
+   (clojure.lang PersistentVector)
+   (jakarta.mail Store Session Folder Message Flags$Flag)
    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
    (jakarta.mail.event MessageCountAdapter MessageCountEvent)
    (java.io ByteArrayOutputStream)
@@ -32,7 +33,7 @@
 
 (defonce parent-folder-name "Categories")
 
-(defonce watchers (atom {}))
+(defonce connections (atom {}))
 
 (defonce health-checks (atom {}))
 
@@ -72,7 +73,7 @@
     (fn [^Properties properties] properties)))
 
 (defn find-by-id-in-watchers [id]
-  (filter #(= id (:id (first %))) @watchers))
+  (get @connections id))
 
 (defn set-debug-mode [connection-config]
   (let [debug? (get connection-config :debug false)]
@@ -101,20 +102,22 @@
 
 (defn read-all-emails [id ^String folder-name options]
   (t/log! :info ["Read all e-mails from:" folder-name "with options:" options])
-  (async/go (let [store (:store (second (first (find-by-id-in-watchers id))))
+  (async/go (let [store (:store (:monitor (find-by-id-in-watchers id)))
                   folder ^Folder (doto (.getFolder ^Store store folder-name) (.open Folder/READ_WRITE))]
               (vec (doseq [message-num (range 1 (inc (.getMessageCount ^Folder folder)))
                            :let [message ^Message (.getMessage ^Folder folder message-num)]]
                      (with-open [os (ByteArrayOutputStream.)]
                        (.writeTo message os)
-                       (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :move (:move options) :store store :folder folder :original-folder folder-name :message message}))))))))
+                       (async/>!! @messaging/main-chan (events/create-event :received-email
+                                                                            (.toByteArray os)
+                                                                            {:enrich true :move (:move options) :id id :folder folder :original-folder folder-name :message message}))))))))
 
 (defn stop-subscription [host user folder-name]
   (let [key {:host host :user user :folder-name folder-name}
-        connection-and-idle-manager (get @watchers key)]
+        connection-and-idle-manager (get @connections key)]
     (cond (some? connection-and-idle-manager)
           (.stop ^IdleManager (:idle-manager connection-and-idle-manager)))
-    (swap! watchers (fn [subs sub] (dissoc subs sub)) key)))
+    (swap! connections (fn [subs sub] (dissoc subs sub)) key)))
 
 (defn create-folder [^Store store ^String folder-name result-map]
   (let [folder ^IMAPFolder (.getFolder store folder-name)]
@@ -126,9 +129,27 @@
 (defn structured-folder-name [store lower-case-folder-name]
   (str parent-folder-name (folder-separator store) (s/capitalize lower-case-folder-name)))
 
-(defn move-message-from-folder-by-id [^Store store ^Message message ^Folder source-folder ^String target-name]
-  (let [target-folder ^IMAPFolder (.getFolder ^Store store ^String (structured-folder-name store target-name))]
-    (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder)))
+(defn copy-message [^Message message ^Folder source-folder ^Folder target-folder]
+  (try
+    (.setPeek ^IMAPMessage message true)
+    (.copyMessages source-folder (into-array Message [message]) target-folder)
+    (t/log! :debug ["Copied" message])
+    (.setFlag message Flags$Flag/DELETED true)
+    (t/log! :debug ["Set DELETED flag for" message])
+    (.expunge source-folder)
+    (t/log! :debug ["Expunged source folder"])
+    (catch Exception e (t/log! {:level :error :error e} ["There was an error copying and deleting the message" message]))))
+
+(defn move-message [id ^Message message ^Folder source-folder ^String target-name]
+  (let [connection (get @connections id)
+        store (:store (:monitor connection))
+        capabilities ^PersistentVector (:capabilities connection)
+        target-folder ^IMAPFolder (.getFolder ^Store store ^String (structured-folder-name store target-name))]
+    (if (.contains capabilities :move)
+      (do (.setPeek ^IMAPMessage message true)
+          (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder))
+      (do (t/log! :debug "Server does not support the IMAP MOVE command. Using copy and delete as fallback.")
+          (copy-message message source-folder target-folder)))))
 
 (defn client-event-loop
   "Listens to :enriched-email
@@ -146,8 +167,12 @@
           (let [category-name (get-in event [:payload :metadata :category])]
             (when (some? category-name)
               (t/log! :info (str "Moving email: " (get-in event [:payload :header :subject]) " categorized as: " (get-in event [:payload :metadata :category])))
-              (try (move-message-from-folder-by-id (get-in event [:options :store]) (get-in event [:options :message]) (get-in event [:options :folder]) category-name)
-                   (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))))))
+              (try (move-message (get-in event [:options :id]) (get-in event [:options :message]) (get-in event [:options :folder]) category-name)
+                   (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))
+                   (finally (do (t/log! :debug ["Continue watching folder" (get-in event [:options :original-folder])])
+                                (let [^Folder folder (get-in event [:options :folder])
+                                      ^IdleManager im @idle-manager]
+                                  (.watch im folder))))))))
         (recur (async/<! local-chan))))))
 
 (defn create-folders
@@ -179,29 +204,30 @@
       (.close ^Folder (.folder this)))
     (.close store)))
 
-(defn monitor-with-new-folder [monitor folder]
-  (->FolderMonitor (:store monitor) folder (:listen-channel monitor)))
+(defn monitor-with-new-folder [connection-data folder]
+  (->FolderMonitor (:store (:monitor connection-data)) folder (:listen-channel (:monitor connection-data))))
 
-(defn message-count-adapter [store folder folder-name]
+(defn message-count-adapter [id folder folder-name]
   (proxy [MessageCountAdapter] []
     (messagesAdded [^MessageCountEvent event]
       (t/log! :info "Received new message event.")
       (doseq [message ^IMAPMessage (.getMessages event)]
-        (t/log! :debug ["Processing message:" (bean message)])
+        (t/log! :debug ["Processing message:" message])
         (.setPeek ^IMAPMessage message true)
         (with-open [os ^OutputStream (ByteArrayOutputStream.)]
           (.writeTo ^IMAPMessage message os)
-          (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :move true :store store :folder folder :original-folder folder-name :message message}))
-          (try
-            (.watch ^IdleManager @idle-manager folder)
-            (catch Exception e
-              (t/log! {:level :error :error e} (.getMessage e)))))))))
+          (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :move true :id id :folder folder :original-folder folder-name :message message}))))
+      (try
+        (t/log! :debug ["Handled messagesAdded event. Resuming to watch the folder" folder-name])
+        (.watch ^IdleManager @idle-manager folder)
+        (catch Exception e
+          (t/log! {:level :error :error e} (.getMessage e)))))))
 
-(defn start-monitoring [^Store store ^String folder-name]
+(defn start-monitoring [id ^Store store ^String folder-name]
   (let [folder ^IMAPFolder (.getFolder store folder-name)]
     (when (not (.isOpen folder))
       (.open folder Folder/READ_WRITE))
-    (.addMessageCountListener folder (message-count-adapter store folder folder-name))
+    (.addMessageCountListener folder (message-count-adapter id folder folder-name))
     (try
       (.watch ^IdleManager @idle-manager folder)
       (t/log! :info ["Started monitoring for" folder-name "in" (.getURLName store)])
@@ -210,33 +236,33 @@
     folder))
 
 (defn swap-new-monitor [identifier monitor]
-  (swap! watchers assoc identifier monitor))
+  (swap! connections assoc identifier monitor))
 
 (defn swap-new-period-check [identifier future]
   (swap! health-checks (fn [futures new-future] (conj futures {identifier new-future})) future))
 
-(defn start-monitoring-and-change-state [identifier monitor]
-  (let [folder (start-monitoring (:store monitor) (:folder identifier))
-        new-monitor (monitor-with-new-folder monitor folder)]
+(defn start-monitoring-and-change-state [identifier connection-data]
+  (let [folder (start-monitoring identifier (:store (:monitor connection-data)) (.fullName ^IMAPFolder (:folder (:monitor connection-data))))
+        new-monitor (monitor-with-new-folder connection-data folder)]
     (swap-new-monitor identifier new-monitor)))
 
 (defn reconnect-to-store [identifier]
-  (let [monitor (get @watchers identifier)
-        store ^Store (:store monitor)]
+  (let [connection-data (get @connections identifier)
+        store ^Store (:store (:monitor connection-data))]
     (t/log! :debug "Closing store.")
     (.close store)
     (try
       (t/log! :debug "Connecting to store.")
       (.connect store)
       (t/log! :debug "Starting to idle.")
-      (start-monitoring-and-change-state identifier monitor)
+      (start-monitoring-and-change-state identifier connection-data)
       (catch Exception e
         (do (t/log! {:level :error :error e} (.getMessage e))
             (Thread/sleep 5000)
             (reconnect-to-store identifier))))))
 
 (defn check-connection [identifier]
-  (let [monitor (get @watchers identifier)
+  (let [{monitor :monitor} (get @connections identifier)
         store (:store monitor)]
     (if (.isConnected ^Store store)
       (t/log! :debug "Store is still connected.")
@@ -244,7 +270,7 @@
           (reconnect-to-store identifier)))))
 
 (defn check-folder [identifier]
-  (let [monitor (get @watchers identifier)
+  (let [{monitor :monitor} (get @connections identifier)
         folder (:folder monitor)]
     (if (.isOpen ^Folder folder)
       (t/log! :debug "Folder is still open.")
@@ -252,17 +278,26 @@
           (reconnect-to-store identifier)))))
 
 (defn create-idle-manager [session]
-  (if (nil? @idle-manager)
-    (let [es (Executors/newCachedThreadPool)]
-      (reset! idle-manager (IdleManager. session es)))
-    nil))
+  (when (nil? @idle-manager)
+    (reset! idle-manager (IdleManager. session (Executors/newCachedThreadPool)))))
 
 (defn health-check-for-identifier [identifier]
   (let [scheduled-future (.scheduleAtFixedRate ^ScheduledExecutorService executor-service
                                                #(do
-                                                  (check-connection identifier)
-                                                  (check-folder identifier))
-                                               60 (p/client-health-check-interval) TimeUnit/SECONDS)]
+                                                  (try
+                                                    (t/log! :debug ["Checking if the connection for id" identifier "is open"])
+                                                    (check-connection identifier)
+                                                    (t/log! :debug ["Checking if the folder for id" identifier "is open"])
+                                                    (check-folder identifier)
+                                                    (let [{monitor :monitor} (get @connections identifier)
+                                                          ^Folder folder (:folder monitor)
+                                                          ^Store store (:store monitor)
+                                                          ^IdleManager im @idle-manager]
+                                                      (t/log! :debug ["Resuming to watch folder:" (.getURLName store) "-" (.getFullName folder) ])
+                                                      (.watch im (:folder monitor)))
+                                                    (catch Exception e (do (t/log! {:level :error :error e} "There was a problem during health check.")
+                                                                           (reconnect-to-store identifier)))))
+                                               120 (p/client-health-check-interval) TimeUnit/SECONDS)]
     (swap-new-period-check identifier scheduled-future)))
 
 (defn config-id [something]
@@ -270,26 +305,39 @@
 
 (defn connection-config->identifier [connection-config]
   (let [cleaned-config (dissoc connection-config :id)]
-    (-> connection-config (assoc :id (config-id cleaned-config)))))
+    (config-id cleaned-config)))
 
 (defn identifier->connection-config [id]
-  (first (filter #(= id (:id %)) (keys @watchers))))
+  (first (filter #(= id (:id %)) (keys @connections))))
+
+(defn capability-name [^IMAPStore store ^String cap-name]
+  (when (.hasCapability store cap-name)
+    (keyword (clojure.string/lower-case cap-name))))
+
+(defn connection-object [^FolderMonitor monitor config capabilities]
+  {:monitor monitor
+   :config config
+   :capabilities capabilities})
+
+(defn connection-object-with-capabilities [^FolderMonitor monitor config]
+  (let [store (:store monitor)]
+    (connection-object monitor config (filterv some? (mapv #(capability-name store %) ["MOVE"])))))
 
 (defn create-folder-monitor [connection-config channel]
+  (create-idle-manager (config->session connection-config))
   (let [store (login connection-config)
-        _ (create-idle-manager (config->session connection-config))
         identifier (connection-config->identifier connection-config)
-        folder (start-monitoring store (:folder connection-config))]
-    (swap! watchers (fn [subs new-data]
-                      (conj subs {identifier new-data}))
-           (->FolderMonitor store folder channel))
+        folder (start-monitoring identifier store (:folder connection-config))]
+    (swap! connections (fn [subs new-data]
+                         (conj subs {identifier new-data}))
+           (connection-object-with-capabilities (->FolderMonitor store folder channel) connection-config))
     (health-check-for-identifier identifier)
     store))
 
 (defn connect-using-id [id]
-  (let [config (identifier->connection-config id)
-        listen-channel (:listen-channel (get @watchers config))]
-    (create-folder-monitor config listen-channel)))
+  (let [connection (get @connections id)
+        listen-channel (:listen-channel (get @connections (:config connection)))]
+    (create-folder-monitor (:config connection) listen-channel)))
 
 (defn monitor->map [monitor]
   (let [store ^Store (-> monitor :store)
