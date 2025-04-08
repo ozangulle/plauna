@@ -207,6 +207,25 @@
 (defn monitor-with-new-folder [connection-data folder]
   (->FolderMonitor (:store (:monitor connection-data)) folder (:listen-channel (:monitor connection-data))))
 
+(defn capability-name [^IMAPStore store ^String cap-name]
+  (when (.hasCapability store cap-name)
+    (keyword (clojure.string/lower-case cap-name))))
+
+(defn connection-object [^FolderMonitor monitor config capabilities]
+  {:monitor monitor
+   :config config
+   :capabilities capabilities})
+
+(defn swap-connection-with-new-monitor [identifier new-monitor]
+  (let [old-connection (get @connections identifier)
+        old-config (:config old-connection)
+        old-capabilities (:capabilities old-connection)] ; assuming the capabilities won't change on reconnect
+    (swap! connections assoc identifier (connection-object new-monitor old-config old-capabilities))))
+
+(defn connection-object-with-capabilities [^FolderMonitor monitor config]
+  (let [store (:store monitor)]
+    (connection-object monitor config (filterv some? (mapv #(capability-name store %) ["MOVE"])))))
+
 (defn message-count-adapter [id folder folder-name]
   (proxy [MessageCountAdapter] []
     (messagesAdded [^MessageCountEvent event]
@@ -235,16 +254,13 @@
         (t/log! {:level :error :error e} (.getMessage e))))
     folder))
 
-(defn swap-new-monitor [identifier monitor]
-  (swap! connections assoc identifier monitor))
-
 (defn swap-new-period-check [identifier future]
   (swap! health-checks (fn [futures new-future] (conj futures {identifier new-future})) future))
 
 (defn start-monitoring-and-change-state [identifier connection-data]
   (let [folder (start-monitoring identifier (:store (:monitor connection-data)) (:folder (:config connection-data)))
         new-monitor (monitor-with-new-folder connection-data folder)]
-    (swap-new-monitor identifier new-monitor)))
+    (swap-connection-with-new-monitor identifier new-monitor)))
 
 (defn reconnect-to-store [identifier]
   (let [connection-data (get @connections identifier)
@@ -256,10 +272,7 @@
       (.connect store)
       (t/log! :debug "Starting to idle.")
       (start-monitoring-and-change-state identifier connection-data)
-      (catch Exception e
-        (do (t/log! {:level :error :error e} (.getMessage e))
-            (Thread/sleep 5000)
-            (reconnect-to-store identifier))))))
+      (catch Exception e (t/log! {:level :error :error e} (.getMessage e))))))
 
 (defn check-connection [identifier]
   (let [{monitor :monitor} (get @connections identifier)
@@ -293,7 +306,7 @@
                                                           ^Folder folder (:folder monitor)
                                                           ^Store store (:store monitor)
                                                           ^IdleManager im @idle-manager]
-                                                      (t/log! :debug ["Resuming to watch folder:" (.getURLName store) "-" (.getFullName folder) ])
+                                                      (t/log! :debug ["Resuming to watch folder:" (.getURLName store) "-" (.getFullName folder)])
                                                       (.watch im (:folder monitor)))
                                                     (catch Exception e (do (t/log! {:level :error :error e} "There was a problem during health check.")
                                                                            (reconnect-to-store identifier)))))
@@ -306,22 +319,6 @@
 (defn connection-config->identifier [connection-config]
   (let [cleaned-config (dissoc connection-config :id)]
     (config-id cleaned-config)))
-
-(defn identifier->connection-config [id]
-  (first (filter #(= id (:id %)) (keys @connections))))
-
-(defn capability-name [^IMAPStore store ^String cap-name]
-  (when (.hasCapability store cap-name)
-    (keyword (clojure.string/lower-case cap-name))))
-
-(defn connection-object [^FolderMonitor monitor config capabilities]
-  {:monitor monitor
-   :config config
-   :capabilities capabilities})
-
-(defn connection-object-with-capabilities [^FolderMonitor monitor config]
-  (let [store (:store monitor)]
-    (connection-object monitor config (filterv some? (mapv #(capability-name store %) ["MOVE"])))))
 
 (defn create-folder-monitor [connection-config channel]
   (create-idle-manager (config->session connection-config))
