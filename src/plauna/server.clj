@@ -339,7 +339,20 @@
        (markup/statistics-categories categories-overall categories-stats))))
 
   (comp/POST "/metadata" request
-    (save-metadata-form (:params request))
+    (if (some? (:move (:params request)))
+      (let [message-id (:message-id (:params request))
+            email-before-update (enriched-email-by-message-id message-id)]
+        (save-metadata-form (:params request))
+        (doseq [{monitor :monitor} (vals @client/connections)
+                :let [updated-email (enriched-email-by-message-id message-id)]]
+          (try
+            (t/log! :debug ["Move message-id" message-id "using store" (:store monitor)])
+            (client/move-messages-by-id-between-category-folders (:store monitor)
+                                                                 message-id
+                                                                 (-> email-before-update :metadata :category)
+                                                                 (-> updated-email :metadata :category))
+            (catch jakarta.mail.FolderNotFoundException e (t/log! :debug e)))))
+      (save-metadata-form (:params request)))
     (redirect-request request))
 
   (comp/POST "/training" request

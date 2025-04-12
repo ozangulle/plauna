@@ -12,6 +12,7 @@
    (jakarta.mail Store Session Folder Message Flags$Flag)
    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
    (jakarta.mail.event MessageCountAdapter MessageCountEvent)
+   (jakarta.mail.search MessageIDTerm)
    (java.io ByteArrayOutputStream)
    (java.lang AutoCloseable)
    (java.util Properties)
@@ -150,6 +151,11 @@
           (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder))
       (do (t/log! :debug "Server does not support the IMAP MOVE command. Using copy and delete as fallback.")
           (copy-message message source-folder target-folder)))))
+
+(defn move-messages-by-id-between-category-folders [^Store store message-id ^String source-name ^String target-name]
+  (with-open [target-folder ^IMAPFolder (doto (.getFolder ^Store store ^String (structured-folder-name store target-name)) (.open Folder/READ_WRITE))
+              source-folder ^AutoCloseable (doto (.getFolder ^Store store ^String (structured-folder-name store source-name)) (.open Folder/READ_WRITE))]
+    (.moveMessages ^IMAPFolder source-folder (into-array Message (.search source-folder (MessageIDTerm. message-id))) target-folder)))
 
 (defn client-event-loop
   "Listens to :enriched-email
