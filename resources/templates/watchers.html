@@ -2,10 +2,9 @@
 
 {% block content %}
 
-<h3 class="uppercase text-lg my-8">IMAP Clients</h3>
-<table class="table-auto border-separate border-spacing-4">
+<table class="table">
   <thead>
-    <tr class="border-b text-slate-700 text-left">
+    <tr>
       <th>Account</th>
       <th>Logged-in?</th>
       <th>Folder open?</th>
@@ -16,12 +15,12 @@
     {% for watcher in watchers %}
     <tr class="border-btext-slate-700">
       <td class="text-left">
-        <a class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm" href="/connections/{{watcher.id}}">{{watcher.string}}</a>
+        <a class="link link-underline" href="/connections/{{watcher.id}}">{{watcher.string}}</a>
       </td>
       <td class="text-center">{{watcher.logged-in}}</td>
       <td class="text-center">{{watcher.folder-open}}</td>
       <td class="text-center">
-        <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm"><a href="/connections/{{watcher.id}}/restart">Restart</a></button>
+        <button class="btn btn-primary"><a href="/connections/{{watcher.id}}/restart">Restart</a></button>
       </td>
     </tr>
     {% endfor %}

@@ -3,16 +3,25 @@
 {% block content %}
 
 <h3 class="uppercase text-lg my-8">IMAP Connection for {{host}} - {{user}}</h3>
-<div class="flex flex-nowrap">
-  <form id="parse" action="/connections/{{id}}" method="POST">
-    <label for="move">Move e-mails after categorization</label>
-    <input class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-200 rounded focus:ring-blue-500 focus:ring-2" name="move" type="checkbox">
-    <select class="block mr-4 my-2 bg-gray-50 border border-gray-200 text-gray-700 focus:bg-gray-700 focus:ring-gray-200 focus:border-gray-200 focus:text-white text-sm rounded-lg block w-full p-2.5 w-full" name="folder">
-      {% for folder in folders %}
-      <option value="{{folder}}">{{folder}}</option>
-      {% endfor %}
-    </select>
-    <button form="parse" class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm">Parse E-mails</button>
+<div class="flex w-full max-w-sm flex-col gap-6">
+  <form id="parse" class="space-y-4" action="/connections/{{id}}" method="POST">
+    <div class="form-field">
+      <label for="folder">Folders</label>
+      <div class="form-control">
+        <select class="select" name="folder">
+          {% for folder in folders %}
+          <option value="{{folder}}">{{folder}}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <label for="move">Move e-mails after categorization</label>
+      <input class="checkbox" name="move" type="checkbox">
+    </div>
+    <div class="form-field">
+      <button form="parse" class="btn btn-primary">Parse E-mails</button>
+    </div>
   </form>
 </div>
 

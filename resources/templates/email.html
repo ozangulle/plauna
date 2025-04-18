@@ -3,90 +3,73 @@
 {% block content %}
 
 <h2 class="uppercase text-lg my-10">{{email.header.subject}}</h2>
-<p><strong>Message ID: </strong>{{email.header.message-id}}</p>
-<p><strong>Date: </strong>{{email.header.date|date:"dd.MM.yyyy HH:mm:ss"}}</p>
-<p><strong>Senders: </strong>{{email.participants|concat-senders}}</p>
-<p><strong>Recipients: </strong>{{email.participants|concat-receivers}}</p>
-<p><strong>Cc: </strong>{{email.participants|concat-cc}}</p>
-<p><strong>Bcc: </strong>{{email.participants|concat-bcc}}</p>
-<h3 class="uppercase text-lg my-8">Metadata</h3>
+<table class="table">
+  <tr><td><strong>Message ID: </strong></td><td>{{email.header.message-id}}</td></tr>
+  <tr><td><strong>Date: </strong></td><td>{{email.header.date|date:"dd.MM.yyyy HH:mm:ss"}}</td></tr>
+  <tr><td><strong>Senders: </strong></td><td>{{email.participants|concat-senders}}</td></tr>
+  <tr><td><strong>Recipients: </strong></td><td>{{email.participants|concat-receivers}}</td></tr>
+  <tr><td><strong>Cc: </strong></td><td>{{email.participants|concat-cc}}</td></tr>
+  <tr><td><strong>Bcc: </strong></td><td>{{email.participants|concat-bcc}}</td></tr>
+
+  <tr><td><h3 class="uppercase text-lg my-8">Metadata</h3></td></tr>
 <form action="/metadata" id="email" method="post">
   <input form="email" hidden="true" name="message-id" type="text" value="{{email.header.message-id}}">
   <input form="email" hidden="true" name="language-confidence" type="text" value="1">
   <input form="email" hidden="true" name="category-confidence" type="text" value="1">
   <input form="email" hidden="true" name="redirect-url" type="text" value="/emails">
-  <p><strong>Language: </strong>
-    <input form="email" class="mr-4 text-gray-700 focus:text-gray-700 focus:border-gray-200 focus:ring-gray-200" name="language" type="text" value="{{email.metadata.language}}"></p>
-  <p><strong>Language Confidence: </strong>{{email.metadata.language-confidence}}</p>
-  <p><strong>Category: </strong>
-    <select class="block mr-4 bg-gray-50 border border-gray-200 text-gray-700 focus:bg-gray-700 focus:ring-gray-200 focus:border-gray-200 focus:text-white text-sm rounded-lg block w-full p-2.5 w-full" form="email" name="category" autocomplete="off">
+    <tr><td><strong>Language: </strong></td><td><input form="email" class="input" name="language" type="text" value="{{email.metadata.language}}"></td></tr>
+    <tr><td><p><strong>Language Confidence: </strong></td><td>{{email.metadata.language-confidence}}</td></tr>
+    <tr><td><strong>Category: </strong></td><td><select class="select" form="email" name="category" autocomplete="off">
       {% for category in categories %}
       <option value="{{category.id}}" {% if category.id = email.metadata.category-id %}selected{% endif %}>{{category.name}}</option>
       {% endfor %}
-    </select>
-  <p><strong>Category Confidence: </strong>{{email.metadata.category-confidence}}</p>
-  <label for="move">Move email after update</label>
-  <input class="w-4 h-4 text-gray-600 bg-gray-100 border-gray-200 rounded focus:ring-blue-500 focus:ring-2" name="move" type="checkbox" data-tooltip-target="tooltip-checkbox" data-tooltip-placement="right" checked>
+    </select></td></tr>
+    <tr><td><strong>Category Confidence: </strong></td><td>{{email.metadata.category-confidence}}</td></tr>
+  <tr><td><label for="move">Move email after update</label>
+  <input class="checkbox" name="move" type="checkbox" data-tooltip-target="tooltip-checkbox" data-tooltip-placement="right" checked>
   <div id="tooltip-checkbox" role="tooltip" class="absolute z-10 invisible inline-block px-3 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg shadow-xs opacity-0 tooltip dark:bg-gray-700">
     Plauna assumes that the e-mail is in the folder which was selected when you first opened this page. If the e-mail was moved manually to somewhere else this operation fails.
     <div class="tooltip-arrow" data-popper-arrow></div>
-</div>
+  </div></td></tr>
+  <tr><td><button class="btn btn-primary" form="email">Update Metadata</button></td></tr>
 </form>
+</table>
 
-<button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm" form="email">Update Metadata</button>
 <h3 class="uppercase text-lg my-8">Contents</h3>
 
 {% for body-part in email.body %}
-
-<div>
-  <p><strong>Mime Type: </strong>{{body-part.mime-type}}</p>
-  <p><strong>Charset: </strong>{{body-part.charset}}</p>
-  <p><strong>Transfer Encoding: </strong>{{body-part.transfer-encoding}}</p>
-  {% if body-part.filename %}<p><strong>File Name: </strong>{{body-part.filename}}</p> {% endif %}
-  {% if body-part.content-disposition %}<p><strong>Content Disposition: </strong>{{body-part.content-disposition}}</p> {% endif %}
+<table class="table">
+  <tr><td><strong>Mime Type: </strong></td><td>{{body-part.mime-type}}</td></tr>
+  <tr><td><strong>Charset: </strong></td><td>{{body-part.charset}}</td></tr>
+  <tr><td><strong>Transfer Encoding: </strong></td><td>{{body-part.transfer-encoding}}</td></tr>
+  {% if body-part.filename %}<tr><td><strong>File Name: </strong></td><td>{{body-part.filename}}</td></tr> {% endif %}
+  {% if body-part.content-disposition %}<tr><td><strong>Content Disposition: </strong></td><td>{{body-part.content-disposition}}</td></tr> {% endif %}
+  </table>
   {% if body-part.mime-type = "text/plain" %}
-  <div class="mb-4 border-b border-gray-200 dark:border-gray-700">
-    <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" data-tabs-toggle="#default-styled-tab-content" data-tabs-active-classes="text-gray-700 hover:text-gray-700 border-gray-700" data-tabs-inactive-classes="text-gray-500 hover:text-gray-600 border-gray-100 hover:border-gray-300" role="tablist">
-      <li class="me-2" role="presentation">
-        <button class="inline-block p-4 border-b-2 rounded-t-lg" data-tabs-target="#sanitized-{{forloop.counter}}" type="button" role="tab" aria-controls="profile" aria-selected="false">Sanitized Text</button>
-      </li>
-      <li class="me-2" role="presentation">
-        <button class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300" data-tabs-target="#original-{{forloop.counter}}" type="button" role="tab" aria-controls="dashboard" aria-selected="false">Original</button>
-      </li>
-    </ul>
-  </div>
-  <div id="default-styled-tab-content">
-    <div class="hidden p-4 rounded-lg bg-gray-50" id="original-{{forloop.counter}}" role="tabpanel" aria-labelledby="original-{{forloop-counter}}">   
-      {{body-part.content}}
-    </div>
-    <div class="hidden p-4 rounded-lg bg-gray-50" id="sanitized-{{forloop.counter}}" role="tabpanel" aria-labelledby="sanitized-{{forloop-counter}}">
+  <div class="tabs tabs-border">
+    <input type="radio" name="{{forloop.counter}}" class="tab" aria-label="Sanitized Text" checked="checked" />
+    <div class="tab-content border-base-300 bg-base-100 p-10">
       {{body-part.sanitized-content}}
+    </div>
+    <input type="radio" name="{{forloop.counter}}" class="tab" aria-label="Original" />
+    <div class="tab-content border-base-300 bg-base-100 p-10">
+      {{body-part.content}}
     </div>
   </div>
   {% elif body-part.mime-type = "text/html" %} 
-  <div class="mb-4 border-b border-gray-200 dark:border-gray-700">
-    <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" data-tabs-toggle="#default-styled-tab-content" data-tabs-active-classes="text-gray-700 hover:text-gray-700 border-gray-700" data-tabs-inactive-classes="text-gray-500 hover:text-gray-600 border-gray-100 hover:border-gray-300" role="tablist">
-      <li class="me-2" role="presentation">
-        <button class="inline-block p-4 border-b-2 rounded-t-lg" data-tabs-target="#sanitized-{{forloop.counter}}" type="button" role="tab" aria-controls="profile" aria-selected="false">Sanitized Text</button>
-      </li>
-      <li class="me-2" role="presentation">
-        <button class="inline-block p-4 border-b-2 rounded-t-lg hover:text-gray-600 hover:border-gray-300" data-tabs-target="#original-{{forloop.counter}}" type="button" role="tab" aria-controls="dashboard" aria-selected="false">Original</button>
-      </li>
-    </ul>
-  </div>
-  <div id="default-styled-tab-content">
-    <div class="hidden p-4 rounded-lg bg-gray-50" id="original-{{forloop.counter}}" role="tabpanel" aria-labelledby="original-{{forloop-counter}}">   
-      {{body-part.content}}
-    </div>
-    <div class="hidden p-4 rounded-lg bg-gray-50" id="sanitized-{{forloop.counter}}" role="tabpanel" aria-labelledby="sanitized-{{forloop-counter}}">
+  <div class="tabs tabs-border">
+    <input type="radio" name="{{forloop.counter}}" class="tab" aria-label="Sanitized Text" checked="checked" />
+    <div class="tab-content border-base-300 bg-base-100 p-10">
       {{body-part.sanitized-content}}
+    </div>
+    <input type="radio" name="{{forloop.counter}}" class="tab" aria-label="Original" />
+    <div class="tab-content border-base-300 bg-base-100 p-10">
+      {{body-part.content}}
     </div>
   </div>
   {% else %}
   Non-text content
   {% endif %}
-</div>
-<br/>
 {% endfor %}
 
 {% endblock %}

@@ -1,0 +1,13 @@
+{
+    "scripts": {
+        "build": "npx @tailwindcss/cli -i resources/public/css/custom.css -c resources/public/js/tailwind.config.js -o resources/public/css/tailwind.css",
+        "dev": "npx @tailwindcss/cli -i resources/public/css/custom.css -c resources/public/js/tailwind.config.js -o resources/public/css/tailwind.css -w"
+    },
+    "dependencies": {
+    },
+    "devDependencies": {
+        "daisyui": "^5.0.23",
+        "tailwindcss": "^4.1.4",
+        "@tailwindcss/cli": "^4.1.4"
+    }
+}

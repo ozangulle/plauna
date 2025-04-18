@@ -35,8 +35,8 @@
     :else message))
 
 (defn administration
-  ([] (render-file "admin.html" {}))
-  ([messages] (render-file "admin.html" {:messages (mapv type->toast-role messages)})))
+  ([] (render-file "admin.html" {:active-nav :admin}))
+  ([messages] (render-file "admin.html" {:messages (mapv type->toast-role messages) :active-nav :admin})))
 
 (defn concat-string [contact]
   (if (nil? (:name contact))
@@ -76,14 +76,14 @@
   ([emails page-info categories]
    (let [last-page {:last-page (quot (:total page-info) (:size page-info))}
          emails-with-java-date (map #(update-in % [:header :date] timestamp->date) emails)]
-     (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories})))
+     (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories :active-nav :emails})))
   ([emails page-info categories messages]
    (let [last-page {:last-page (quot (:total page-info) (:size page-info))}
          emails-with-java-date (map #(update-in % [:header :date] timestamp->date) emails)]
-     (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories :messages (mapv type->toast-role messages)}))))
+     (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories :messages (mapv type->toast-role messages) :active-nav :emails}))))
 
 (defn list-email-contents [email-data categories]
-  (render-file "email.html" {:email (update-in email-data [:header :date] timestamp->date) :categories categories}))
+  (render-file "email.html" {:email (update-in email-data [:header :date] timestamp->date) :categories categories :active-nav :emails}))
 
 (defn statistics-contacts [intervals top-from interval-from]
   (let [vega-interval-from {:data {:values interval-from}
@@ -112,7 +112,8 @@
                :radius {:field :count :scale {:type :sqrt :zero true :rangeMin 15}}
                :color {:field (keyword ~key) :legend nil}
                :tooltip [{:field (keyword ~key) :type "nominal" :title ~key-label}
-                         {:field :count :type "nominal" :title "Count"}]}})
+                         {:field :count :type "nominal" :title "Count"}]}
+    :config {:background nil}})
 
 (defn statistics-types [overview-map yearly-mime-types]
   (let [overall-pie (pie-chart overview-map 'mime-type "MIME TYPE" "MIME Types Overview")
@@ -125,7 +126,8 @@
                                       {:filter "datum.rank <= 50"}]
                           :encoding {:x {:field :mime-type :type "nominal" :title "Mime types" :sort "-y"}
                                      :y {:field :sum :type "quantitative" :title "Count"}
-                                     :tooltip [{:field :sum :type "quantitative"} {:field :mime-type :type "nominal"}]}}
+                                     :tooltip [{:field :sum :type "quantitative"} {:field :mime-type :type "nominal"}]}
+                          :config {:background nil}}
         vega-least-common {:data {:values yearly-mime-types}
                            :description "Least common mime types"
                            :mark "bar"
@@ -133,12 +135,15 @@
                                        {:filter "datum.sum <= 50"}]
                            :encoding {:x {:field :mime-type :type "nominal" :title "Mime types" :sort "-y"}
                                       :y {:field :sum :type "quantitative" :title "Count"}
-                                      :tooltip [{:field :sum :type "quantitative"} {:field :mime-type :type "nominal"}]}}]
+                                      :tooltip [{:field :sum :type "quantitative"} {:field :mime-type :type "nominal"}]}
+                           :config {:background nil}}]
     (render-file "statistics.html"
                  {:statistics
                   [{:type :bar-chart :header "MIME Types Overview" :id "overview" :json-data (json/write-str overall-pie)}
                    {:type :bar-chart :header "Most Common MIME Types" :id "most-common" :json-data (json/write-str vega-most-common)}
-                   {:type :bar-chart :header "Least Common MIME Types" :id "least-common" :json-data (json/write-str vega-least-common)}]})))
+                   {:type :bar-chart :header "Least Common MIME Types" :id "least-common" :json-data (json/write-str vega-least-common)}]
+                  :active-tab :types
+                  :active-nav :statistics})))
 
 (defn statistics-languages [languages-overall yearly-languages]
   (let [overall-languages (pie-chart languages-overall 'language "Language" "Languages Overview")
@@ -147,10 +152,13 @@
                      :encoding {:y {:field :count :type "quantitative"}
                                 :x {:field :interval :type "ordinal" :axis {:labelOverlap "parity" :labelSeparation 10}}
                                 :color {:field :language :type "nominal" :scale {:scheme "category20c"}}
-                                :text {:field :language :type "nominal" :scale {:scheme "category20c"}}}}]
+                                :text {:field :language :type "nominal" :scale {:scheme "category20c"}}}
+                     :config {:background nil}}]
     (render-file "statistics.html"
                  {:statistics [{:type :bar-chart :header "Languages Overview" :id "languages-overview" :json-data (json/write-str overall-languages)}
-                               {:type :bar-chart :header "Yearly Languages" :id "languages" :json-data (json/write-str yearly-data)}]})))
+                               {:type :bar-chart :header "Yearly Languages" :id "languages" :json-data (json/write-str yearly-data)}]
+                  :active-tab :languages
+                  :active-nav :statistics})))
 
 (defn statistics-categories [categories-overall yearly-categories]
   (let [overall-categories (pie-chart categories-overall 'category "Category" "Categories Overview")
@@ -159,9 +167,12 @@
                    :transform [{:filter "datum.interval != null"}]
                    :encoding {:y {:field :count :type "quantitative"}
                               :x {:field :interval :type "ordinal" :axis {:labelOverlap "parity" :labelSeparation 10}}
-                              :color {:field :category :type "nominal"}}}]
+                              :color {:field :category :type "nominal"}}
+                   :config {:background nil}}]
     (render-file "statistics.html" {:statistics [{:type :bar-chart :header "Categories Overview" :id "cat-overview" :json-data (json/write-str overall-categories)}
-                                                 {:type :bar-chart :header "Yearly Categories" :id "categories" :json-data (json/write-str vega-data)}]})))
+                                                 {:type :bar-chart :header "Yearly Categories" :id "categories" :json-data (json/write-str vega-data)}]
+                                    :active-tab :categories
+                                    :active-nav :statistics})))
 
 (defn statistics-overall [yearly-emails]
   (let [vega-data {:data {:values yearly-emails}
@@ -169,21 +180,23 @@
                    :transform [{:filter "datum.date != null"}]
                    :encoding {:y {:field :count :type "quantitative"}
                               :x {:field :date :type "ordinal" :axis {:labelOverlap "parity" :labelSeparation 10}}
-                              :tooltip {:field :count :type "quantitative"}}}]
-    (render-file "statistics.html" {:statistics [{:type :bar-chart :header "Yearly Emails" :id "emails" :json-data (json/write-str vega-data)}]})))
+                              :tooltip {:field :count :type "quantitative"}}
+                   :config {:background nil}}]
+    (render-file "statistics.html" {:statistics [{:type :bar-chart :header "Yearly Emails" :id "emails" :json-data (json/write-str vega-data)}]
+                                    :active-nav :statistics})))
 
-(defn categories-page [categories] (render-file "admin-categories.html" {:categories categories}))
+(defn categories-page [categories] (render-file "admin-categories.html" {:categories categories :active-nav :admin}))
 
 (defn languages-admin-page [language-preferences]
-  (render-file "admin-languages.html" {:language-preferences language-preferences}))
+  (render-file "admin-languages.html" {:language-preferences language-preferences :active-nav :admin}))
 
 (defn watcher-list [clients]
   (let [watchers (mapv (fn [client] {:id (first client) :logged-in (-> client second :connected) :folder-open (-> client second :folder) :string (str (-> client (nth 2) :config :host) " - " (-> client (nth 2) :config :user))}) clients)]
-    (render-file "watchers.html" {:watchers watchers})))
+    (render-file "watchers.html" {:watchers watchers :active-nav :connections})))
 
 (defn watcher
-  ([id config folders] (render-file "watcher.html" {:id id :host (:host config) :user (:user config) :folders folders}))
-  ([id client folders messages] (render-file "watcher.html" {:id id :host (:host client) :user (:user client) :folders folders :messages (mapv type->toast-role messages)})))
+  ([id config folders] (render-file "watcher.html" {:id id :host (:host config) :user (:user config) :folders folders :active-nav :connections}))
+  ([id client folders messages] (render-file "watcher.html" {:id id :host (:host client) :user (:user client) :folders folders :messages (mapv type->toast-role messages) :active-nav :connections})))
 
-(defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}]}]
+(defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}] :active-nav :admin}]
                                 (render-file "admin-preferences.html" (conj data log-levels))))

@@ -2,13 +2,12 @@
 
 {% block content %}
 
-<h2 class="uppercase text-3xl my-8">Statistics</h2>
-<nav class="flow flow-row space-x-4">
-  <a class="nav-button" href="/statistics" role="button">Overall</a>
-  <a class="nav-button" href="/statistics/types" role="button">Types</a>
-  <a class="nav-button" href="/statistics/languages" role="button">Languages</a>
-  <a class="nav-button" href="/statistics/categories" role="button">Categories</a>
-</nav>
+<div class="tabs">
+	<div class="tab tab-bordered {% if active-tab = nil %}tab-active{% endif %}"><a href="/statistics" role="button">Overall</a></div>
+	<div class="tab tab-bordered {% if active-tab = :types %}tab-active{% endif %}"><a href="/statistics/types" role="button">Types</a></div>
+	<div class="tab tab-bordered {% if active-tab = :languages %}tab-active{% endif %}"><a href="/statistics/languages" role="button">Languages</a></div>
+	<div class="tab tab-bordered {% if active-tab = :categories %}tab-active{% endif %}"><a href="/statistics/categories" role="button">Categories</a></div>
+</div>
 
 {% if interval-filter %}
 <h3 class="uppercase text-lg my-8 mx-16">Filter</h3>
