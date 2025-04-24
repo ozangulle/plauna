@@ -2,8 +2,8 @@
 
 {% block content %}
 
-<div class="grid grid-flow-col gap-4">
-  <div class="card card-border">
+<div class="flex flex-wrap gap-4">
+  <div class="card card-border grow lg:grow-0">
     <div class="card-body">
       <h2 class="card-title">Management</h2>
 	  <ul class="menu">
@@ -15,7 +15,7 @@
   </div>
   
   <div class="card card-border">
-    <div class="card-body">
+    <div class="card-body grow lg:grow-0">
       <h2 class="card-title">Parse E-mails from Mbox</h2>
       <form action="emails/parse" enctype="multipart/form-data" method="POST">
         <input name="redirect-url" type="hidden" value="/admin" />
