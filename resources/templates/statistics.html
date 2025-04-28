@@ -2,13 +2,12 @@
 
 {% block content %}
 
-<h2 class="uppercase text-3xl my-8">Statistics</h2>
-<nav class="flow flow-row space-x-4">
-  <a class="nav-button" href="/statistics" role="button">Overall</a>
-  <a class="nav-button" href="/statistics/types" role="button">Types</a>
-  <a class="nav-button" href="/statistics/languages" role="button">Languages</a>
-  <a class="nav-button" href="/statistics/categories" role="button">Categories</a>
-</nav>
+<div class="tabs flex-nowrap">
+	<div class="tab tab-bordered {% if active-tab = nil %}tab-active{% endif %}"><a href="/statistics" role="button">Overall</a></div>
+	<div class="tab tab-bordered {% if active-tab = :types %}tab-active{% endif %}"><a href="/statistics/types" role="button">Types</a></div>
+	<div class="tab tab-bordered {% if active-tab = :languages %}tab-active{% endif %}"><a href="/statistics/languages" role="button">Languages</a></div>
+	<div class="tab tab-bordered {% if active-tab = :categories %}tab-active{% endif %}"><a href="/statistics/categories" role="button">Categories</a></div>
+</div>
 
 {% if interval-filter %}
 <h3 class="uppercase text-lg my-8 mx-16">Filter</h3>
@@ -34,31 +33,59 @@
 {% endif %}
   
 
-<div class="grid justify-items-start">
+<div class="flex flex-wrap justify-items-start gap-4">
   {% for stats in statistics %}
-  <div class="mx-16">
+  
+  <div class="mx-16 card bg-base-100 shadow-sm w-full">
     <h3 class="uppercase text-lg my-8">{{stats.header}}</h3>
+    
     {% if stats.type = :bar-chart %}
-    <div id="{{stats.id}}"></div>
-    <script>vegaEmbed('#{{stats.id}}', {{stats.json-data|safe}});</script>
-    {% elif stats.type = :table %}
-  <table class="border-collapse table-auto w-full text-sm">
-    <thead>
-      <tr>{% for header in stats.data.headers %}<th class="text-left">{{header}}</th>{% endfor %}</tr>
-    </thead>
-    <tbody> 
-      {% for values in stats.data.values %}
-      <tr>
-        {% for val in values %}
-        <td class="text-left">{{val}}</td>
-        {% endfor %}
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-    {% endif %}
+
+      {% if no-data %}
+
+      <div role="alert" class="alert">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info h-6 w-6 shrink-0">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span>Not enough data</span>
+      </div>
+  
+      {% else %}
+      <div class="card-body" id="{{stats.id}}"></div>
+      <script>vegaEmbed('#{{stats.id}}', {{stats.json-data|safe}});</script>
+      {% endif %}
+      {% elif stats.type = :table %}
+      {% if stats.data.values|empty? %}
+
+      <div role="alert" class="alert">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info h-6 w-6 shrink-0">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span>Not enough data</span>
+      </div>
+      
+      {% else %}
+      <div class="card-body">
+        <table class="border-collapse table-auto w-full text-sm">
+          <thead>
+            <tr>{% for header in stats.data.headers %}<th class="text-left">{{header}}</th>{% endfor %}</tr>
+          </thead>
+          <tbody> 
+            {% for values in stats.data.values %}
+            <tr>
+              {% for val in values %}
+              <td class="text-left">{{val}}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+      {% endif %}
   </div>
 {% endfor %}
+</div>
 </div>
 
 {% endblock %}

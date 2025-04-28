@@ -2,30 +2,44 @@
 
 {% block content %}
 
-<h3 class="uppercase text-lg my-8">IMAP Clients</h3>
-<table class="table-auto border-separate border-spacing-4">
-  <thead>
-    <tr class="border-b text-slate-700 text-left">
-      <th>Account</th>
-      <th>Logged-in?</th>
-      <th>Folder open?</th>
-      <th>Restart connection</th>
+{% if watchers|empty? %}
+
+<div role="alert" class="alert">
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info h-6 w-6 shrink-0">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+  </svg>
+  <span>There are no active IMAP connections</span>
+</div>
+
+{% endif %}
+
+{% if watchers|not-empty %}
+
+<table class="table-xs lg:table table-zebra">
+  <thead class="table-header-group">
+    <tr>
+      <th class="text-xs lg:text-md">Account</th>
+      <th class="text-xs lg:text-md text-center">Logged-in</th>
+      <th class="text-xs lg:text-md text-center">Folder Open</th>
+      <th class="text-xs lg:text-md text-center">Reconnect</th>
     </tr>
   </thead>
   <tbody>
     {% for watcher in watchers %}
-    <tr class="border-btext-slate-700">
-      <td class="text-left">
-        <a class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm" href="/connections/{{watcher.id}}">{{watcher.string}}</a>
+    <tr class="table-row">
+      <td class="text-xs lg:text-md text-left">
+        <a class="link link-underline" href="/connections/{{watcher.id}}">{{watcher.string}}</a>
       </td>
-      <td class="text-center">{{watcher.logged-in}}</td>
-      <td class="text-center">{{watcher.folder-open}}</td>
+      <td class="text-center">{{watcher.logged-in | iconize}}</td>
+      <td class="text-center">{{watcher.folder-open | iconize}}</td>
       <td class="text-center">
-        <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium rounded-lg text-sm"><a href="/connections/{{watcher.id}}/restart">Restart</a></button>
+        <button class="btn btn-primary"><a href="/connections/{{watcher.id}}/restart">Restart</a></button>
       </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
+
+{% endif %}
 
 {% endblock %}

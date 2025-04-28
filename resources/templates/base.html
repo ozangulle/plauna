@@ -3,15 +3,12 @@
   <head>
     <script src="https://cdn.jsdelivr.net/npm/vega@5" type="text/javascript"></script>
     <script src="https://cdn.jsdelivr.net/npm/vega-lite@5" type="text/javascript"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6" type="text/javascript"></script>
-    <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
-    <link href="/css/custom.css" rel="stylesheet" type="text/css">
-    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    <link rel="manifest" href="/site.webmanifest">
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6" type="text/javascript"/></script>
+    <link rel="stylesheet" href="/css/tailwind.css" type="text/css"/>
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png"/>
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"/>
+    <link rel="manifest" href="/site.webmanifest"/>
     <meta charset="UTF-8">
     <title>Plauna</title>
   </head>
@@ -19,7 +16,7 @@
   <body class="countainer mx-8 my-4">
     {% if messages %}
     <div class="absolute top-5 inset-x-0">
-    {% for message in messages %}
+      {% for message in messages %}
     <div id="{{ message.id }}" class="relative flex items-center w-full my-2 max-w-xs m-auto text-gray-500 bg-white rounded-lg shadow-sm" role="alert">
       <div class="inline-flex items-center justify-center shrink-0 w-8 h-8 {{ message.color }} {{ message.bg-color }} rounded-lg">
         <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
@@ -38,14 +35,36 @@
     {% endfor %}
     </div>
     {% endif %}
-    <h1 class="uppercase text-lg my-8">plauna</h1>
-    <nav class="flex flex-row space-x-8">
-      <a class="nav-button" href="/admin">Admin</a>
-      <a class="nav-button" href="/statistics">Statistics</a>
-      <a class="nav-button" href="/emails">Emails</a>
-      <a class="nav-button" href="/connections">Connections</a>
-    </nav>
-    <main class="">
+    <div class="navbar lg:hidden">
+	  <div class="navbar-start flex-nowrap">
+		<a class="uppercase" href="/">Plauna</a>
+	  </div>
+      <div class="navbar-end dropdown">
+        <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" /> </svg>
+        </div>
+        <ul class="menu menu-sm dropdown-content rounded-box bg-base-100 z-1 mt-3 w-32 p-2 shadow">
+          <li><a class="{% if active-nav = :admin %}menu-active{% endif %}" href="/admin">Administration</a></li>
+          <li><a class="{% if active-nav = :statistics %}menu-active{% endif %}" href="/statistics">Statistics</a></li>
+          <li><a class="{% if active-nav = :emails %}menu-active{% endif %}" href="/emails">Emails</a></li>
+          <li><a class="{% if active-nav = :connections %}menu-active{% endif %}" href="/connections">Connections</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="navbar hidden lg:flex shadow-sm">
+	  <div class="navbar-start flex-nowrap">
+		<a class="uppercase" href="/">Plauna</a>
+	  </div>
+	  <div class="navbar-end">
+        <ul class="menu menu-horizontal px-1">
+          <li><a class="{% if active-nav = :admin %}menu-active{% endif %}" href="/admin">Administration</a></li>
+          <li><a class="{% if active-nav = :statistics %}menu-active{% endif %}" href="/statistics">Statistics</a></li>
+          <li><a class="{% if active-nav = :emails %}menu-active{% endif %}" href="/emails">Emails</a></li>
+          <li><a class="{% if active-nav = :connections %}menu-active{% endif %}" href="/connections">Connections</a></li>
+        </ul>
+	  </div>
+    </div>
+    <main class="mx-2 my-4">
     {% block content %}
     {% endblock %}
     </main>

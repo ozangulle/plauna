@@ -1,6 +1,9 @@
 FROM clojure:temurin-23-tools-deps-bookworm-slim as build
+RUN apt update && apt install -y nodejs npm
 COPY . /usr/src/app/
 WORKDIR /usr/src/app
+RUN npm install
+RUN npm run build
 RUN clojure -T:build uber
 
 FROM eclipse-temurin:23.0.2_7-jre-ubi9-minimal

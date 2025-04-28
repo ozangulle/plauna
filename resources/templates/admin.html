@@ -2,22 +2,27 @@
 
 {% block content %}
 
-<h3 class="uppercase text-lg my-10">Administration</h3>
-<div class="grid">
-  <nav class="flow flow-row space-x-4">
-    <a class="sub-nav-button" href="/admin/categories" role="button">Manage Categories</a>
-    <a class="sub-nav-button" href="/admin/languages" role="button">Manage Languages</a>
-    <a class="sub-nav-button" href="/admin/preferences" role="button">Preferences</a>
-  </nav>
-
-
-  <h4 class="text-l mt-16 mb-2">Parse E-Mails</h4>
-  <div class="columns-2 mt-2">
-    <form action="emails/parse" enctype="multipart/form-data" method="POST">
-      <input name="redirect-url" type="hidden" value="/admin" />
-      <input name="filename" type="file" />
-      <button class="px-4 py-2 text-white bg-gray-700 hover:bg-gray-900 font-medium text-sm rounded-lg" type="submit">Parse Mbox</button>
-    </form>
+<div class="flex flex-wrap gap-4">
+  <div class="card card-border grow lg:grow-0">
+    <div class="card-body">
+      <h2 class="card-title">Management</h2>
+	  <ul class="menu">
+        <li><a href="/admin/categories" role="button">Categories</a></li>
+        <li><a href="/admin/languages" role="button">Languages</a></li>
+        <li><a href="/admin/preferences" role="button">Preferences</a></li>
+	  </ul>
+    </div>
+  </div>
+  
+  <div class="card card-border">
+    <div class="card-body grow lg:grow-0">
+      <h2 class="card-title">Parse E-mails from Mbox</h2>
+      <form action="emails/parse" enctype="multipart/form-data" method="POST">
+        <input name="redirect-url" type="hidden" value="/admin" />
+        <input name="filename" type="file" class="file-input"/>
+        <button class="btn btn-outline-primary" type="submit">Upload</button>
+      </form>
+    </div>
   </div>
 </div>
 

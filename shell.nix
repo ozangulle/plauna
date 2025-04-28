@@ -14,7 +14,9 @@ pkgs.mkShell {
     pkgs.libGL
     pkgs.glib.out
     pkgs.gtk3
-    pkgs.git-cliff];
+    pkgs.git-cliff
+    pkgs.nodejs_22
+    pkgs.tailwindcss_4];
 
   shellHook = ''
     export JAVA_HOME="${pkgs.jdk23}/lib/openjdk"

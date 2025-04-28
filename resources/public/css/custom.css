@@ -1,18 +1,6 @@
-.nav-button {
-    border-bottom: solid;
-    border-bottom-color: black;
-    border-bottom-width: thick;
-    text-transform: uppercase;
-}
+/*@config "../js/tailwind.config.js";*/
 
-.sub-nav-button {
-    border-bottom: solid;
-    border-bottom-color: black;
-    border-bottom-width: thick;
-    text-transform: uppercase;
-    font-size: 0.9em;
-}
-
-.flex-container {
-    display: flex;
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: autumn --default;
 }
