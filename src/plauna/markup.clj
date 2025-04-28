@@ -65,6 +65,8 @@
 
 (add-filter! :concat-bcc (partial concat-contacts :bcc))
 
+(add-filter! :iconize (fn [pred] (if pred "✓" "⤫")))
+
 (add-filter! :double-format-nillable (fn [n & [decimal-places]]
                                        (if (nil? n)
                                          0
@@ -102,6 +104,7 @@
 (defmacro pie-chart [data-values key key-label description]
   `{:data {:values ~data-values}
     :description ~description
+    :width :container
     :transform [{:joinaggregate [{:op "sum" :field :count :as :total}]}
                 {:calculate (str "datum.count / datum.total < 0.1 ? 'others' : datum['" ~key "']") :as (keyword ~key)}
                 {:aggregate [{:op :sum :field :count :as :count}] :groupby [(keyword ~key)]}]
@@ -120,6 +123,7 @@
 
         vega-most-common {:data {:values yearly-mime-types}
                           :description "Most common mime types"
+                          :width :container
                           :mark "bar"
                           :transform [{:aggregate [{:op "sum" :field :count :as :sum}] :groupby [:mime-type]}
                                       {:window [{:op "rank" :as :rank}] :sort [{:field :sum :order "descending"}]}
@@ -130,6 +134,7 @@
                           :config {:background nil}}
         vega-least-common {:data {:values yearly-mime-types}
                            :description "Least common mime types"
+                           :width :container
                            :mark "bar"
                            :transform [{:aggregate [{:op "sum" :field :count :as :sum}] :groupby [:mime-type]}
                                        {:filter "datum.sum <= 50"}]
@@ -143,12 +148,14 @@
                    {:type :bar-chart :header "Most Common MIME Types" :id "most-common" :json-data (json/write-str vega-most-common)}
                    {:type :bar-chart :header "Least Common MIME Types" :id "least-common" :json-data (json/write-str vega-least-common)}]
                   :active-tab :types
-                  :active-nav :statistics})))
+                  :active-nav :statistics
+                  :no-data (empty? overview-map)})))
 
 (defn statistics-languages [languages-overall yearly-languages]
   (let [overall-languages (pie-chart languages-overall 'language "Language" "Languages Overview")
         yearly-data {:data {:values yearly-languages}
                      :mark {:type "bar" :tooltip true}
+                     :width :container
                      :encoding {:y {:field :count :type "quantitative"}
                                 :x {:field :interval :type "ordinal" :axis {:labelOverlap "parity" :labelSeparation 10}}
                                 :color {:field :language :type "nominal" :scale {:scheme "category20c"}}
@@ -158,12 +165,14 @@
                  {:statistics [{:type :bar-chart :header "Languages Overview" :id "languages-overview" :json-data (json/write-str overall-languages)}
                                {:type :bar-chart :header "Yearly Languages" :id "languages" :json-data (json/write-str yearly-data)}]
                   :active-tab :languages
-                  :active-nav :statistics})))
+                  :active-nav :statistics
+                  :no-data (empty? languages-overall)})))
 
 (defn statistics-categories [categories-overall yearly-categories]
   (let [overall-categories (pie-chart categories-overall 'category "Category" "Categories Overview")
         vega-data {:data {:values yearly-categories}
                    :mark {:type "bar" :tooltip true}
+                   :width :container
                    :transform [{:filter "datum.interval != null"}]
                    :encoding {:y {:field :count :type "quantitative"}
                               :x {:field :interval :type "ordinal" :axis {:labelOverlap "parity" :labelSeparation 10}}
@@ -172,18 +181,21 @@
     (render-file "statistics.html" {:statistics [{:type :bar-chart :header "Categories Overview" :id "cat-overview" :json-data (json/write-str overall-categories)}
                                                  {:type :bar-chart :header "Yearly Categories" :id "categories" :json-data (json/write-str vega-data)}]
                                     :active-tab :categories
-                                    :active-nav :statistics})))
+                                    :active-nav :statistics
+                                    :no-data (empty? categories-overall)})))
 
 (defn statistics-overall [yearly-emails]
   (let [vega-data {:data {:values yearly-emails}
                    :mark "bar"
+                   :width :container
                    :transform [{:filter "datum.date != null"}]
                    :encoding {:y {:field :count :type "quantitative"}
                               :x {:field :date :type "ordinal" :axis {:labelOverlap "parity" :labelSeparation 10}}
                               :tooltip {:field :count :type "quantitative"}}
                    :config {:background nil}}]
     (render-file "statistics.html" {:statistics [{:type :bar-chart :header "Yearly Emails" :id "emails" :json-data (json/write-str vega-data)}]
-                                    :active-nav :statistics})))
+                                    :active-nav :statistics
+                                    :no-data (empty? yearly-emails)})))
 
 (defn categories-page [categories] (render-file "admin-categories.html" {:categories categories :active-nav :admin}))
 
