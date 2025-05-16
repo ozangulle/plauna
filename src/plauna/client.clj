@@ -38,6 +38,9 @@
 
 (defonce health-checks (atom {}))
 
+;; id -> listener
+(defonce message-count-listeners (atom {}))
+
 (defn default-port-for-security [security]
   (if (= security :ssl) 993 143))
 
@@ -113,13 +116,6 @@
                                                                             (.toByteArray os)
                                                                             {:enrich true :move (:move options) :id id :folder folder :original-folder folder-name :message message}))))))))
 
-(defn stop-subscription [host user folder-name]
-  (let [key {:host host :user user :folder-name folder-name}
-        connection-and-idle-manager (get @connections key)]
-    (cond (some? connection-and-idle-manager)
-          (.stop ^IdleManager (:idle-manager connection-and-idle-manager)))
-    (swap! connections (fn [subs sub] (dissoc subs sub)) key)))
-
 (defn create-folder [^Store store ^String folder-name result-map]
   (let [folder ^IMAPFolder (.getFolder store folder-name)]
     (if (not (.exists folder))
@@ -151,11 +147,6 @@
           (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder))
       (do (t/log! :debug "Server does not support the IMAP MOVE command. Using copy and delete as fallback.")
           (copy-message message source-folder target-folder)))))
-
-(defn move-messages-by-id-between-category-folders [^Store store message-id ^String source-name ^String target-name]
-  (with-open [target-folder ^IMAPFolder (doto (.getFolder ^Store store ^String (structured-folder-name store target-name)) (.open Folder/READ_WRITE))
-              source-folder ^AutoCloseable (doto (.getFolder ^Store store ^String (structured-folder-name store source-name)) (.open Folder/READ_WRITE))]
-    (.moveMessages ^IMAPFolder source-folder (into-array Message (.search source-folder (MessageIDTerm. message-id))) target-folder)))
 
 (defn client-event-loop
   "Listens to :enriched-email
@@ -252,13 +243,21 @@
   (let [folder ^IMAPFolder (.getFolder store folder-name)]
     (when (not (.isOpen folder))
       (.open folder Folder/READ_WRITE))
-    (.addMessageCountListener folder (message-count-adapter id folder folder-name))
+    (let [listener (message-count-adapter id folder folder-name)]
+      (swap! message-count-listeners conj {id listener})
+      (.addMessageCountListener folder listener))
     (try
       (.watch ^IdleManager @idle-manager folder)
       (t/log! :info ["Started monitoring for" folder-name "in" (.getURLName store)])
       (catch Exception e
         (t/log! {:level :error :error e} (.getMessage e))))
     folder))
+
+(defn stop-monitoring [id]
+  (let [{monitor :monitor} (get @connections id)
+        listener (get @message-count-listeners id)]
+    (t/log! :debug ["Removing message count listener from folder" (:folder monitor)])
+    (.removeMessageCountListener ^IMAPFolder (:folder monitor) listener)))
 
 (defn swap-new-period-check [identifier future]
   (swap! health-checks (fn [futures new-future] (conj futures {identifier new-future})) future))
@@ -350,3 +349,21 @@
 
 (defn folders-in-store [^Store store]
   (.list (.getDefaultFolder store) "*"))
+
+(defn inbox-or-category-folder-name [^Store store ^String folder-name]
+  (if (nil? folder-name) "INBOX" (structured-folder-name store folder-name)))
+
+(defn move-messages-by-id-between-category-folders [^String id ^Store store message-id ^String source-name ^String target-name]
+  (let [{config :config} (get @connections id)
+        source-folder-name (inbox-or-category-folder-name store source-name)
+        target-folder-name (inbox-or-category-folder-name store target-name)]
+    (with-open [target-folder ^IMAPFolder (doto (.getFolder ^Store store ^String target-folder-name) (.open Folder/READ_WRITE))
+                source-folder ^AutoCloseable (doto (.getFolder ^Store store ^String source-folder-name) (.open Folder/READ_WRITE))]
+      (let [found-messages (.search source-folder (MessageIDTerm. message-id))]
+        (t/log! :debug ["Found" (count found-messages) "messages when searched for the message-id:" message-id])
+        (when (seq found-messages)
+          (stop-monitoring id)
+          (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
+          (.moveMessages ^IMAPFolder source-folder (into-array Message found-messages) target-folder))))
+    (start-monitoring id store (:folder config))))
+

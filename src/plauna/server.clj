@@ -343,11 +343,14 @@
       (let [message-id (:message-id (:params request))
             email-before-update (enriched-email-by-message-id message-id)]
         (save-metadata-form (:params request))
-        (doseq [{monitor :monitor} (vals @client/connections)
-                :let [updated-email (enriched-email-by-message-id message-id)]]
+        (doseq [key-val @client/connections
+                :let [updated-email (enriched-email-by-message-id message-id)
+                      id (first key-val)
+                      monitor (:monitor (second key-val))]]
           (try
             (t/log! :debug ["Move message-id" message-id "using store" (:store monitor)])
-            (client/move-messages-by-id-between-category-folders (:store monitor)
+            (client/move-messages-by-id-between-category-folders id
+                                                                 (:store monitor)
                                                                  message-id
                                                                  (-> email-before-update :metadata :category)
                                                                  (-> updated-email :metadata :category))
