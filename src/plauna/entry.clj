@@ -14,7 +14,7 @@
   (:gen-class))
 
 (defn setup-logging []
-  (t/set-min-level! :info)
+  (t/set-min-level! :debug)
   ;; jetty is very noisy. Disable all jetty logs.
   (t/set-ns-filter! {:disallow "org.eclipse.jetty.*"}))
 
@@ -34,6 +34,8 @@
         (client/check-necessary-capabilities store)))
     (t/log! :debug "Listening to new emails from listen-channel")))
 
+(def args nil)
+
 (defn -main
   [& args]
   (setup-logging)
@@ -42,6 +44,9 @@
     (database/create-db)
     (t/log! :info "Setting log level according to preferences.")
     (t/set-min-level! (preferences/log-level))
-    (start-imap-client application-config)
+    ;(start-imap-client application-config)
     (events/start-event-loops event-register)
     (server/start-server application-config)))
+
+(comment (start-imap-client (files/parse-config-from-cli-arguments nil)))
+
