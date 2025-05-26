@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2025-05-26] - 2025-05-26
+
+### 🚀 Features
+
+- Use IMAP copy and delete when move is not available
+- Move e-mail when its category is changed by user
+- *(ui)* Make ui better and mobile friendly
+- *(ui)* Add the new plauna logo
+
+### 🐛 Bug Fixes
+
+- Change text sanitization for cleaner training texts
+- Adjust text sanitization for cleaner training texts
+- Moving emails no longer triggers a search through the whole folder
+- *(imap client)* Wrong method call during reconnection
+- Faulty partial update of connection data on reconnect
+- Setting category to n/a now moves messages back to Inbox
+- *(ui)* Toast messages cannot be closed anymore
+
+### ⚙️ Miscellaneous Tasks
+
+- Add flow-storm for better debugging experience
+- Update ring dependencies
+
 ## [2025-03-22.0] - 2025-03-22
 
 ### 🚀 Features
