@@ -10,7 +10,6 @@ RENAME COLUMN name TO filename;
 ALTER TABLE bodies
 ADD content_disposition TEXT; 
 
-
 CREATE TABLE new_bodies(
        id INTEGER PRIMARY KEY autoincrement,
        content TEXT,
