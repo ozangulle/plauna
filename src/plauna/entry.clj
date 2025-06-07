@@ -1,6 +1,5 @@
 (ns plauna.entry
   (:require
-   [clojure.core.async :refer [chan] :as async]
    [plauna.files :as files]
    [plauna.server :as server]
    [plauna.client :as client]
@@ -27,12 +26,12 @@
 
 (defn start-imap-client
   [config]
-  (let [listen-channel (chan 10)]
-    (doseq [client-config (:clients (:email config))]
-      (let [store (client/create-folder-monitor client-config listen-channel)]
-        (client/create-imap-directories! store)
-        (client/check-necessary-capabilities store)))
-    (t/log! :debug "Listening to new emails from listen-channel")))
+  (doseq [client-config (:clients (:email config))]
+    (-> (client/create-imap-monitor client-config)
+        (client/create-category-folders! (mapv :name (database/get-categories)))
+        (client/start-monitoring)
+        (client/schedule-health-checks)))
+  (t/log! :debug "Listening to new emails from listen-channel"))
 
 (defn -main
   [& args]
@@ -45,3 +44,5 @@
     (start-imap-client application-config)
     (events/start-event-loops event-register)
     (server/start-server application-config)))
+
+(comment (server/stop-server))

@@ -1,6 +1,8 @@
 #+OPTIONS: ^:nil
 
-* Plauna
+
+#+CAPTION: Plauna Banner
+[[./docs/resources/plauna-hero-banner.png]]
 
 Plauna is a privacy focused service that helps you categorize your e-mails. All of its data is stored only on your computer.
 
@@ -8,7 +10,7 @@ You can parse your e-mails from mbox files or directly by connecting to your IMA
 
 *IMPORTANT:* Plauna is still under heavy development at the moment. The features and the DB structure are subject to change.
 
-** Features
+* Features
 
 - You own 100% of your data. Everything is on your machine.
 
@@ -22,7 +24,7 @@ You can parse your e-mails from mbox files or directly by connecting to your IMA
 
 - Read emails directly from IMAP folders.
 
-** Screenshots
+* Screenshots
 
 #+CAPTION: List emails and edit metadata
 [[./docs/resources/plauna1.png]]

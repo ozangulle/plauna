@@ -69,3 +69,18 @@
 (deftest set-cert-checks-to-false
   (let [session ^Session (client/config->session {:security :ssl :check-ssl-certs false})]
     (is (= "*" (.getProperty session "mail.imap.ssl.trust")))))
+
+(deftest id-creating
+  (let [config {:host "imap.testmail.com" :user "test@testmail.com" :secret "12345" :folder "Inbox" :debug false}
+        same-config-different-secret-and-debug {:host "imap.testmail.com" :user "test@testmail.com" :secret "67890" :folder "Inbox" :debug true}
+        config-but-different-folder {:host "imap.testmail.com" :user "test@testmail.com" :secret "12345" :folder "Otherbox" :debug false}
+        expected-uuid "2d9f0ab8-00f2-3600-b6b9-24054e1e3337"]
+    (is (= expected-uuid (client/id-from-config config)))
+    (is (= expected-uuid (client/id-from-config same-config-different-secret-and-debug)))
+    (is (not (= expected-uuid (client/id-from-config config-but-different-folder))))))
+
+(deftest adding-to-connections
+  (let [test-config {:host "imap.testmail.com" :user "test@testmail.com" :secret "12345" :folder "Inbox" :debug false}
+        test-con-data (client/->ConnectionData test-config nil nil nil nil nil)]
+    (client/add-to-connections test-con-data)
+    (is (= (get @client/connections (client/id-from-config test-config)) test-con-data))))

@@ -68,7 +68,7 @@
    :body    body})
 
 (defn find-running-clients []
-  (mapv (fn [connection] [(first connection) (client/monitor->map (:monitor (second connection))) (second connection)]) @client/connections))
+  (mapv (fn [[id connection-data]] [id (client/monitor->map connection-data) connection-data]) @client/connections))
 
 (defn redirect-request
   ([request]
@@ -285,8 +285,8 @@
 
   (comp/POST "/admin/categories" {params :params}
     (db/create-category (:name params))
-    (doseq [client-config (get-in (files/config) [:email :clients])]
-      (client/create-imap-directories! client-config))
+    (doseq [connection-data (client/get-connections)]
+      (client/create-category-folders! connection-data [(:name params)]))
     {:status  301
      :headers {"Location" "/admin/categories"}
      :body    (markup/administration)})
@@ -345,12 +345,10 @@
         (save-metadata-form (:params request))
         (doseq [key-val @client/connections
                 :let [updated-email (enriched-email-by-message-id message-id)
-                      id (first key-val)
-                      monitor (:monitor (second key-val))]]
+                      id (first key-val)]]
           (try
-            (t/log! :debug ["Move message-id" message-id "using store" (:store monitor)])
+            (t/log! :debug ["Move message-id" message-id])
             (client/move-messages-by-id-between-category-folders id
-                                                                 (:store monitor)
                                                                  message-id
                                                                  (-> email-before-update :metadata :category)
                                                                  (-> updated-email :metadata :category))
@@ -398,25 +396,26 @@
       (let [messages @global-messages]
         (swap! global-messages (fn [_] []))
         (success-html-with-body (markup/watcher id
-                                                (:config (client/find-by-id-in-watchers id))
-                                                (client/folders-in-store (:store (:monitor (client/find-by-id-in-watchers id)))) messages)))
+                                                (:config (client/connection-data-from-id id))
+                                                (client/folders-in-store (:store (client/connection-data-from-id id))) messages)))
       (success-html-with-body (markup/watcher id
-                                              (:config (client/find-by-id-in-watchers id))
-                                              (client/folders-in-store (:store (:monitor (client/find-by-id-in-watchers id))))))))
+                                              (:config (client/connection-data-from-id id))
+                                              (client/folders-in-store (:store (client/connection-data-from-id id)))))))
 
   (comp/POST "/connections/:id" request
     (let [params (:params request)
           id (:id params)
           folder (:folder params)
-          move (some? (:move params))]
-      (client/read-all-emails id folder {:move move})
+          move (some? (:move params))
+          conn-data (client/connection-data-from-id id)]
+      (client/parse-all-in-folder conn-data folder {:move move})
       (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)}))))
     (redirect-request request))
 
   (comp/GET "/connections/:id/restart" request
     (let [id (:id (:params request))]
-      (client/connect-using-id id))
-    {:status 301 :headers {"Location" "/connections"}})
+      (client/reconnect (client/connection-data-from-id id)))
+    {:status 301 :headers {"Location" "/connections"} :cache-control :no-store}) ;TODO put cache-control in a middleware
 
   (comp/POST "/metadata/languages" request
     (let [limiter (messaging/channel-limiter :enriched-email)
