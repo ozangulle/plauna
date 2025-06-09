@@ -130,12 +130,12 @@
 (defn id-from-config [config]
   (str (UUID/nameUUIDFromBytes (.getBytes ^String (str (hash (clean-config config)))))))
 
-
 (defrecord ConnectionData [config ^Store store ^Folder folder ^IdleManager idle-manager capabilities ^MessageCountListener message-count-listener]
   AutoCloseable
-  (close [_]
+  (close [this]
     (t/log! :info "Closing the idle manager, removing from health checks, closing the folder and the store.")
     (.stop idle-manager)
+    (stop-monitoring this)
     (swap! health-checks dissoc (id-from-config config))
     (when (.isOpen folder)
       (.close folder))
@@ -236,7 +236,6 @@
               (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
               (.moveMessages ^IMAPFolder source-folder (into-array Message found-messages) target-folder))))))))
 
-
 ;; Public Interface
 
 (defn create-imap-monitor [connection-config]
@@ -250,28 +249,28 @@
     connection-data))
 
 (defn reconnect [^AutoCloseable connection-data]
-  (stop-monitoring connection-data)
-  (.close connection-data)
-  (-> (create-imap-monitor (:config connection-data))
-      start-monitoring 
-      schedule-health-checks))
+  (let [new-connection (create-imap-monitor (:config connection-data))]
+    ;; Close the old connection only after a successful new connection. Otherwise health checks are removed and plauna never tries to reestablish the connection again.
+    (.close connection-data)
+    (start-monitoring new-connection)
+    (schedule-health-checks new-connection)))
 
 (defn start-monitoring [connection-data]
-    (try
-      (.addMessageCountListener ^IMAPFolder (:folder connection-data) (message-count-listener (id-from-config (:config connection-data)) (:folder connection-data) (-> connection-data :config :folder)))
-      (t/log! :info ["Started monitoring for" (:folder (:config connection-data)) "in" (.getURLName ^Store (:store connection-data))])
-      (.watch ^IdleManager (:idle-manager connection-data) ^Folder (:folder connection-data))
-      (catch Exception e
-        (t/log! {:level :error :error e} (.getMessage e))))
-    connection-data)
+  (try
+    (.addMessageCountListener ^IMAPFolder (:folder connection-data) (message-count-listener (id-from-config (:config connection-data)) (:folder connection-data) (-> connection-data :config :folder)))
+    (t/log! :info ["Started monitoring for" (:folder (:config connection-data)) "in" (.getURLName ^Store (:store connection-data))])
+    (.watch ^IdleManager (:idle-manager connection-data) ^Folder (:folder connection-data))
+    (catch Exception e
+      (t/log! {:level :error :error e} (.getMessage e))))
+  connection-data)
 
 (defn stop-monitoring [connection-data]
-    (t/log! :info ["Removing message count listener from folder" (-> connection-data :config :folder)])
+  (t/log! :info ["Removing message count listener from folder" (-> connection-data :config :folder)])
   (let [id (id-from-config (:config connection-data))
         sf ^ScheduledFuture (get @health-checks id)]
     (when (some? sf) (.cancel sf true)))
-    (.removeMessageCountListener ^IMAPFolder (:folder connection-data) (:message-count-listener connection-data))
-    connection-data)
+  (.removeMessageCountListener ^IMAPFolder (:folder connection-data) (:message-count-listener connection-data))
+  connection-data)
 
 (defn create-category-folders! [connection-data categories]
   (let [store ^Store (:store connection-data)

@@ -33,7 +33,9 @@
       <td class="text-center">{{watcher.logged-in | iconize}}</td>
       <td class="text-center">{{watcher.folder-open | iconize}}</td>
       <td class="text-center">
-        <a class="btn btn-primary" href="/connections/{{watcher.id}}/restart">Restart</a>
+        <form action="/connections/{{watcher.id}}/restart" method="post">
+          <button class="btn btn-primary">Reconnect</button>
+        </form>
       </td>
     </tr>
     {% endfor %}

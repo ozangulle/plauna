@@ -412,7 +412,7 @@
       (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)}))))
     (redirect-request request))
 
-  (comp/GET "/connections/:id/restart" request
+  (comp/POST "/connections/:id/restart" request
     (let [id (:id (:params request))]
       (client/reconnect (client/connection-data-from-id id)))
     {:status 301 :headers {"Location" "/connections"} :cache-control :no-store}) ;TODO put cache-control in a middleware
