@@ -1,6 +1,6 @@
 (ns plauna.server
   (:require [ring.adapter.jetty :as jetty]
-            [ring.util.codec :refer [url-decode]]
+            [ring.util.codec :refer [base64-decode]]
             [plauna.markup :as markup]
             [plauna.files :as files]
             [plauna.util.page :as page]
@@ -379,7 +379,7 @@
         (success-html-with-body (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories)))))
 
   (comp/GET "/emails/:id" [id]
-    (let [decoded-id (url-decode id)
+    (let [decoded-id (new String ^"[B" (base64-decode id))
           email-data (add-sanitized-text-to-enriched-email (enriched-email-by-message-id decoded-id))
           categories (conj (db/get-categories) {:id nil :name "n/a"})]
       {:status 200

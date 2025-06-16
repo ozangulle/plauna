@@ -2,7 +2,8 @@
   (:require [clojure.data.json :as json]
             [selmer.parser :refer [render-file set-resource-path!]]
             [selmer.filters :refer [add-filter!]]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [ring.util.codec :refer [base64-encode]])
   (:import
    (java.time LocalDateTime ZoneOffset)))
 
@@ -66,6 +67,8 @@
 (add-filter! :concat-bcc (partial concat-contacts :bcc))
 
 (add-filter! :iconize (fn [pred] (if pred "✓" "⤫")))
+
+(add-filter! :base64-encode (fn [^String string] (base64-encode (.getBytes string))))
 
 (add-filter! :double-format-nillable (fn [n & [decimal-places]]
                                        (if (nil? n)

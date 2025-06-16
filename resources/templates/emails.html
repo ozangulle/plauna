@@ -107,10 +107,10 @@
     <tbody>
       {% for email in emails %}
       <tr class="table-row">
-        <td class="table-cell"><a href="/emails/{{email.header.message-id|urlescape}}">{{email.header.date|date:"dd.MM.yyyy"}}</a></td>
-        <td class="table-cell" style="text-wrap-mode: wrap;"><a href="/emails/{{email.header.message-id|urlescape}}">{{email.header.subject}}</a></td>
-        <td class="hidden lg:table-cell" style="text-wrap-mode: wrap;"><a href="/emails/{{email.header.message-id|urlescape}}">{{email.participants|concat-senders}}</a></td>
-        <td class="hidden lg:table-cell" style="text-wrap-mode: wrap;"><a href="/emails/{{email.header.message-id|urlescape}}">{{email.participants|concat-receivers}}</a></td>
+        <td class="table-cell"><a href="/emails/{{email.header.message-id|base64-encode}}">{{email.header.date|date:"dd.MM.yyyy"}}</a></td>
+        <td class="table-cell" style="text-wrap-mode: wrap;"><a href="/emails/{{email.header.message-id|base64-encode}}">{{email.header.subject}}</a></td>
+        <td class="hidden lg:table-cell" style="text-wrap-mode: wrap;"><a href="/emails/{{email.header.message-id|base64-encode}}">{{email.participants|concat-senders}}</a></td>
+        <td class="hidden lg:table-cell" style="text-wrap-mode: wrap;"><a href="/emails/{{email.header.message-id|base64-encode}}">{{email.participants|concat-receivers}}</a></td>
         <td class="hidden lg:table-cell"><input class="input" form="emails" name="language" type="text" value="{{email.metadata.language}}"></td>
         <td class="hidden lg:table-cell">{{email.metadata.language-confidence|double-format-nillable:10}}</td>
         <td class="hidden lg:table-cell">
