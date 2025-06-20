@@ -234,7 +234,12 @@
 
   (route/resources "/")
 
-  (comp/GET "/" {} (success-html-with-body (markup/administration)))
+  (comp/GET "/" {} (let [data (db/yearly-email-stats)]
+                     (if (> (count data) 0)
+                       {:status  302
+                        :headers {"Location" "/emails"}}
+                       {:status  302
+                        :headers {"Location" "/admin"}})))
 
   (comp/GET "/admin" {}
     (if (seq @global-messages)
