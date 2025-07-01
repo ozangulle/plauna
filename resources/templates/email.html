@@ -27,8 +27,8 @@
 		  </div>
           <script>
             document.getElementById('delete-button-email').addEventListener('click', (e) => {
-                fetch('/emails/{{email.header.message-id|urlescape}}', {method: 'DELETE'})
-                    .then(() => window.location.href = '/emails')});
+                fetch('/emails/{{email.header.message-id|base64-encode}}', {method: 'DELETE'})
+                    .then((res) =>  window.location.replace('/emails'))});
           </script>
 	    </div>
       </div>

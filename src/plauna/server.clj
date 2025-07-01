@@ -392,11 +392,9 @@
        :body   (markup/list-email-contents email-data categories)}))
 
   (comp/DELETE "/emails/:id" [id]
-    (db/delete-email-by-message-id (url-decode id))
-    {:status  301
-     :headers {"Location" "/emails"}
-     :body    (markup/administration)})
-  
+    (db/delete-email-by-message-id (new String ^"[B" (base64-decode id)))
+    {:status  200})
+
   (comp/GET "/connections" []
     {:status 200
      :header html-headers

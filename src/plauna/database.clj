@@ -197,8 +197,7 @@
 (defn delete-email-by-message-id [message-id]
   (let [conn (jdbc/get-connection (ds))]
     (jdbc/execute! conn ["PRAGMA foreign_keys = ON"])
-    (jdbc/execute! conn ["DELETE FROM headers WHERE message_id = ?" message-id]))
-  )
+    (jdbc/execute! conn ["DELETE FROM headers WHERE message_id = ?" message-id])))
 
 (defn category-by-name [category-name]
   (jdbc/execute-one! (ds) (honey/format {:select [:*] :from :categories :where [:= :name category-name]}) builder-function))
