@@ -36,7 +36,8 @@
 (defn create-db []
   (.migrate ^Flyway (flyway))
   (jdbc/execute! (ds) ["PRAGMA foreign_keys = ON;"])
-  (jdbc/execute! (ds) ["PRAGMA journal_mode = WAL;"]))
+  (jdbc/execute! (ds) ["PRAGMA journal_mode = WAL;"])
+  (jdbc/execute! (ds) ["PRAGMA foreign_keys=on;"]))
 
 (def builder-function {:builder-fn as-unqualified-lower-maps})
 
@@ -192,6 +193,11 @@
 
 (defn delete-category-by-id [id]
   (jdbc/execute! (ds) (honey/format {:delete-from :categories :where [:= :id id]})))
+
+(defn delete-email-by-message-id [message-id]
+  (let [conn (jdbc/get-connection (ds))]
+    (jdbc/execute! conn ["PRAGMA foreign_keys = ON"])
+    (jdbc/execute! conn ["DELETE FROM headers WHERE message_id = ?" message-id])))
 
 (defn category-by-name [category-name]
   (jdbc/execute-one! (ds) (honey/format {:select [:*] :from :categories :where [:= :name category-name]}) builder-function))

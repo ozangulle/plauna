@@ -11,6 +11,30 @@
   <tr><td><strong>Cc: </strong></td><td>{{email.participants|concat-cc}}</td></tr>
   <tr><td><strong>Bcc: </strong></td><td>{{email.participants|concat-bcc}}</td></tr>
 
+  <tr>
+    <td>
+      <label class="btn" style="white-space: nowrap;" for="modal">Delete from database</label>
+      <input class="modal-toggle" id="modal" type="checkbox" />
+      <div class="modal">
+	    <label class="modal-overlay" for="modal"></label>
+	    <div class="modal-box flex flex-col gap-5">
+		  <h2 class="text-xl">Delete E-Mail from Database</h2>
+		  <span>Are you sure you want to delete this email from the database?</span>
+		  <span>This will only remove it from the Plauna database. The actualy e-mail on your e-mail server will not be deleted.</span>
+		  <div class="flex gap-3">
+			<button id="delete-button-email" class="btn btn-error">Delete</button>
+		    <label for="modal" class="btn">Cancel</label>
+		  </div>
+          <script>
+            document.getElementById('delete-button-email').addEventListener('click', (e) => {
+                fetch('/emails/{{email.header.message-id|base64-encode}}', {method: 'DELETE'})
+                    .then((res) =>  window.location.replace('/emails'))});
+          </script>
+	    </div>
+      </div>
+    </td>
+  </tr>
+  
   <tr><td><h3 class="uppercase text-lg my-8">Metadata</h3></td></tr>
 <form action="/metadata" id="email" method="post">
   <input form="email" hidden="true" name="message-id" type="text" value="{{email.header.message-id}}">

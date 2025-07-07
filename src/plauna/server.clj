@@ -391,6 +391,10 @@
        :header html-headers
        :body   (markup/list-email-contents email-data categories)}))
 
+  (comp/DELETE "/emails/:id" [id]
+    (db/delete-email-by-message-id (new String ^"[B" (base64-decode id)))
+    {:status  200})
+
   (comp/GET "/connections" []
     {:status 200
      :header html-headers
@@ -434,10 +438,11 @@
   (route/resources "/"))
 
 (defn upload-progress [_ bytes-read content-length item-count]
-  (t/log! {:level       :info
-           :sample 0.5
-           :limit  {"1 per 10 sec" [1 10000]}}
-          ["Writing" item-count "files. Read" (* 100 (float (/ bytes-read content-length))) "% until now. Total length: " content-length]))
+  (t/log! {:level :info
+           :limit  [[1 5000]]
+           :limit-by content-length
+           :let [read-percent  (* 100 (float (/ bytes-read content-length)))]}
+          ["Writing" item-count "files. Read" read-percent "% until now. Total length: " content-length]))
 
 (def app (-> (fn [req] (routes req))
              wrap-keyword-params
