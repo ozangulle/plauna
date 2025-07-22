@@ -4,11 +4,13 @@
 #+CAPTION: Plauna Banner
 [[./docs/resources/plauna-hero-banner.png]]
 
+*Organize your e-mails without sacrificing your privacy*
+
 Plauna is a privacy focused service that helps you categorize your e-mails. All of its data is stored only on your computer.
 
 You can parse your e-mails from mbox files or directly by connecting to your IMAP servers. Plauna helps you categorize your e-mails and automates the process so that incoming e-mails are moved to their respective folders on your IMAP server.
 
-*IMPORTANT:* Plauna is still under heavy development at the moment. The features and the DB structure are subject to change.
+*IMPORTANT:* Plauna is still under heavy development at the moment. The features are subject to change.
 
 * Features
 
@@ -18,30 +20,24 @@ You can parse your e-mails from mbox files or directly by connecting to your IMA
 
 - Multi-language support.
 
+- Support for multiple IMAP connections.
+
 - Statistics about your emails and metadata (very basic, still under development).
 
 - Upload data from mbox archives.
 
 - Read emails directly from IMAP folders.
 
-* Screenshots
 
-#+CAPTION: List emails and edit metadata
-[[./docs/resources/plauna1.png]]
-List emails and edit metadata
+* How to get Plauna
 
-#+CAPTION: See details of an email and edit metadata
-[[./docs/resources/plauna3.png]]
-See details of an email and edit metadata
-
-#+CAPTION: Admin panel
-[[./docs/resources/plauna2.png]]
-Admin panel
-
-* Installation
+** Docker
 
 The easiest way to get Plauna is using the [[https://hub.docker.com/r/ozangulle/plauna][Docker image]].
 
+Plauna requires some configuration to work as mention under "How to use" -> "How to run" below. If you're going to use docker, it makes sense to mount the configuration file in a separate volume.
+
+** Build from source
 The second way to get Plauna is fetching it from the git repository and compiling using Clojure CLI with the command:
 
 #+begin_src 
@@ -49,6 +45,12 @@ clj -T:build uber
 #+end_src
 
 This will produce a Plauna uberjar in the ./target directory which you can run using a Java Runtime Environment.
+
+* Security
+
+Plauna comes without security features like different users. It is made to be used by self-hosters who own and use the service themselves in an internal network that is isolated.
+
+*Please do not use Plauna in an open network or open ports to outside!*
 
 * How to use
 
@@ -121,6 +123,12 @@ Go to "Admin" -> "Manage Categories" in order to create and delete categories. I
 *** Categorize E-mails
 
 Under the tab "E-mails" you can edit the language and category of every e-mail; either as a batch operation or by clicking on an e-mail and changing it at the details page.
+
+#+CAPTION: List emails and edit metadata
+[[./docs/resources/plauna-new-1.png]]
+
+#+CAPTION: See details of an email and edit metadata
+[[./docs/resources/plauna-new-2.png]]
 
 *** Data Training
 
