@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2025-07-29.0] - 2025-07-29
+
+### 🚀 Features
+
+- Visiting root path on server redirects to /emails if there are e-mails to show
+- Add delete functionality for e-mails in the db
+
+### 🐛 Bug Fixes
+
+- Creating categories without any IMAP connections returns 500
+- Broken reconnection logic in the IMAP client
+- [**breaking**] Email url uses base64 encoding instead of urlescaping
+
+### 📚 Documentation
+
+- Add screenshots from new design to docs and improve
+
+### ⚙️ Miscellaneous Tasks
+
+- Update dependencies for security reasons
+- Update ring dependencies
+
 ## [2025-05-26.0] - 2025-05-26
 
 ### 🚀 Features
