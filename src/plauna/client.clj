@@ -174,6 +174,7 @@
           (.writeTo ^IMAPMessage message os)
           (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :move true :id id :folder folder :original-folder folder-name :message message})))
         (let [conn-data ^ConnectionData (connection-data-from-id id)]
+          (t/log! :debug ["Idling on the folder" folder-name "while waiting for new messages."])
           (.watch ^IdleManager (.idle-manager conn-data) (.folder conn-data)))))))
 
 (defn open-folder-in-store [^Store store ^String folder-name]
@@ -294,11 +295,12 @@
                                                           (t/log! :debug ["Checking if the folder " (:folder config) "is open"])
                                                           (if (.isOpen ^Folder folder)
                                                             (t/log! :debug "Folder is still open.")
-                                                            (do (t/log! :info "Folder is closed. Opening...")
-                                                                (.open folder Folder/READ_WRITE)
-                                                                (start-monitoring connection-data))))
+                                                            (do (t/log! :info "Folder is closed. Opening it again.")
+                                                                (.open folder Folder/READ_WRITE))))
                                                       (do (t/log! :warn "Connection lost. Reconnecting to email server...")
                                                           (reconnect connection-data)))
+                                                    (t/log! :debug "Idling and waiting for messages after a health check.")
+                                                    (start-idling-for-id (id-from-config config))
                                                     (catch Exception e
                                                       (t/log! {:level :error :error e} "There was an error during health check. The connection is probably in a broken state."))))
                                                120 (p/client-health-check-interval) TimeUnit/SECONDS)]
