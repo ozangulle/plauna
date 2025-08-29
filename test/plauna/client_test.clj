@@ -2,7 +2,9 @@
   (:require [clojure.test :refer :all]
             [plauna.client :as client])
   (:import (java.util Properties)
-           (jakarta.mail Session)))
+           (jakarta.mail Session)
+           (org.mockito Mockito)
+           (org.mockito ArgumentMatchers)))
 
 (deftest ssl-properties-set-correctly
   (let [session ^Session (client/config->session {:security :ssl :port 993})
@@ -84,3 +86,22 @@
         test-con-data (client/->ConnectionData test-config nil nil nil nil nil)]
     (client/add-to-connections test-con-data)
     (is (= (get @client/connections (client/id-from-config test-config)) test-con-data))))
+
+(deftest folder-throws-exception-on-move
+  (with-redefs [client/reconnect (fn [_] true)
+                client/move-messages-by-id-between-category-folders (fn [_ _ _ _] true)]
+    (let [test-config {:host "imap.testmail.com" :user "test@testmail.com" :secret "12345" :folder "Inbox" :debug false}
+          store (Mockito/mock org.eclipse.angus.mail.imap.IMAPStore)
+          folder (Mockito/mock org.eclipse.angus.mail.imap.IMAPFolder)
+          idle-manager (Mockito/mock org.eclipse.angus.mail.imap.IdleManager)
+          message (Mockito/mock org.eclipse.angus.mail.imap.IMAPMessage)
+          conn-data (client/->ConnectionData test-config store folder idle-manager [:move] nil)
+          mock-event {:payload {:metadata {:category "yes"}}
+                      :options {:move true
+                                :connection-id (client/id-from-config test-config)
+                                :folder folder
+                                :message message}}]
+      (.thenReturn (Mockito/when (.getDefaultFolder store)) (Mockito/mock org.eclipse.angus.mail.imap.IMAPFolder))
+      (.thenThrow (Mockito/when (.moveMessages folder (ArgumentMatchers/any) (ArgumentMatchers/any))) jakarta.mail.FolderClosedException) nil
+      (client/add-to-connections conn-data)
+      (is (= (client/handle-incoming-events mock-event) true)))))

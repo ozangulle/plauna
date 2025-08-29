@@ -2,18 +2,20 @@
  :aliases {:build {:deps {io.github.clojure/tools.build {:git/tag "v0.10.3" :git/sha "15ead66"}}
                    :ns-default build
                    :jvm-opts ["-Dclojure.compiler.direct-linking=true" "-Xmx4000m"]}
-           :cider-clj {:extra-deps {cider/cider-nrepl {:mvn/version "0.52.1"}}
-                       :classpath-overrides {org.clojure/clojure nil}
+           :cider-clj {:extra-deps {cider/cider-nrepl {:mvn/version "0.57.0"}
+                                    org.mockito/mockito-core {:mvn/version "5.19.0"}}
+                       ;:classpath-overrides {org.clojure/clojure nil}
                        :main-opts ["-m" "nrepl.cmdline" "--middleware" "[cider.nrepl/cider-middleware]"]}
            :1.12-storm
            {;; for disabling the official compiler
             :classpath-overrides {org.clojure/clojure nil}
             :extra-deps {com.github.flow-storm/clojure {:mvn/version "1.12.0-9"}
                          com.github.flow-storm/flow-storm-dbg {:mvn/version "4.2.2"}
-                         cider/cider-nrepl {:mvn/version "0.52.1"}}
+                         cider/cider-nrepl {:mvn/version "0.57.0"}}
             :main-opts ["-m" "nrepl.cmdline" "--middleware" "[cider.nrepl/cider-middleware]"]}
            :test {:extra-paths ["test"]
-                  :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+                  :extra-deps {io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}
+                               org.mockito/mockito-core {:mvn/version "5.19.0"}}
                   :main-opts ["-m" "cognitect.test-runner"]
                   :exec-fn cognitect.test-runner.api/test}}
  :deps {commons-codec/commons-codec {:mvn/version "1.18.0"}

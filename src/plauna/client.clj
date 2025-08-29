@@ -160,10 +160,10 @@
 
 (defn start-idling-for-id [id]
   (let [connection-data (connection-data-from-id id)]
-    (t/log! :debug "Starting to idle.")
+    (t/log! :debug ["Starting to idle for id:" id "using connection-data" connection-data])
     (.watch ^IdleManager (.idle-manager connection-data) (.folder connection-data))))
 
-(defn message-count-listener [id folder folder-name]
+(defn message-count-listener [connection-id folder folder-name]
   (proxy [MessageCountAdapter] []
     (messagesAdded [^MessageCountEvent event]
       (t/log! :info "Received new message event.")
@@ -172,8 +172,8 @@
         (.setPeek ^IMAPMessage message true)
         (with-open [os ^OutputStream (ByteArrayOutputStream.)]
           (.writeTo ^IMAPMessage message os)
-          (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :move true :id id :folder folder :original-folder folder-name :message message})))
-        (let [conn-data ^ConnectionData (connection-data-from-id id)]
+          (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :move true :connection-id connection-id :folder folder :original-folder folder-name :message message})))
+        (let [conn-data ^ConnectionData (connection-data-from-id connection-id)]
           (t/log! :debug ["Idling on the folder" folder-name "while waiting for new messages."])
           (.watch ^IdleManager (.idle-manager conn-data) (.folder conn-data)))))))
 
@@ -194,8 +194,8 @@
     (t/log! :debug ["Expunged source folder"])
     (catch Exception e (t/log! {:level :error :error e} ["There was an error copying and deleting the message" message]))))
 
-(defn move-message [id ^Message message ^Folder source-folder ^String target-name]
-  (let [connection-data (connection-data-from-id id)
+(defn move-message [connection-id ^Message message ^Folder source-folder ^String target-name]
+  (let [connection-data (connection-data-from-id connection-id)
         store (:store connection-data)
         capabilities ^PersistentVector (:capabilities connection-data)
         target-folder ^IMAPFolder (.getFolder ^Store store ^String (structured-folder-name store target-name))]
@@ -218,12 +218,12 @@
   (if (nil? folder-name) default (structured-folder-name store folder-name)))
 
 (defn move-messages-by-id-between-category-folders [^String id message-id ^String source-name ^String target-name]
-  (let [connection-data ^ConnectionData (connection-data-from-id id)
-        store ^Store (:store connection-data)
-        source-folder-name (inbox-or-category-folder-name store source-name (-> connection-data :config :folder))
-        target-folder-name (inbox-or-category-folder-name store target-name (-> connection-data :config :folder))]
-    (with-open [target-folder ^IMAPFolder (doto (.getFolder ^Store store ^String target-folder-name) (.open Folder/READ_WRITE))
-                source-folder ^AutoCloseable (doto (.getFolder ^Store store ^String source-folder-name) (.open Folder/READ_WRITE))]
+  (let [^ConnectionData connection-data (connection-data-from-id id)
+        ^Store store (:store connection-data)
+        ^String source-folder-name (inbox-or-category-folder-name store source-name (-> connection-data :config :folder))
+        ^String target-folder-name (inbox-or-category-folder-name store target-name (-> connection-data :config :folder))]
+    (with-open [^IMAPFolder target-folder (doto (.getFolder store target-folder-name) (.open Folder/READ_WRITE))
+                ^IMAPFolder source-folder (doto (.getFolder store source-folder-name) (.open Folder/READ_WRITE))]
       (let [found-messages (.search source-folder (MessageIDTerm. message-id))]
         (t/log! :debug ["Found" (count found-messages) "messages when searched for the message-id:" message-id])
         (when (seq found-messages)
@@ -231,11 +231,11 @@
             (do
               (stop-monitoring connection-data)
               (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
-              (.moveMessages ^IMAPFolder source-folder (into-array Message found-messages) target-folder)
+              (.moveMessages source-folder (into-array Message found-messages) target-folder)
               (start-monitoring connection-data))
             (do
               (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
-              (.moveMessages ^IMAPFolder source-folder (into-array Message found-messages) target-folder))))))))
+              (.moveMessages source-folder (into-array Message found-messages) target-folder))))))))
 
 ;; Public Interface
 
@@ -267,8 +267,8 @@
 
 (defn stop-monitoring [connection-data]
   (t/log! :info ["Removing message count listener from folder" (-> connection-data :config :folder)])
-  (let [id (id-from-config (:config connection-data))
-        sf ^ScheduledFuture (get @health-checks id)]
+  (let [connection-id (id-from-config (:config connection-data))
+        sf ^ScheduledFuture (get @health-checks connection-id)]
     (when (some? sf) (.cancel sf true)))
   (.removeMessageCountListener ^IMAPFolder (:folder connection-data) (:message-count-listener connection-data))
   connection-data)
@@ -283,8 +283,8 @@
     connection-data))
 
 (defn schedule-health-checks [connection-data]
-  (let [store ^Store (:store connection-data)
-        folder ^Folder (:folder connection-data)
+  (let [^Store store (:store connection-data)
+        ^Folder folder (:folder connection-data)
         config (:config connection-data)
         scheduled-future (.scheduleAtFixedRate ^ScheduledExecutorService executor-service
                                                #(do
@@ -293,7 +293,7 @@
                                                     (if (.isConnected store)
                                                       (do (t/log! :debug "Store is still connected.")
                                                           (t/log! :debug ["Checking if the folder " (:folder config) "is open"])
-                                                          (if (.isOpen ^Folder folder)
+                                                          (if (.isOpen folder)
                                                             (t/log! :debug "Folder is still open.")
                                                             (do (t/log! :info "Folder is closed. Opening it again.")
                                                                 (.open folder Folder/READ_WRITE))))
@@ -308,20 +308,42 @@
     connection-data))
 
 (defn parse-all-in-folder [connection-data folder-name options]
-  (let [store ^Store (:store connection-data)
+  (let [^Store store (:store connection-data)
         config (:config connection-data)
-        folder ^Folder (:folder connection-data)]
+        ^Folder folder (:folder connection-data)]
     (t/log! :info ["Read all e-mails from:" folder-name "with options:" options])
-    (async/go (let [read-folder ^Folder (doto (.getFolder ^Store store ^String folder-name) (.open Folder/READ_WRITE))
-                    id (id-from-config config)]
-                (vec (doseq [message-num (range 1 (inc (.getMessageCount ^Folder read-folder)))
-                             :let [message ^Message (.getMessage ^Folder read-folder message-num)]]
+    (async/go (let [^Folder read-folder (doto (.getFolder store ^String folder-name) (.open Folder/READ_WRITE))
+                    connection-id (id-from-config config)]
+                (vec (doseq [message-num (range 1 (inc (.getMessageCount read-folder)))
+                             :let [^Message message (.getMessage read-folder message-num)]]
+                       (t/log! :debug ["Reading message number" message-num "from" folder-name])
                        (with-open [os (ByteArrayOutputStream.)]
                          (.writeTo message os)
                          (async/>!! @messaging/main-chan (events/create-event :received-email
                                                                               (.toByteArray os)
-                                                                              {:enrich true :move (:move options) :id id :folder folder :original-folder folder-name :message message})))))))
+                                                                              {:enrich true :move (:move options) :connection-id connection-id :folder folder :original-folder folder-name :message message})))))))
     connection-data))
+
+(defn handle-incoming-events [event]
+  (when (and (true? (:move (:options event))) (some? (:category (:metadata (:payload event)))))
+    (let [category-name (get-in event [:payload :metadata :category])]
+      (when (some? category-name)
+        (t/log! :info (str "Moving email: " (get-in event [:payload :header :subject]) " categorized as: " (get-in event [:payload :metadata :category])))
+        (let [connection-id (get-in event [:options :connection-id])
+              ^IMAPMessage message (get-in event [:options :message])
+              ^IMAPFolder folder (get-in event [:options :folder])]
+          (try (move-message connection-id message folder category-name)
+               (catch jakarta.mail.FolderClosedException e
+                 (do (t/log! {:level :error :error e})
+                     (let [folder-name (.getName folder)
+                           message-id (.getMessageID message)]
+                       (t/log! :debug ["Lost connection to folder" folder-name "with connection-id" connection-id ". Trying to reconnect and move the message again."])
+                       (reconnect (connection-data-from-id connection-id))
+                       (move-messages-by-id-between-category-folders connection-id message-id folder-name category-name))))
+               (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))
+               (finally (do (t/log! :debug ["Continue watching folder" (get-in event [:options :original-folder])])
+                            (let [connection-id (get-in event [:options :connection-id])]
+                              (start-idling-for-id connection-id))))))))))
 
 (defn client-event-loop
   "Listens to :enriched-email
@@ -335,13 +357,6 @@
     (async/sub publisher :enriched-email local-chan)
     (async/go-loop [event (async/<! local-chan)]
       (when (some? event)
-        (when (and (true? (:move (:options event))) (some? (:category (:metadata (:payload event)))))
-          (let [category-name (get-in event [:payload :metadata :category])]
-            (when (some? category-name)
-              (t/log! :info (str "Moving email: " (get-in event [:payload :header :subject]) " categorized as: " (get-in event [:payload :metadata :category])))
-              (try (move-message (get-in event [:options :id]) (get-in event [:options :message]) (get-in event [:options :folder]) category-name)
-                   (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))
-                   (finally (do (t/log! :debug ["Continue watching folder" (get-in event [:options :original-folder])])
-                                (let [id (get-in event [:options :id])]
-                                  (start-idling-for-id id))))))))
+        (t/log! :debug ["Client event loop processing the event:" event])
+        (handle-incoming-events event)
         (recur (async/<! local-chan))))))
