@@ -1,4 +1,6 @@
-name: build
+name: Build and Upload to Dockerhub
+permissions:
+  contents: read
 
 on:
   push:

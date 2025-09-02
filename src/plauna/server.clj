@@ -19,13 +19,16 @@
             [plauna.database :as db]
             [plauna.messaging :as messaging]
             [clojure.core.async :as async]
-            [clojure.data :as cd])
+            [clojure.data :as cd]
+            [nrepl.server :as nrepl])
   (:import [java.net ServerSocket]
            [org.eclipse.jetty.server Server]))
 
 (set! *warn-on-reflection* true)
 
 (defonce server (atom nil))
+
+(defonce repl-server (atom nil))
 
 (def html-headers {"Content-Type" "text/html; charset=UTF-8"})
 
@@ -230,6 +233,8 @@
                                 (conj body-part {:sanitized-content (analysis/normalize-body-part body-part)})
                                 body-part)) (:body email))})
 
+(defn get-status-repl-server [] {:status (some? @repl-server) :port 7888})
+
 (comp/defroutes routes
 
   (route/resources "/")
@@ -246,7 +251,7 @@
       (let [messages @global-messages]
         (swap! global-messages (fn [_] []))
         (success-html-with-body (markup/administration messages)))
-      (success-html-with-body (markup/administration))))
+      (success-html-with-body (markup/administration {:repl (get-status-repl-server)}))))
 
   (comp/POST "/emails/parse" request
     (let [temp-file (get-in request [:params :filename :tempfile])]
@@ -294,20 +299,20 @@
       (client/create-category-folders! connection-data [(:name params)]))
     {:status  301
      :headers {"Location" "/admin/categories"}
-     :body    (markup/administration)})
+     :body    (markup/administration {:repl (get-status-repl-server)})})
 
   (comp/DELETE "/admin/categories/:id" {route-params :route-params}
     (db/delete-category-by-id (:id route-params))
     {:status  301
      :headers {"Location" "/admin/categories"}
-     :body    (markup/administration)})
+     :body    (markup/administration {:repl (get-status-repl-server)})})
 
   (comp/POST "/admin/database" {}
     (files/check-and-create-database-file)
     (db/create-db)
     {:status  301
      :headers {"Location" "/admin"}
-     :body    (markup/administration)})
+     :body    (markup/administration {:repl (get-status-repl-server)})})
 
   (comp/GET "/statistics" {}
     (success-html-with-body (markup/statistics-overall (db/yearly-email-stats))))
@@ -338,7 +343,7 @@
     (let [;selected-interval (params->interval-request params)
           categories-stats (category-statistics-by-period {:interval :yearly})
           categories-overall (statistics-overall-for-categories)
-          ;years (db/years-of-data)
+                                        ;years (db/years-of-data)
           ]
       (success-html-with-body
        (markup/statistics-categories categories-overall categories-stats))))
@@ -434,6 +439,13 @@
                          (async/>!! @messaging/main-chan {:type :language-detection-request :options {} :payload enriched-email})))]
       (core-email/iterate-over-all-pages db/fetch-data process-fn {:entity :enriched-email :strict false :page {:page 1 :size 500}} {:where [:= :language nil]} true))
     (redirect-request request))
+
+  (comp/POST "/repl" request
+    (let [operation (get-in request [:params :operation])]
+      (cond (= operation "start") (swap! repl-server (fn [_] (t/log! :info "Starting repl server") (nrepl/start-server :bind "0.0.0.0" :port 7888)))
+            (= operation "stop") (swap! repl-server (fn [_] (t/log! :info "Stopping repl server") (nrepl/stop-server @repl-server) nil))
+            :else (t/log! :error ["Unsupported operation" operation "at /repl"]))
+      (redirect-request request)))
 
   (route/resources "/"))
 

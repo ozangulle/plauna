@@ -36,8 +36,8 @@
     :else message))
 
 (defn administration
-  ([] (render-file "admin.html" {:active-nav :admin}))
-  ([messages] (render-file "admin.html" {:messages (mapv type->toast-role messages) :active-nav :admin})))
+  ([data] (render-file "admin.html" {:active-nav :admin :data data}))
+  ([data messages] (render-file "admin.html" {:messages (mapv type->toast-role messages) :active-nav :admin :data data})))
 
 (defn concat-string [contact]
   (if (nil? (:name contact))

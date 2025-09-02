@@ -24,6 +24,24 @@
       </form>
     </div>
   </div>
+
+  <div class="card card-border">
+    <div class="card-body grow lg:grow-0">
+      <h2 class="card-title">REPL Status</h2>
+      <p>Running: {{data.repl.status}}</p>
+      {% if data.repl.status %}<p>Port: {{data.repl.port}} </p>{% endif %}
+      <form>
+        <input name="redirect-url" type="hidden" value="admin">
+      {% if data.repl.status %}
+        <input name="operation" type="hidden" value="stop">
+        <button class="btn btn-outline-primary" type="submit" formmethod="post" formaction="repl">Stop REPL</button>
+      {% else %}
+        <input name="operation" type="hidden" value="start">
+        <button class="btn btn-outline-primary" type="submit" formmethod="post" formaction="repl">Start REPL</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
 </div>
 
 {% endblock %}
