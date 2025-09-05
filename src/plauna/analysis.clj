@@ -31,7 +31,10 @@
                            (normalize [_ text] ((comp st/trim #(st/replace % #"https?://[-_.?&~%;+=/#0-9A-Za-z]+" "")) text))))
 
 (def NonCharNormalizer (reify CharSequenceNormalizer
-                         (normalize [_ text] (#(st/replace % (Pattern/compile "[^\\s\\w]" Pattern/UNICODE_CHARACTER_CLASS) " ") text))))
+                         (normalize [_ text] (#(st/replace % (Pattern/compile "[^\\s\\w]" (bit-or Pattern/MULTILINE Pattern/UNICODE_CHARACTER_CLASS)) " ") text))))
+
+(def ExtraWhiteSpaceNormalizer (reify CharSequenceNormalizer
+                                 (normalize [_ text] (#(st/replace % (Pattern/compile "\\W{2,}" Pattern/MULTILINE) " ") text))))
 
 (def NonPrintableCharNormalizer (reify CharSequenceNormalizer
                                   (normalize [_ text] (#(st/replace % (Pattern/compile "\\p{C}") " ") text))))
@@ -41,11 +44,11 @@
                                                          [BetterURLNormalizer
                                                           MailtoNormalizer
                                                           (NumberCharSequenceNormalizer/getInstance)
-
                                                           BracketsNormalizer
                                                           NonPrintableCharNormalizer
                                                           NonCharNormalizer
-                                                          (ShrinkCharSequenceNormalizer/getInstance)])))
+                                                          (ShrinkCharSequenceNormalizer/getInstance)
+                                                          ExtraWhiteSpaceNormalizer])))
 
 (defn normalize [^String text] (.normalize normalizer text))
 
@@ -58,13 +61,18 @@
 
 (defn detect-language [^String text]
   (when (some? text)
-    (if (> (count text) 3)
-      (let [result (second (lang/detect text))
-            confidence (Double/parseDouble (first (vals result)))
-            lang-code (lang-code-set3 (first (keys result)))]
-        {:code (if (< confidence (p/language-detection-threshold)) "n/a" lang-code)
-         :confidence confidence})
-      {:code "n/a" :confidence 0.0})))
+    (try
+      (if (> (count text) 3)
+        (let [result (second (lang/detect text))
+              confidence (Double/parseDouble (first (vals result)))
+              lang-code (lang-code-set3 (first (keys result)))]
+          {:code (if (< confidence (p/language-detection-threshold)) "n/a" lang-code)
+           :confidence confidence})
+        {:code "n/a" :confidence 0.0})
+    (catch com.cybozu.labs.langdetect.NoFeatureInTextException e
+      (t/log! {:level :error :error e} "There was an error when detecting the language")
+      (t/log! :debug ["The following text threw an exception:" text])
+      {:code "n/a" :confidence 0.0}))))
 
 (defn training-data-stream [file]
   (-> (MarkableFileInputStreamFactory. file)
