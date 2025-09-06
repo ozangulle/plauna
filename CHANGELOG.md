@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2025-09-06.0] - 2025-09-06
+
+### 🚀 Features
+
+- Toggle the repl on/off over the ui
+
+### 🐛 Bug Fixes
+
+- Imap client now properly idles and handles dead connections
+- Closed folder when moving emails causes emails to get stuck in the inbox
+- Text normalizer removes extra whitespaces and special characters from texts properly
+
 ## [2025-07-29.0] - 2025-07-29
 
 ### 🚀 Features
