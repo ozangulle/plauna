@@ -69,10 +69,10 @@
           {:code (if (< confidence (p/language-detection-threshold)) "n/a" lang-code)
            :confidence confidence})
         {:code "n/a" :confidence 0.0})
-    (catch com.cybozu.labs.langdetect.NoFeatureInTextException e
-      (t/log! {:level :error :error e} "There was an error when detecting the language")
-      (t/log! :debug ["The following text threw an exception:" text])
-      {:code "n/a" :confidence 0.0}))))
+      (catch com.cybozu.labs.langdetect.NoFeatureInTextException e
+        (t/log! {:level :error :error e} "There was an error when detecting the language")
+        (t/log! :debug ["The following text threw an exception:" text])
+        {:code "n/a" :confidence 0.0}))))
 
 (defn training-data-stream [file]
   (-> (MarkableFileInputStreamFactory. file)

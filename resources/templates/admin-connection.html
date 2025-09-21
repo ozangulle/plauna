@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="uppercase text-lg my-8">IMAP Connection for {{host}} - {{user}}</h3>
+<div class="flex flex-wrap gap-6">
+  <div class="grow-4">
+    <form id="update" class="space-y-4" actions="/admin/connections/{{id}}" method="POST">
+      <h4 class="text-lg">Connection Config</h4>
+      <div class="flex gap-2">
+        <label for="host">Host</label>
+        <input class="input" name="host" value="{{host}}">
+        <input name="id" type="hidden" value="{{id}}">
+      </div>
+      <div class="flex gap-2">
+        <label for="user">User</label>
+        <input class="input" name="user" value="{{user}}">
+      </div>
+      <div class="flex gap-2">
+        <label for="secret">Secret</label>
+        <input class="input" name="secret" type="password" value="{{secret}}">
+      </div>
+      <div class="flex gap-2">
+        <label for="folder">Folder to watch</label>
+        <input class="input" name="folder" value="{{folder}}">
+      </div>
+      <div class="flex gap-2">
+        <label for="port">Port (defaults to default port of "security")</label>
+        <input class="input" name="port" value="{{port}}">
+      </div>
+      <div class="flex gap-2">
+        <label for="security">Security</label>
+        <div class="form-control">
+          <select class="select" name="security">
+            <option value="ssl" {% if security = "ssl" %}selected{% endif %}>SSL</option>
+            <option value="starttls" {% if security = "starttls" %}selected{% endif %}>STARTTLS</option>
+            <option value="plain" {% if security = "plain" %}selected{% endif %}>PLAIN</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <label for="check-ssl-certs">Check ssl certificates</label>
+        <input class="checkbox" name="check-ssl-certs" type="checkbox" value="false" {% if check-ssl-certs %} checked="true"{% endif %}>
+      </div>
+      <div class="flex gap-2">
+        <label for="debug">Debug mode</label>
+        <input class="checkbox" name="debug" type="checkbox" value="false" {% if debug %} checked="true"{% endif %}>
+      </div>
+    </form>
+    <div class="form-field my-4">
+      <button id="update-button" class="btn btn-primary">Update Config</button>
+    </div>
+  </div>
+  <script>
+    document.getElementById('update-button').addEventListener('click', (e) => {
+        const form = document.querySelector('form'); 
+        const body = new FormData();
+        for (let element of form.elements) {
+            if(element.checked){
+                body.append(element.name, true);
+            } else {
+                body.append(element.name, element.value);
+            }
+        }
+        console.log(body);
+        fetch('/admin/connections/{{id}}', {method: 'PUT', body: body})
+            .then(() => window.location.href = '/admin/connections/{{id}}')});
+  </script>
+  {% if folders|not-empty %}
+  <div class="grow-2">
+    <h4 class="text-lg">Parse E-mails from Folders</h4>
+    <form id="parse" class="space-y-4" action="/admin/connections/{{id}}/controls" method="POST">
+      <div class="form-field">
+        <label for="folder">Folders</label>
+        <div class="form-control">
+          <select class="select" name="folder">
+            {% for folder in folders %}
+            <option value="{{folder}}">{{folder}}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <label for="move">Move e-mails after categorization</label>
+        <input class="checkbox" name="move" type="checkbox">
+      </div>
+      <div class="form-field">
+        <button form="parse" class="btn btn-primary">Parse E-mails</button>
+      </div>
+    </form>
+  {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+
+
+
+
+
+
+
+

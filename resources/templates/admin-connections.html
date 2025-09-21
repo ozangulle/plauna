@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% if configs|empty? %}
+
+<div role="alert" class="alert">
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info h-6 w-6 shrink-0">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+  </svg>
+  <span>There are no active IMAP connections</span>
+</div>
+
+{% endif %}
+
+{% if configs|not-empty %}
+
+<table class="table-xs lg:table table-zebra">
+  <thead class="table-header-group">
+    <tr>
+      <th class="text-xs lg:text-lg">Account</th>
+      <th class="text-xs lg:text-lg">Host</th>
+      <th class="text-xs lg:text-lg text-center">Logged-in</th>
+      <th class="text-xs lg:text-lg text-center">Folder Open</th>
+      <th class="text-xs lg:text-lg"></th>
+      <th class="text-xs lg:text-lg"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for config in configs %}
+    <tr class="table-row">
+      <td class="text-xs lg:text-lg text-left">
+        <a class="link link-underline" href="/admin/connections/{{config.id}}">{{config.user}}</a>
+      </td>
+      <td class="text-left text-xs lg:text-lg">{{config.host}}</td>
+      <td class="text-center text-xs lg:text-lg">{{config.connected | iconize}}</td>
+      <td class="text-center text-xs lg:text-lg">{{config.folder-open | iconize}}</td>
+      <td class="flex flex-wrap gap-2">
+        {% if config.connected %}
+        <form action="/admin/connections/{{config.id}}/controls" method="post">
+          <input type="hidden" name="operation" value="reconnect"/>
+          <input type="hidden" name="redirect-url" value="/admin/connections"/>
+          <button class="btn btn-outline-primary">Reconnect</button>
+        </form>
+        <form action="/admin/connections/{{config.id}}/controls" method="post">
+          <input type="hidden" name="operation" value="disconnect"/>
+          <input type="hidden" name="redirect-url" value="/admin/connections"/>
+          <button class="btn btn-primary">Disconnect</button>
+        </form>
+        {% endif %}
+        {% if not config.connected %}
+        <form action="/admin/connections/{{config.id}}/controls" method="post">
+          <input type="hidden" name="operation" value="connect"/>
+          <input type="hidden" name="redirect-url" value="/admin/connections"/>
+          <button class="btn btn-outlint-primary">Connect</button>
+        </form>
+        {% endif %}
+      </td>
+      <td>
+        <label class="btn btn-ghost" for="modal-{{config.id}}">X</label>
+        <input class="modal-toggle" id="modal-{{config.id}}" type="checkbox" />
+        <div class="modal">
+	      <label class="modal-overlay" for="modal-{{config.id}}"></label>
+	      <div class="modal-box flex flex-col gap-5">
+		    <h2 class="text-xl">Delete Category: {{config.host}} - {{config.user}}</h2>
+		    <span>Are you sure you want to delete this connection?</span>
+		    <div class="flex gap-3">
+			  <button id="delete-button-{{config.id}}" class="btn btn-error">Delete</button>
+		      <label for="modal-{{config.id}}" class="btn">Cancel</label>
+		    </div>
+            <script>
+              document.getElementById('delete-button-{{config.id}}').addEventListener('click', (e) => {
+                  fetch('/admin/connections/{{config.id}}', {method: 'DELETE'})
+                      .then(() => window.location.href = '/admin/connections')});
+            </script>
+	      </div>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<a class="btn my-4" href="/admin/new-connection">New Connection</a>
+
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,62 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="uppercase text-lg my-8">New Connection</h3>
+<div class="flex w-full max-w-sm flex-col gap-6">
+  <form id="create" class="space-y-4" action="/admin/connections" method="POST">
+    <input name="redirect-url" type="hidden" value="/admin/connections">
+    <div class="flex gap-2">
+      <label for="host">Host</label>
+      <input class="input" name="host" value="{{host}}">
+    </div>
+    <div class="flex gap-2">
+      <label for="user">User</label>
+      <input class="input" name="user" value="{{user}}">
+    </div>
+    <div class="flex gap-2">
+      <label for="secret">Secret</label>
+      <input class="input" name="secret" type="password" value="{{secret}}">
+    </div>
+    <div class="flex gap-2">
+      <label for="folder">Folder to watch</label>
+      <input class="input" name="folder" value="{{folder}}">
+    </div>
+    <div class="flex gap-2">
+      <label for="port">Port (defaults to default port of "security", leave empty if not sure)</label>
+      <input class="input" name="port" value="{{port}}">
+    </div>
+    <div class="flex gap-2">
+      <label for="security">Security</label>
+      <div class="form-control">
+        <select class="select" name="security">
+          <option value="ssl" selected>SSL</option>
+          <option value="starttls">STARTTLS</option>
+          <option value="plain">PLAIN</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <label for="check-ssl-certs">Check ssl certificates</label>
+      <input class="checkbox" name="check-ssl-certs" type="checkbox" value="true" checked>
+    </div>
+    <div class="flex gap-2">
+      <label for="debug">Debug mode</label>
+      <input class="checkbox" name="debug" type="checkbox" value="false" {% if debug %} checked="true"{% endif %}>
+    </div>
+    <div class="form-field">
+      <button form="create" class="btn btn-primary" type="submit">Create Connection</button>
+    </div>  
+  </form>
+</div>
+
+{% endblock %}
+
+
+
+
+
+
+
+

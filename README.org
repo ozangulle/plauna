@@ -72,6 +72,8 @@ services:
 
 ** Configuration
 
+IMPORTANT NOTE: The ":email" part of the configuration was moved over to the database. If you had an old configuration, the first time you run Plauna after updating will save the email client configuration to the database. If it's your first time using Plauna, you should leave it empty and use the UI.
+
 The following is a configuration file with all of the possible settings. The default value for data-folder is "~/.local/state/plauna" and the default value for the server port is 8080. The e-mail configurations have no default settings. Plauna can be run without any e-mail credentials, even though the key point of Plauna is having it automatically categorize your e-mails.
 
 #+begin_src clojure

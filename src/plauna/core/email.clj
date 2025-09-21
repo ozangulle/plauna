@@ -83,3 +83,18 @@
           :else
           (let [first-match (first (filter #(.equals ^String (:mime-type %) mime-type) body-parts))]
             (if (some? first-match) first-match (first body-parts))))))
+
+(defrecord ImapConnection [host user secret folder security port debug check-ssl-certs])
+
+(def type-check-imap-connection
+  ;; These fields used to optional in the configuration. Now we need to make sure that they are set properly.
+  (comp (fn [connection] (update connection :check-ssl-certs #(or (nil? %) (= % true))))
+        (fn [connection] (update connection :debug (fn [x] (if (nil? x) false x))))
+        (fn [connection] (update connection :security (fn [x] (if (nil? x) "ssl" x))))))
+
+(defn construct-imap-connection-from-config-file [data-map]
+  (cond (and (some? (:host data-map))
+             (some? (:user data-map))
+             (some? (:secret data-map))
+             (some? (:folder data-map)))
+        (map->ImapConnection (type-check-imap-connection data-map))))

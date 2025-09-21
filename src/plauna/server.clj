@@ -235,6 +235,12 @@
 
 (defn get-status-repl-server [] {:status (some? @repl-server) :port 7888})
 
+(defn connection-information [id] (let [conn (db/get-connection id)] (merge conn (client/monitor->map (get @client/connections (:id conn))))))
+(defn connection-folders [conn]
+  (if (= true (:connected conn))
+    (client/folders-in-store (:store (client/connection-data-from-id (:id conn))))
+    []))
+
 (comp/defroutes routes
 
   (route/resources "/")
@@ -400,36 +406,54 @@
     (db/delete-email-by-message-id (new String ^"[B" (base64-decode id)))
     {:status  200})
 
-  (comp/GET "/connections" []
+  (comp/GET "/admin/connections" []
     {:status 200
      :header html-headers
-     :body   (markup/watcher-list (find-running-clients))})
+     :body   (markup/connections-list (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))})
 
-  (comp/GET "/connections/:id" [id]
-    (if (seq @global-messages)
-      (let [messages @global-messages]
-        (swap! global-messages (fn [_] []))
-        (success-html-with-body (markup/watcher id
-                                                (:config (client/connection-data-from-id id))
-                                                (client/folders-in-store (:store (client/connection-data-from-id id))) messages)))
-      (success-html-with-body (markup/watcher id
-                                              (:config (client/connection-data-from-id id))
-                                              (client/folders-in-store (:store (client/connection-data-from-id id)))))))
-
-  (comp/POST "/connections/:id" request
+  (comp/POST "/admin/connections" request
     (let [params (:params request)
-          id (:id params)
-          folder (:folder params)
-          move (some? (:move params))
-          conn-data (client/connection-data-from-id id)]
-      (client/parse-all-in-folder conn-data folder {:move move})
-      (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)}))))
-    (redirect-request request))
+          config {:host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (get params :check-ssl-certs)}
+          id (client/id-from-config config)]
+      (db/add-connection (merge config {:id id}))
+      (redirect-request request)))
 
-  (comp/POST "/connections/:id/restart" request
-    (let [id (:id (:params request))]
-      (client/reconnect (client/connection-data-from-id id)))
-    {:status 301 :headers {"Location" "/connections"} :cache-control :no-store}) ;TODO put cache-control in a middleware
+  (comp/DELETE "/admin/connections/:id" request
+    (let [params (:params request)]
+      (db/delete-connection (get params :id))
+      {:status 200}))
+
+  (comp/GET "/admin/new-connection" []
+    {:status 200
+     :header html-headers
+     :body   (markup/new-connection)})
+
+  (comp/GET "/admin/connections/:id" [id]
+    (let [conn-info (connection-information id)]
+      (if (seq @global-messages)
+        (let [messages @global-messages]
+          (swap! global-messages (fn [_] []))
+          (success-html-with-body (markup/connection conn-info (connection-folders conn-info) messages)))
+        (success-html-with-body (markup/connection conn-info (connection-folders conn-info))))))
+
+  (comp/PUT "/admin/connections/:id" request
+    (let [params (:params request)]
+      (db/update-connection {:id (get params :id) :host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs))})
+      {:status 200}))
+
+  (comp/POST "/admin/connections/:id/controls" request
+    (let [id (:id (:params request))
+          operation (:operation (:params request))]
+      (cond (= "reconnect" operation) (client/reconnect (client/connection-data-from-id id))
+            (= "disconnect" operation) (client/disconnect (client/connection-data-from-id id))
+            (= "connect" operation) (client/connect (db/get-connection id))
+            (= "parse" operation) (let [params (:params request)
+                                        folder (:folder params)
+                                        move (some? (:move params))
+                                        conn-data (client/connection-data-from-id id)]
+                                    (client/parse-all-in-folder conn-data folder {:move move})
+                                    (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)}))))))
+    (redirect-request request))
 
   (comp/POST "/metadata/languages" request
     (let [limiter (messaging/channel-limiter :enriched-email)

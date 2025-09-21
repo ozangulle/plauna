@@ -205,13 +205,15 @@
 (defn languages-admin-page [language-preferences]
   (render-file "admin-languages.html" {:language-preferences language-preferences :active-nav :admin}))
 
-(defn watcher-list [clients]
-  (let [watchers (mapv (fn [client] {:id (first client) :logged-in (-> client second :connected) :folder-open (-> client second :folder) :string (str (-> client (nth 2) :config :host) " - " (-> client (nth 2) :config :user))}) clients)]
-    (render-file "watchers.html" {:watchers watchers :active-nav :connections})))
+(defn connections-list [connections]
+  (render-file "admin-connections.html" {:configs connections :active-nav :admin}))
 
-(defn watcher
-  ([id config folders] (render-file "watcher.html" {:id id :host (:host config) :user (:user config) :folders folders :active-nav :connections}))
-  ([id client folders messages] (render-file "watcher.html" {:id id :host (:host client) :user (:user client) :folders folders :messages (mapv type->toast-role messages) :active-nav :connections})))
+(defn connection
+  ([config folders] (render-file "admin-connection.html" (merge config {:folders folders :active-nav :admin})))
+  ([config folders messages] (render-file "admin-connection.html" (merge config {:folders folders :messages (mapv type->toast-role messages) :active-nav :admin}))))
 
 (defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}] :active-nav :admin}]
                                 (render-file "admin-preferences.html" (conj data log-levels))))
+
+(defn new-connection []
+  (render-file "admin-new-connection.html" {}))

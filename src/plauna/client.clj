@@ -5,7 +5,8 @@
    [plauna.preferences :as p]
    [clojure.string :as s]
    [taoensso.telemere :as t]
-   [plauna.messaging :as messaging])
+   [plauna.messaging :as messaging]
+   [plauna.client :as client])
   (:import
    (clojure.lang PersistentVector)
    (jakarta.mail Store Session Folder Message Flags$Flag)
@@ -29,6 +30,8 @@
 
 (defonce health-checks (atom {}))
 
+(declare connect)
+
 (declare reconnect)
 
 (declare parse-all-in-folder)
@@ -40,13 +43,13 @@
 (declare schedule-health-checks)
 
 (defn default-port-for-security [security]
-  (if (= security :ssl) 993 143))
+  (if (= security "ssl") 993 143))
 
 (defn security [connection-config]
-  (let [security (get connection-config :security :ssl)]
-    (if (some #(= security %) [:ssl :starttls :plain])
+  (let [security (get connection-config :security "ssl")]
+    (if (some #(= security %) ["ssl" "starttls" "plain"])
       security
-      :ssl)))
+      "ssl")))
 
 (defn port [connection-config]
   (str (get connection-config :port (default-port-for-security (security connection-config)))))
@@ -64,9 +67,9 @@
 (defn security-properties [connection-config]
   (let [security-key (security connection-config)]
     (fn [^Properties properties]
-      (cond (= security-key :ssl) (doto properties (.setProperty "mail.imap.ssl.enable", "true"))
-            (= security-key :starttls) (doto properties (.setProperty "mail.imap.starttls.enable", "true"))
-            (= security-key :plain) properties
+      (cond (= security-key "ssl") (doto properties (.setProperty "mail.imap.ssl.enable", "true"))
+            (= security-key "starttls") (doto properties (.setProperty "mail.imap.starttls.enable", "true"))
+            (= security-key "plain") properties
             :else (doto properties (.setProperty "mail.imap.ssl.enable", "true"))))))
 
 (defn certification-check-properties [connection-config]
@@ -88,7 +91,7 @@
 
 (defn connection-config->store [connection-config]
   (let [session ^Session (config->session connection-config)]
-    (if (= security :ssl)
+    (if (= security "ssl")
       (.getStore session "imaps")
       (.getStore session "imap"))))
 
@@ -136,7 +139,7 @@
     (t/log! :info "Closing the idle manager, removing from health checks, closing the folder and the store.")
     (.stop idle-manager)
     (stop-monitoring this)
-    (swap! health-checks dissoc (id-from-config config))
+    (swap! health-checks dissoc (:id config))
     (when (.isOpen folder)
       (.close folder))
     (.close store)))
@@ -147,7 +150,7 @@
   (get @connections id))
 
 (defn add-to-connections [^ConnectionData connection-data]
-  (swap! connections conj {(id-from-config (.config connection-data)) connection-data}))
+  (swap! connections conj {(:id (.config connection-data)) connection-data}))
 
 ;; Calls
 
@@ -206,10 +209,12 @@
           (copy-message message source-folder target-folder)))))
 
 (defn monitor->map [monitor]
-  (let [store ^Store (-> monitor :store)
-        folder ^IMAPFolder (-> monitor :folder)]
-    {:connected (.isConnected ^Store store)
-     :folder    (.isOpen ^IMAPFolder folder)}))
+  (if (nil? monitor)
+    {:connected false :folder-open false}
+    (let [store ^Store (-> monitor :store)
+          folder ^IMAPFolder (-> monitor :folder)]
+      {:connected (.isConnected ^Store store)
+       :folder-open    (.isOpen ^IMAPFolder folder)})))
 
 (defn folders-in-store [^Store store]
   (.list (.getDefaultFolder store) "*"))
@@ -242,12 +247,14 @@
 (defn create-imap-monitor [connection-config]
   (let [idle-manager (IdleManager. (config->session connection-config) (Executors/newCachedThreadPool))
         store (login connection-config)
-        id (id-from-config connection-config)
+        id (:id connection-config)
         folder (open-folder-in-store store (:folder connection-config))
         listener (message-count-listener id folder (:folder connection-config))
         connection-data (->ConnectionData connection-config store folder idle-manager (capabilities store) listener)]
     (add-to-connections connection-data)
     connection-data))
+
+(defn disconnect [^AutoCloseable connection-data] (.close connection-data))
 
 (defn reconnect [^AutoCloseable connection-data]
   (let [new-connection (create-imap-monitor (:config connection-data))]
@@ -258,7 +265,7 @@
 
 (defn start-monitoring [connection-data]
   (try
-    (.addMessageCountListener ^IMAPFolder (:folder connection-data) (message-count-listener (id-from-config (:config connection-data)) (:folder connection-data) (-> connection-data :config :folder)))
+    (.addMessageCountListener ^IMAPFolder (:folder connection-data) (message-count-listener (:id (:config connection-data)) (:folder connection-data) (-> connection-data :config :folder)))
     (t/log! :info ["Started monitoring for" (:folder (:config connection-data)) "in" (.getURLName ^Store (:store connection-data))])
     (.watch ^IdleManager (:idle-manager connection-data) ^Folder (:folder connection-data))
     (catch Exception e
@@ -267,7 +274,7 @@
 
 (defn stop-monitoring [connection-data]
   (t/log! :info ["Removing message count listener from folder" (-> connection-data :config :folder)])
-  (let [connection-id (id-from-config (:config connection-data))
+  (let [connection-id (:id (:config connection-data))
         sf ^ScheduledFuture (get @health-checks connection-id)]
     (when (some? sf) (.cancel sf true)))
   (.removeMessageCountListener ^IMAPFolder (:folder connection-data) (:message-count-listener connection-data))
@@ -300,11 +307,11 @@
                                                       (do (t/log! :warn "Connection lost. Reconnecting to email server...")
                                                           (reconnect connection-data)))
                                                     (t/log! :debug "Idling and waiting for messages after a health check.")
-                                                    (start-idling-for-id (id-from-config config))
+                                                    (start-idling-for-id (:id config))
                                                     (catch Exception e
                                                       (t/log! {:level :error :error e} "There was an error during health check. The connection is probably in a broken state."))))
                                                120 (p/client-health-check-interval) TimeUnit/SECONDS)]
-    (swap-new-period-check (id-from-config config) scheduled-future)
+    (swap-new-period-check (:id config) scheduled-future)
     connection-data))
 
 (defn parse-all-in-folder [connection-data folder-name options]
@@ -323,6 +330,11 @@
                                                                               (.toByteArray os)
                                                                               {:enrich true :move (:move options) :connection-id connection-id :folder folder :original-folder folder-name :message message})))))))
     connection-data))
+
+(defn connect [connection-config]
+  (-> (client/create-imap-monitor connection-config)
+      client/start-monitoring
+      client/schedule-health-checks))
 
 (defn handle-incoming-events [event]
   (when (and (true? (:move (:options event))) (some? (:category (:metadata (:payload event)))))

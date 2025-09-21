@@ -339,3 +339,47 @@
                                                  :from [:preferences]
                                                  :where [:= :preference (name preference)]}) builder-function-kebab)]
     (when (some? result) (:value result))))
+
+(defn db-connection->model [db-conn]
+  (apply (comp core.email/map->ImapConnection
+               (fn [conn] (update conn :check-ssl-certs #(= % 1)))
+               (fn [conn] (update conn :debug #(= % 1)))) [db-conn]))
+
+(defn get-connections [] (map
+                          db-connection->model
+                          (jdbc/execute! (ds) (honey/format {:select [:*] :from [:connections]}) builder-function-kebab)))
+
+(defn get-connection [id] (db-connection->model (jdbc/execute-one! (ds) (honey/format {:select [:*] :from [:connections] :where [:= :id id]}) builder-function-kebab)))
+
+(defn add-connection [connection]
+  (jdbc/execute! (ds)
+                 (honey/format {:insert-into [:connections]
+                                :columns [:id :host :user :secret :folder :debug :security :port :check-ssl-certs]
+                                :values [[(:id connection) (:host connection) (:user connection)
+                                          (:secret connection) (:folder connection) (:debug connection) (:security connection) (:port connection) (:check-ssl-certs connection)]]})
+                 builder-function))
+
+(defn update-connection [connection]
+  (jdbc/execute! (ds)
+                 (honey/format {:update [:connections]
+                                :set {:host (:host connection) :user (:user connection) :secret (:secret connection) :folder (:folder connection) :debug (:debug connection) :port (:port connection) :security (:security connection) :check-ssl-certs (:check-ssl-certs connection)}
+                                :where  [:= :id (:id connection)]})
+                 builder-function))
+
+(defn delete-connection [id] (jdbc/execute! (ds) (honey/format {:delete-from [:connections]
+                                                                :where [:= :id id]}) builder-function-kebab))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

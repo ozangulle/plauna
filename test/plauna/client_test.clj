@@ -7,7 +7,7 @@
            (org.mockito ArgumentMatchers)))
 
 (deftest ssl-properties-set-correctly
-  (let [session ^Session (client/config->session {:security :ssl :port 993})
+  (let [session ^Session (client/config->session {:security "ssl" :port 993})
         expected-properties (doto (new Properties)
                               (.setProperty "mail.imap.ssl.enable", "true")
                               (.setProperty "mail.imap.port", "993")
@@ -18,7 +18,7 @@
     (is (= expected-properties (.getProperties session)))))
 
 (deftest starttls-properties-set-correctly
-  (let [session ^Session (client/config->session {:security :starttls :port 143})
+  (let [session ^Session (client/config->session {:security "starttls" :port 143})
         expected-properties (doto (new Properties)
                               (.setProperty "mail.imap.starttls.enable", "true")
                               (.setProperty "mail.imap.port", "143")
@@ -29,7 +29,7 @@
     (is (= expected-properties (.getProperties session)))))
 
 (deftest plain-text-properties-set-correctly
-  (let [session ^Session (client/config->session {:security :plain :port 143})
+  (let [session ^Session (client/config->session {:security "plain" :port 143})
         expected-properties (doto (new Properties)
                               (.setProperty "mail.imap.usesocketchannels" "true")
                               (.setProperty "mail.imap.port", "143")
@@ -50,7 +50,7 @@
     (is (= expected-properties (.getProperties session)))))
 
 (deftest non-compliant-security-values-return-ssl
-  (let [session ^Session (client/config->session {:security :does-not-exist})
+  (let [session ^Session (client/config->session {:security "does-not-exist"})
         expected-properties (doto (new Properties)
                               (.setProperty "mail.imap.ssl.enable", "true")
                               (.setProperty "mail.imap.port" "993")
@@ -69,7 +69,7 @@
     (is (= true (.getDebug session)))))
 
 (deftest set-cert-checks-to-false
-  (let [session ^Session (client/config->session {:security :ssl :check-ssl-certs false})]
+  (let [session ^Session (client/config->session {:security "ssl" :check-ssl-certs false})]
     (is (= "*" (.getProperty session "mail.imap.ssl.trust")))))
 
 (deftest id-creating
@@ -82,26 +82,27 @@
     (is (not (= expected-uuid (client/id-from-config config-but-different-folder))))))
 
 (deftest adding-to-connections
-  (let [test-config {:host "imap.testmail.com" :user "test@testmail.com" :secret "12345" :folder "Inbox" :debug false}
+  (let [test-config {:id "test-id":host "imap.testmail.com" :user "test@testmail.com" :secret "12345" :folder "Inbox" :debug false :security "starttls"}
         test-con-data (client/->ConnectionData test-config nil nil nil nil nil)]
     (client/add-to-connections test-con-data)
-    (is (= (get @client/connections (client/id-from-config test-config)) test-con-data))))
+    (is (= (get @client/connections "test-id") test-con-data))))
+
 
 (deftest folder-throws-exception-on-move
-  (with-redefs [client/reconnect (fn [_] true)
-                client/move-messages-by-id-between-category-folders (fn [_ _ _ _] true)]
-    (let [test-config {:host "imap.testmail.com" :user "test@testmail.com" :secret "12345" :folder "Inbox" :debug false}
-          store (Mockito/mock org.eclipse.angus.mail.imap.IMAPStore)
-          folder (Mockito/mock org.eclipse.angus.mail.imap.IMAPFolder)
-          idle-manager (Mockito/mock org.eclipse.angus.mail.imap.IdleManager)
-          message (Mockito/mock org.eclipse.angus.mail.imap.IMAPMessage)
-          conn-data (client/->ConnectionData test-config store folder idle-manager [:move] nil)
-          mock-event {:payload {:metadata {:category "yes"}}
-                      :options {:move true
-                                :connection-id (client/id-from-config test-config)
-                                :folder folder
-                                :message message}}]
-      (.thenReturn (Mockito/when (.getDefaultFolder store)) (Mockito/mock org.eclipse.angus.mail.imap.IMAPFolder))
-      (.thenThrow (Mockito/when (.moveMessages folder (ArgumentMatchers/any) (ArgumentMatchers/any))) jakarta.mail.FolderClosedException) nil
-      (client/add-to-connections conn-data)
-      (is (= (client/handle-incoming-events mock-event) true)))))
+   (with-redefs [client/reconnect (fn [_] true)
+                 client/move-messages-by-id-between-category-folders (fn [_ _ _ _] true)]
+     (let [test-config {:id "test-id" :host "imap.testmail.com" :user "test@testmail.com" :secret "12345" :folder "Inbox" :debug false :security "starttls"}
+           store (Mockito/mock org.eclipse.angus.mail.imap.IMAPStore)
+           folder (Mockito/mock org.eclipse.angus.mail.imap.IMAPFolder)
+           idle-manager (Mockito/mock org.eclipse.angus.mail.imap.IdleManager)
+           message (Mockito/mock org.eclipse.angus.mail.imap.IMAPMessage)
+           conn-data (client/->ConnectionData test-config store folder idle-manager [:move] nil)
+           mock-event {:payload {:metadata {:category "yes"}}
+                       :options {:move true
+                                 :connection-id "test-id"
+                                 :folder folder
+                                 :message message}}]
+       (.thenReturn (Mockito/when (.getDefaultFolder store)) (Mockito/mock org.eclipse.angus.mail.imap.IMAPFolder))
+       (.thenThrow (Mockito/when (.moveMessages folder (ArgumentMatchers/any) (ArgumentMatchers/any))) jakarta.mail.FolderClosedException) nil
+       (client/add-to-connections conn-data)
+       (is (= (client/handle-incoming-events mock-event) true)))))
