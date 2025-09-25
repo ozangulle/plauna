@@ -135,6 +135,9 @@
                                     (edn/read-string (slurp path)))
                                 (throw (t/error! (ex-info "Provided config file at does not exist. Exiting application." {:path path})))))
 
+(defn default-config [] {:data-folder "/var/lib/plauna/"
+                         :server {:port 8080}})
+
 (defn config-from-default-location []
   (if (file-exists? (config-location))
     (config)
@@ -142,11 +145,13 @@
 
 (defmulti parse-cli-arg (fn [arg] (first (string/split arg #"="))))
 (defmethod parse-cli-arg "--config-file" [arg-string] {:config-file (second (string/split arg-string #"="))})
+(defmethod parse-cli-arg "--data-folder" [arg-string] {:data-folder (second (string/split arg-string #"="))})
+(defmethod parse-cli-arg "--server-port" [arg-string] {:server {:port (Integer/parseInt (second (string/split arg-string #"=")))}})
 (defmethod parse-cli-arg :default [arg-string]
   (t/log! :info ["Received non Plauna specific argument" arg-string "- Doing nothing."])
   nil)
 
 (defn parse-config-from-cli-arguments [cli-args]
-  (let [arguments (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} cli-args)]
-    (cond (some? (:config-file arguments)) (config-from-file (:config-file arguments))
-          (nil? (:config-file arguments)) (config-from-default-location))))
+  (let [parsed-config (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} cli-args)]
+    (cond (some? (:config-file parsed-config)) (merge (default-config) (config-from-file (:config-file parsed-config)))
+          (nil? (:config-file parsed-config)) (merge (default-config) parsed-config))))
