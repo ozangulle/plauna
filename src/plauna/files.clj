@@ -143,15 +143,31 @@
     (config)
     (throw (t/error! (ex-info "Tried reading config from default location but result was nil." {:path (config-location)})))))
 
-(defmulti parse-cli-arg (fn [arg] (first (string/split arg #"="))))
-(defmethod parse-cli-arg "--config-file" [arg-string] {:config-file (second (string/split arg-string #"="))})
-(defmethod parse-cli-arg "--data-folder" [arg-string] {:data-folder (second (string/split arg-string #"="))})
-(defmethod parse-cli-arg "--server-port" [arg-string] {:server {:port (Integer/parseInt (second (string/split arg-string #"=")))}})
-(defmethod parse-cli-arg :default [arg-string]
-  (t/log! :info ["Received non Plauna specific argument" arg-string "- Doing nothing."])
+(defn system-env-config [key env-name] (if-let [env-value (System/getenv env-name)] {key env-value} nil))
+
+(def env-var-key-pairs [[ "--config-file" "CONFIG_FILE"] [ "--data-folder" "DATA_FOLDER"] [ "--server-port" "SERVER_PORT"]])
+
+(defmulti parse-cli-arg (fn [arg] (first arg)))
+(defmethod parse-cli-arg "--config-file" [arg-pair]  {:config-file (second arg-pair)})
+(defmethod parse-cli-arg "--data-folder" [arg-pair] {:data-folder (second arg-pair)})
+(defmethod parse-cli-arg "--server-port" [arg-pair] {:server {:port (Integer/parseInt (second arg-pair))}})
+(defmethod parse-cli-arg :default [arg-pair]
+  (t/log! :info ["Received non Plauna specific argument" arg-pair "- Doing nothing."])
   nil)
 
+(defn partition-cli-args [args] (partition 2 args))
+
+(defn aggregate-config-map
+  ([acc val] (conj acc val))
+  ([val] val))
+
+(def env-key-pair-transformation
+  (comp (map (fn [pair] (if-let [val (System/getenv (second pair))] {(first pair) val} nil)))
+        (filter some?)
+        (map parse-cli-arg)))
+
 (defn parse-config-from-cli-arguments [cli-args]
-  (let [parsed-config (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} cli-args)]
-    (cond (some? (:config-file parsed-config)) (merge (default-config) (config-from-file (:config-file parsed-config)))
-          (nil? (:config-file parsed-config)) (merge (default-config) parsed-config))))
+  (let [parsed-config (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} (partition-cli-args cli-args))
+        env-config (transduce env-key-pair-transformation aggregate-config-map {} env-var-key-pairs)]
+    (cond (some? (:config-file parsed-config)) (merge (default-config) env-config (config-from-file (:config-file parsed-config)))
+          (nil? (:config-file parsed-config)) (merge (default-config) env-config parsed-config))))
