@@ -162,7 +162,7 @@
   ([val] val))
 
 (def env-key-pair-transformation
-  (comp (map (fn [pair] (if-let [val (System/getenv (second pair))] {(first pair) val} nil)))
+  (comp (map (fn [pair] (if-let [val (System/getenv (second pair))] [(first pair) val] nil)))
         (filter some?)
         (map parse-cli-arg)))
 
