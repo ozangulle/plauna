@@ -11,34 +11,22 @@
 
 (set! *warn-on-reflection* true)
 
-(def custom-config-location (ref nil))
-
 (def database-file "email.db")
 
-(defn default-config-location [] "~/.config/plauna.edn")
-
-(defn set-custom-config-location! [location]
-  (if (some? location)
-    (do (t/log! :info ["Setting custom config location to:" location])
-        (dosync (alter custom-config-location (fn [_ l] l) location)))
-    (t/log! :info ["No config file was supplied. Using the default config location:" (default-config-location)])))
+(def plauna-config (atom nil))
 
 (defn expand-home [^String s]
   (if (.startsWith s "~")
     (clojure.string/replace-first s "~" (System/getProperty "user.home"))
     s))
 
-(defn config-location [] (if (some? @custom-config-location)
-                           (expand-home @custom-config-location)
-                           (expand-home (default-config-location))))
-
-(defn config [] (edn/read-string (slurp (config-location))))
+(defn config [] @plauna-config)
 
 (defn file-dir []
-  (let [configured-location (expand-home (:data-folder (config)))]
-    (if (some? configured-location)
-      configured-location
-      (expand-home "~/.local/state/plauna"))))
+  (if-let [data-location (:data-folder (config))]
+    (let [configured-location (expand-home data-location)]
+      configured-location)
+    (expand-home "~/.local/state/plauna")))
 
 (defn check-and-create-database-file []
   (let [db-file (io/file (file-dir) database-file)]
@@ -131,22 +119,42 @@
 (defn file-exists? [path] (.exists ^File (io/file path)))
 
 (defn config-from-file [path] (if (file-exists? path)
-                                (do (files/set-custom-config-location! path)
-                                    (edn/read-string (slurp path)))
+                                (edn/read-string (slurp path))
                                 (throw (t/error! (ex-info "Provided config file at does not exist. Exiting application." {:path path})))))
 
-(defn config-from-default-location []
-  (if (file-exists? (config-location))
-    (config)
-    (throw (t/error! (ex-info "Tried reading config from default location but result was nil." {:path (config-location)})))))
+(defn default-config [] {:data-folder "/var/lib/plauna/"
+                         :server {:port 8080}})
 
-(defmulti parse-cli-arg (fn [arg] (first (string/split arg #"="))))
-(defmethod parse-cli-arg "--config-file" [arg-string] {:config-file (second (string/split arg-string #"="))})
-(defmethod parse-cli-arg :default [arg-string]
-  (t/log! :info ["Received non Plauna specific argument" arg-string "- Doing nothing."])
+(def env-var-key-pairs [["--config-file" "CONFIG_FILE"] ["--data-folder" "DATA_FOLDER"] ["--server-port" "SERVER_PORT"]])
+
+(defmulti parse-cli-arg (fn [arg] (first arg)))
+(defmethod parse-cli-arg "--config-file" [arg-pair]  {:config-file (second arg-pair)})
+(defmethod parse-cli-arg "--data-folder" [arg-pair] {:data-folder (second arg-pair)})
+(defmethod parse-cli-arg "--server-port" [arg-pair] {:server {:port (Integer/parseInt (second arg-pair))}})
+(defmethod parse-cli-arg :default [arg-pair]
+  (t/log! :info ["Received non Plauna specific argument" arg-pair "- Doing nothing."])
   nil)
 
+(defn partition-cli-args [args] (partition 2 args))
+
+(defn aggregate-config-map
+  ([acc val] (conj acc val))
+  ([val] val))
+
+(defn ^:dynamic system-env [key] (System/getenv key))
+
+(def env-key-pair-transformation
+  (comp (map (fn [pair] (if-let [val (system-env (second pair))] [(first pair) val] nil)))
+        (filter some?)
+        (map parse-cli-arg)))
+
 (defn parse-config-from-cli-arguments [cli-args]
-  (let [arguments (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} cli-args)]
-    (cond (some? (:config-file arguments)) (config-from-file (:config-file arguments))
-          (nil? (:config-file arguments)) (config-from-default-location))))
+  (let [parsed-config (reduce (fn [acc val] (conj acc (parse-cli-arg val))) {} (partition-cli-args cli-args))
+        env-config (transduce env-key-pair-transformation aggregate-config-map {} env-var-key-pairs)]
+    (cond
+      (some? (:config-file parsed-config))
+      (swap! plauna-config (fn [_] (merge (default-config) env-config (config-from-file (:config-file parsed-config)))))
+      (some? (:config-file env-config))
+      (swap! plauna-config (fn [_] (merge (default-config) env-config (config-from-file (:config-file env-config)))))
+      :else
+      (swap! plauna-config (fn [_] (merge (default-config) env-config parsed-config))))))

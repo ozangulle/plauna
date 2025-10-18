@@ -72,34 +72,43 @@ services:
 
 ** Configuration
 
-IMPORTANT NOTE: The ":email" part of the configuration was moved over to the database. If you had an old configuration, the first time you run Plauna after updating will save the email client configuration to the database. If it's your first time using Plauna, you should leave it empty and use the UI.
+*** IMPORTANT NOTE
 
-The following is a configuration file with all of the possible settings. The default value for data-folder is "~/.local/state/plauna" and the default value for the server port is 8080. The e-mail configurations have no default settings. Plauna can be run without any e-mail credentials, even though the key point of Plauna is having it automatically categorize your e-mails.
+The configuration file is deprecated and will be removed in a future release.
+
+If this is your first time using Plauna, do not use a configuration file.
+
+The ":email" part of the configuration was moved over to the database.
+
+If you had an old configuration, the first time you run Plauna after updating it will save the email client configuration to the database. You don't have to do anything manually.
+
+*** Configuration File (Deprecated)
+
+Plauna can be configured using a separate configuration file. Currently the only values that can be configured using the configuration file are :data-folder (defaults to /var/lib/plauna) and :server {:port *} (defaults to 8080).
 
 #+begin_src clojure
   {:data-folder "/home/myhome/example-directory" ; The location for the db, training files and models. Refers to the path in the container
    :server {:port 80} ; The port Plauna's web server listens to in the container. Defaults to 8080.
-   :email {
-           :clients [{:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox"}]
-  }}
+  }
 #+end_src
 
-Additionally, you can adjust the IMAP connection security and port by using the keys :security and :port. Possible values for :security are :ssl (default), :starttls, and :plain. The default values for these keys are :ssl and 993, respectively. The IMAP client configuration with the optional keys would look like this:
+*** Environment Variables
 
-#+begin_src clojure
-  ;; Specify connection security only
-  {:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox" :security :starttls}
+You can use the environment variables $DATA_FOLDER and $SERVER_PORT instead of using a configuration file. You can also use the environment variable $CONFIG_FILE to specify the location of your config file.
 
-  ;; Port 143 is default for starttls so you only need to set port explicitely if you are using a non-standard port.
-  {:host "imap.example.com" :user "me@example.com" :secret "mysecret" :folder "Inbox" :security :starttls :port 155} 
-#+end_src
 
-Currently, Plauna only supports the AUTHENTICATION PLAIN method, i.e. authentication using username and password. Other authentication mechanisms like OAUTH are not supported yet.
+*** CLI Parameters
 
-Other optional keys are:
-- :debug = Set to true to see the IMAP communication with the server in debug mode. Usage: ~{... :debug true}~ Defaults to false.
+Everything that can be done using the environment variables can also be done using the cli parameters --config-file, --data-folder, and --server-port.
 
-- :check-ssl-certs = Set to false if you are using a self signed certificate on a server. Usage ~{... :check-ssl-certs false}~ Defaults to true.
+*** Order of Priority
+
+The order which configuration is used is determined by the following order:
+
+1. Config file specified as cli parameter (will be deprecated soon)
+2. CLI parameters
+3. Environment variables
+4. Default configuration
 
 ** Getting Started
 

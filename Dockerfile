@@ -10,4 +10,5 @@ FROM eclipse-temurin:23.0.2_7-jre-ubi9-minimal
 COPY --from=build /usr/src/app/target/plauna-standalone.jar /app/
 EXPOSE 8080
 WORKDIR /app
+RUN mkdir /var/lib/plauna # Default location for data files
 CMD ["sh", "-c", "java -jar plauna-standalone.jar $PLAUNA_ARGS"]
