@@ -30,9 +30,6 @@
 
 (def my-addresses (atom #{}))
 
-(defn add-to-my-addresses [address]
-  (swap! my-addresses (fn [cur new] (conj cur new)) address))
-
 (defn create-db []
   (.migrate ^Flyway (flyway))
   (jdbc/execute! (ds) ["PRAGMA foreign_keys = ON;"])
@@ -148,14 +145,6 @@
           :else
           (recur (async-utils/fetch-or-timeout! local-chan 1000) (add-to-buffer (:payload event) buffer)))))))
 
-(defonce year-format "STRFTIME(\"%Y\", DATETIME(date, 'unixepoch'))")
-
-(defonce month-format "STRFTIME(\"%Y-%m\", DATETIME(date, 'unixepoch'))")
-
-(defonce intervals
-  {:yearly  year-format
-   :monthly month-format})
-
 (defonce honey-intervals
   {:yearly [:strftime "%Y" [:datetime :date "unixepoch"]]
    :monthly [:strftime "%Y-%m" [:datetime :date "unixepoch"]]})
@@ -217,9 +206,6 @@
 (defn update-language-preference [preference]
   (jdbc/execute! (ds) ["UPDATE category_training_preferences SET use_in_training = ?  WHERE id = ?" (:use preference) (:id preference)] builder-function))
 
-(defn years-of-data []
-  (mapv :year (jdbc/execute! (ds) [(str "SELECT " year-format " as year FROM headers WHERE date IS NOT NULL GROUP BY year ORDER BY year;")] builder-function)))
-
 ;;;;;;;;;;;;;; Refactored call stuff
 
 (defn headers-for-strict-options [strict]
@@ -228,10 +214,6 @@
     "SELECT headers.message_id, in_reply_to, subject, mime_type, date FROM headers LEFT JOIN metadata ON headers.message_id = metadata.message_id"))
 
 (defn body-parts-for-options [] "SELECT * FROM bodies INNER JOIN metadata ON metadata.message_id = bodies.message_id")
-
-(defn participants [] "SELECT * FROM communications INNER JOIN contacts ON communications.contact_key = contacts.contact_key")
-
-(defn interval-for [key] (get intervals key :yearly))
 
 (defn interval-for-honey [key] (get honey-intervals key :yearly))
 
@@ -320,10 +302,16 @@
   (map core.email/map->Participant (jdbc/execute! (ds) (data->sql entity-clause sql-clause) builder-function-kebab)))
 
 (defn yearly-email-stats []
-  (jdbc/execute! (ds) [(str "SELECT COUNT(message_id) AS count, " (interval-for :yearly) " AS date FROM headers WHERE date IS NOT NULL GROUP BY " (interval-for :yearly))]))
+  (jdbc/execute! (ds) ["SELECT COUNT(message_id) AS count, date AS date FROM headers WHERE date IS NOT NULL GROUP BY date"] builder-function-kebab))
 
 (defn query-db [honeysql-query]
   (jdbc/execute! (ds) (honey/format honeysql-query) builder-function-kebab))
+
+(comment (honey/format
+          {:select [[[:count :headers.message-id] :count] :bodies.mime-type] :from [:bodies]
+                :join [:headers [:= :bodies.message-id :headers.message_id]]
+                :group-by [:bodies.mime-type]
+                :order-by [[:count :desc]]}))
 
 (defn update-preference [preference value]
   (jdbc/execute! (ds)
@@ -368,18 +356,4 @@
 
 (defn delete-connection [id] (jdbc/execute! (ds) (honey/format {:delete-from [:connections]
                                                                 :where [:= :id id]}) builder-function-kebab))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

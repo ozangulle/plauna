@@ -321,38 +321,7 @@
      :body    (markup/administration {:repl (get-status-repl-server)})})
 
   (comp/GET "/statistics" {}
-    (success-html-with-body (markup/statistics-overall (db/yearly-email-stats))))
-
-  (comp/GET "/statistics/types" {params :params}
-    (let [period (keyword (get params :period :yearly))
-          yearly-mime-types (mime-type-statistics period)]
-      (success-html-with-body (markup/statistics-types (email-type-statistics-overview) yearly-mime-types))))
-
-  (comp/GET "/statistics/contacts" {params :params}
-    (let [interval-request (params->interval-request params)
-          years (db/years-of-data)
-          contact-count (if (some? (:year params)) (email-from-count (:year params)) (email-from-count))
-          contacts-over-interval (email-from-statistics interval-request)]
-      (success-html-with-body
-       (markup/statistics-contacts {:years             years
-                                    :selected-interval (get params :interval :yearly)
-                                    :selected-year     (get params :year)}
-                                   contact-count contacts-over-interval))))
-
-  (comp/GET "/statistics/languages" {}
-    (let [yearly-languages (language-statistics-by-period :yearly)
-          languages-overall (statistics-overall-for-language)]
-      (success-html-with-body
-       (markup/statistics-languages languages-overall yearly-languages))))
-
-  (comp/GET "/statistics/categories" {}
-    (let [;selected-interval (params->interval-request params)
-          categories-stats (category-statistics-by-period {:interval :yearly})
-          categories-overall (statistics-overall-for-categories)
-                                        ;years (db/years-of-data)
-          ]
-      (success-html-with-body
-       (markup/statistics-categories categories-overall categories-stats))))
+    (success-html-with-body (markup/statistics-overall (db/yearly-email-stats) (mime-type-statistics :yearly) (language-statistics-by-period :yearly) (category-statistics-by-period {:interval :yearly}))))
 
   (comp/POST "/metadata" request
     (if (some? (:move (:params request)))

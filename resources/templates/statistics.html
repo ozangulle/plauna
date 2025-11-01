@@ -2,13 +2,6 @@
 
 {% block content %}
 
-<div class="tabs flex-nowrap">
-	<div class="tab tab-bordered {% if active-tab = nil %}tab-active{% endif %}"><a href="/statistics" role="button">Overall</a></div>
-	<div class="tab tab-bordered {% if active-tab = :types %}tab-active{% endif %}"><a href="/statistics/types" role="button">Types</a></div>
-	<div class="tab tab-bordered {% if active-tab = :languages %}tab-active{% endif %}"><a href="/statistics/languages" role="button">Languages</a></div>
-	<div class="tab tab-bordered {% if active-tab = :categories %}tab-active{% endif %}"><a href="/statistics/categories" role="button">Categories</a></div>
-</div>
-
 {% if interval-filter %}
 <h3 class="uppercase text-lg my-8 mx-16">Filter</h3>
 <form action="{{interval-filter.url}}" method="GET">
@@ -32,12 +25,12 @@
 
 {% endif %}
   
-
+{% for part in statistics %}
+<h2 class="uppercase text-lg my-8 mx-16">{{part.title}}</h2>
 <div class="flex flex-wrap justify-items-start gap-4">
-  {% for stats in statistics %}
+  {% for stats in part.contents %}
   
-  <div class="mx-16 card bg-base-100 shadow-sm w-full">
-    <h3 class="uppercase text-lg my-8">{{stats.header}}</h3>
+  <div class="mx-16 px-8 py-8 bg-base-100 shadow-sm">
     
     {% if stats.type = :bar-chart %}
 
@@ -51,10 +44,10 @@
       </div>
   
       {% else %}
-      <div class="card-body" id="{{stats.id}}"></div>
+      <div id="{{stats.id}}"></div>
       <script>vegaEmbed('#{{stats.id}}', {{stats.json-data|safe}});</script>
       {% endif %}
-      {% elif stats.type = :table %}
+    {% elif stats.type = :table %}
       {% if stats.data.values|empty? %}
 
       <div role="alert" class="alert">
@@ -65,7 +58,7 @@
       </div>
       
       {% else %}
-      <div class="card-body">
+      <div>
         <table class="border-collapse table-auto w-full text-sm">
           <thead>
             <tr>{% for header in stats.data.headers %}<th class="text-left">{{header}}</th>{% endfor %}</tr>
@@ -82,10 +75,12 @@
         </table>
       </div>
       {% endif %}
-      {% endif %}
+    {% endif %}
   </div>
 {% endfor %}
 </div>
 </div>
+
+{% endfor %}
 
 {% endblock %}

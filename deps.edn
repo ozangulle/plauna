@@ -43,6 +43,11 @@
         org.xerial/sqlite-jdbc {:mvn/version "3.47.1.0"}
         ring/ring-core {:mvn/version "1.14.2"}
         ring/ring-jetty-adapter {:mvn/version "1.14.2"}
-        selmer/selmer {:mvn/version "1.12.61"}}}
+        selmer/selmer {:mvn/version "1.12.61"}
+        org.scicloj/tableplot {:mvn/version "1-beta14"}
+        scicloj/tablecloth {:mvn/version "7.062"}
+        cnuernber/dtype-next {:mvn/version "10.146"}
+        }
+ }
 
     
