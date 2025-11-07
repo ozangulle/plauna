@@ -309,9 +309,9 @@
 
 (comment (honey/format
           {:select [[[:count :headers.message-id] :count] :bodies.mime-type] :from [:bodies]
-                :join [:headers [:= :bodies.message-id :headers.message_id]]
-                :group-by [:bodies.mime-type]
-                :order-by [[:count :desc]]}))
+           :join [:headers [:= :bodies.message-id :headers.message_id]]
+           :group-by [:bodies.mime-type]
+           :order-by [[:count :desc]]}))
 
 (defn update-preference [preference value]
   (jdbc/execute! (ds)

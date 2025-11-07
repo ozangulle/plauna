@@ -382,7 +382,7 @@
 
   (comp/POST "/admin/connections" request
     (let [params (:params request)
-          config {:host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (get params :check-ssl-certs)}
+          config {:host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs))}
           id (client/id-from-config config)]
       (db/add-connection (merge config {:id id}))
       (redirect-request request)))
@@ -411,7 +411,7 @@
       {:status 200}))
 
   (comp/POST "/admin/connections/:id/controls" request
-    (let [id (:id (:params request))
+    (let [id (:id (:route-params request))
           operation (:operation (:params request))]
       (cond (= "reconnect" operation) (client/reconnect (client/connection-data-from-id id))
             (= "disconnect" operation) (client/disconnect (client/connection-data-from-id id))
@@ -477,5 +477,3 @@
       nil)
     (do (t/log! :info "No server running.")
         nil)))
-
-

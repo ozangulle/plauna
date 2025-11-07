@@ -162,7 +162,7 @@
   (filterv some? (mapv #(capability-name store %) ["MOVE"])))
 
 (defn start-idling-for-id [id]
-  (let [connection-data (connection-data-from-id id)]
+  (let [^ConnectionData connection-data (connection-data-from-id id)]
     (t/log! :debug ["Starting to idle for id:" id "using connection-data" connection-data])
     (.watch ^IdleManager (.idle-manager connection-data) (.folder connection-data))))
 
@@ -203,7 +203,8 @@
         capabilities ^PersistentVector (:capabilities connection-data)
         target-folder ^IMAPFolder (.getFolder ^Store store ^String (structured-folder-name store target-name))]
     (if (.contains capabilities :move)
-      (do (.setPeek ^IMAPMessage message true)
+      (do (t/log! :debug ["Moving message from" source-folder "to" target-folder])
+          (.setPeek ^IMAPMessage message true)
           (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder))
       (do (t/log! :debug "Server does not support the IMAP MOVE command. Using copy and delete as fallback.")
           (copy-message message source-folder target-folder)))))
@@ -317,10 +318,11 @@
 (defn parse-all-in-folder [connection-data folder-name options]
   (let [^Store store (:store connection-data)
         config (:config connection-data)
-        ^Folder folder (:folder connection-data)]
+        ^Folder folder (open-folder-in-store store folder-name)]
     (t/log! :info ["Read all e-mails from:" folder-name "with options:" options])
-    (async/go (let [^Folder read-folder (doto (.getFolder store ^String folder-name) (.open Folder/READ_WRITE))
-                    connection-id (id-from-config config)]
+    (async/go (let [^Folder read-folder (doto (.getFolder store ^String folder-name)
+                                          (.open Folder/READ_WRITE))
+                    connection-id (:id config)]
                 (vec (doseq [message-num (range 1 (inc (.getMessageCount read-folder)))
                              :let [^Message message (.getMessage read-folder message-num)]]
                        (t/log! :debug ["Reading message number" message-num "from" folder-name])
@@ -353,9 +355,8 @@
                        (reconnect (connection-data-from-id connection-id))
                        (move-messages-by-id-between-category-folders connection-id message-id folder-name category-name))))
                (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))
-               (finally (do (t/log! :debug ["Continue watching folder" (get-in event [:options :original-folder])])
-                            (let [connection-id (get-in event [:options :connection-id])]
-                              (start-idling-for-id connection-id))))))))))
+               (finally (start-idling-for-id connection-id)))
+          connection-id)))))
 
 (defn client-event-loop
   "Listens to :enriched-email

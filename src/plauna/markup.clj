@@ -94,7 +94,6 @@
 (defn list-email-contents [email-data categories]
   (render-file "email.html" {:email (update-in email-data [:header :date] timestamp->date) :categories categories :active-nav :emails}))
 
-
 (defmacro pie-chart [data-values key key-label description]
   `{:data {:values ~data-values}
     :title ~description
@@ -114,28 +113,34 @@
 
 (defn transform-into-overview-dataset [dataset key]
   (-> (tc/group-by dataset [(keyword key)])
-                               (tc/aggregate {:count #(-> % :count tcc/sum)})
-                               (tc/join-columns :joined [:count (keyword key)] {:result-type :map})
-                               first
-                               second))
+      (tc/aggregate {:count #(-> % :count tcc/sum)})
+      (tc/join-columns :joined [:count (keyword key)] {:result-type :map})
+      first
+      second))
 
 (defn statistics-overall [yearly-emails yearly-mime-types yearly-languages yearly-categories]
-  (let [overall-email (-> yearly-emails
-                          (tc/dataset {:key-fn keyword})
-                          (tc/map-columns :date #(datetime/instant->local-date-time (datetime/seconds-since-epoch->instant %)))
-                          (tc/add-column :interval #(datetime/long-temporal-field :years (:date %)))
-                          (tc/group-by [:interval])
-                          (tc/aggregate {:total-count #(-> % :count tcc/sum)})
-                          (hanami/plot hanami/bar-chart {:=background nil :=x :interval :=x-type :nominal :=x-title "Years" :=y :total-count :=y-title "Number of E-mails" :=title "Yearly E-Mails"}))
+  (let [overall-email (if (seq yearly-emails)
+                        (-> yearly-emails
+                            (tc/dataset {:key-fn keyword})
+                            (tc/map-columns :date #(datetime/instant->local-date-time (datetime/seconds-since-epoch->instant %)))
+                            (tc/add-column :interval #(datetime/long-temporal-field :years (:date %)))
+                            (tc/group-by [:interval])
+                            (tc/aggregate {:total-count #(-> % :count tcc/sum)})
+                            (hanami/plot hanami/bar-chart {:=background nil :=x :interval :=x-type :nominal :=x-title "Years" :=y :total-count :=y-title "Number of E-mails" :=title "Yearly E-Mails"}))
+                        yearly-emails)
         mime-type-data (tc/dataset yearly-mime-types)
-        mime-type-overview (-> mime-type-data
-                               (transform-into-overview-dataset 'mime-type)
-                               (pie-chart 'mime-type "MIME TYPE" "MIME Types Overview"))
-        mime-type-bar-data (-> (tc/group-by mime-type-data [:mime-type])
-                               (tc/aggregate {:sum #(-> % :count tcc/sum)})
-                               (tc/order-by :sum :desc)
-                               (hanami/plot hanami/bar-chart {:=y :mime-type :=y-title "Mime Type" :=x :sum :=x-title "Total Count" :=title "Mime Types by Occurence" :=background nil :=y-sort nil :=x-sort nil})
-                               (update-in [:encoding :y] conj {:sort nil}))
+        mime-type-overview (if (seq mime-type-data)
+                             (-> mime-type-data
+                                 (transform-into-overview-dataset 'mime-type)
+                                 (pie-chart 'mime-type "MIME TYPE" "MIME Types Overview"))
+                             mime-type-data)
+        mime-type-bar-data (if (seq mime-type-data)
+                             (-> (tc/group-by mime-type-data [:mime-type])
+                                 (tc/aggregate {:sum #(-> % :count tcc/sum)})
+                                 (tc/order-by :sum :desc)
+                                 (hanami/plot hanami/bar-chart {:=y :mime-type :=y-title "Mime Type" :=x :sum :=x-title "Total Count" :=title "Mime Types by Occurence" :=background nil :=y-sort nil :=x-sort nil})
+                                 (update-in [:encoding :y] conj {:sort nil}))
+                             mime-type-data)
         language-data (-> (filterv (fn [col] (some? (:interval col))) yearly-languages) tc/dataset)
         language-overview (-> language-data
                               (transform-into-overview-dataset 'language)
@@ -147,19 +152,19 @@
                                 (transform-into-overview-dataset 'category)
                                 (pie-chart 'category "Category" "Category Overview"))
         categories-bar-data (hanami/plot categories-data hanami/bar-chart {:=x :interval :=y :count :=background nil :=color :category :=x-title "Year" :=y-title "Categories"})]
-    (render-file "statistics.html" {:statistics [{:title "Overall"
-                                                  :contents [{:type :bar-chart :header "" :id "emails" :json-data (json/write-str overall-email)}
-                                                             {:type :bar-chart :id "overview" :json-data (json/write-str mime-type-overview)}
-                                                             {:type :bar-chart :id "most-common" :json-data (json/write-str mime-type-bar-data)}]}
-                                                 {:title "Languages"
-                                                  :contents [{:type :bar-chart :id "languages-overview" :json-data (json/write-str language-overview)}
-                                                             {:type :bar-chart :id "languages" :json-data (json/write-str language-bar-data)}
-                                                             ]}
-                                                 {:title "Categories"
-                                                  :contents [{:type :bar-chart :id "categories-overview" :json-data (json/write-str categories-overview)}
-                                                             {:type :bar-chart :id "categories" :json-data (json/write-str categories-bar-data)}]}]
-                                    :active-nav :statistics
-                                    :no-data (empty? yearly-emails)})))
+    (render-file "statistics.html"
+                 {:statistics [{:title "Overall"
+                                :contents [{:type :bar-chart :header "" :id "emails" :json-data (json/write-str overall-email)}
+                                           {:type :bar-chart :id "overview" :json-data (json/write-str mime-type-overview)}
+                                           {:type :bar-chart :id "most-common" :json-data (json/write-str mime-type-bar-data)}]}
+                               {:title "Languages"
+                                :contents [{:type :bar-chart :id "languages-overview" :json-data (json/write-str language-overview)}
+                                           {:type :bar-chart :id "languages" :json-data (json/write-str language-bar-data)}]}
+                               {:title "Categories"
+                                :contents [{:type :bar-chart :id "categories-overview" :json-data (json/write-str categories-overview)}
+                                           {:type :bar-chart :id "categories" :json-data (json/write-str categories-bar-data)}]}]
+                  :active-nav :statistics
+                  :no-data (empty? yearly-emails)})))
 
 (defn categories-page [categories] (render-file "admin-categories.html" {:categories categories :active-nav :admin}))
 
@@ -172,7 +177,7 @@
 (defn connection
   ([config folders] (render-file "admin-connection.html" (merge config {:folders folders :active-nav :admin})))
   ([config folders messages] (render-file "admin-connection.html" (merge config {:folders folders :messages (mapv type->toast-role messages) :active-nav :admin}))))
- 
+
 (defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}] :active-nav :admin}]
                                 (render-file "admin-preferences.html" (conj data log-levels))))
 

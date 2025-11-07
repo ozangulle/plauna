@@ -70,6 +70,8 @@
   <div class="grow-2">
     <h4 class="text-lg">Parse E-mails from Folders</h4>
     <form id="parse" class="space-y-4" action="/admin/connections/{{id}}/controls" method="POST">
+      <input type="hidden" name="operation" value="parse"/>
+      <input type="hidden" name="redirect-url" value="/admin/connections/{{id}}"/>
       <div class="form-field">
         <label for="folder">Folders</label>
         <div class="form-control">
