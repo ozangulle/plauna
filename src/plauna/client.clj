@@ -3,13 +3,14 @@
    [clojure.core.async :as async]
    [plauna.core.events :as events]
    [plauna.preferences :as p]
+   [plauna.database :as db]
+   [plauna.client.oauth :as oauth]
    [clojure.string :as s]
    [taoensso.telemere :as t]
-   [plauna.messaging :as messaging]
-   [plauna.client :as client])
+   [plauna.messaging :as messaging])
   (:import
    (clojure.lang PersistentVector)
-   (jakarta.mail Store Session Folder Message Flags$Flag)
+   (jakarta.mail Store Session Folder Message Flags$Flag AuthenticationFailedException)
    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
    (jakarta.mail.event MessageCountAdapter MessageCountEvent MessageCountListener)
    (jakarta.mail.search MessageIDTerm)
@@ -45,6 +46,8 @@
 (defn default-port-for-security [security]
   (if (= security "ssl") 993 143))
 
+(defn oauth2? [connection-config] (= "oauth2" (:auth-type connection-config)))
+
 (defn security [connection-config]
   (let [security (get connection-config :security "ssl")]
     (if (some #(= security %) ["ssl" "starttls" "plain"])
@@ -64,17 +67,23 @@
     (.setProperty "mail.imap.partialfetch" "false")
     (.setProperty "mail.imap.fetchsize" "1048576")))
 
+(defn oauth-properties [connection-config]
+  (fn [^Properties properties]
+    (if (oauth2? connection-config)
+      (doto properties (.setProperty "mail.imap.auth.mechanisms" "XOAUTH2"))
+      properties)))
+
 (defn security-properties [connection-config]
   (let [security-key (security connection-config)]
     (fn [^Properties properties]
-      (cond (= security-key "ssl") (doto properties (.setProperty "mail.imap.ssl.enable", "true"))
-            (= security-key "starttls") (doto properties (.setProperty "mail.imap.starttls.enable", "true"))
+      (cond (= security-key "ssl") (doto properties (.setProperty "mail.imap.ssl.enable" "true"))
+            (= security-key "starttls") (doto properties (.setProperty "mail.imap.starttls.enable" "true"))
             (= security-key "plain") properties
-            :else (doto properties (.setProperty "mail.imap.ssl.enable", "true"))))))
+            :else (doto properties (.setProperty "mail.imap.ssl.enable" "true"))))))
 
 (defn certification-check-properties [connection-config]
   (if (not (check-ssl-certs? connection-config))
-    (fn [^Properties properties] (doto properties (.setProperty "mail.imap.ssl.trust", "*")))
+    (fn [^Properties properties] (doto properties (.setProperty "mail.imap.ssl.trust" "*")))
     (fn [^Properties properties] properties)))
 
 (defn set-debug-mode [connection-config]
@@ -85,6 +94,7 @@
 (defn config->session [connection-config]
   (-> (default-imap-properties connection-config)
       ((security-properties connection-config))
+      ((oauth-properties connection-config))
       ((certification-check-properties connection-config))
       Session/getInstance
       ((set-debug-mode connection-config))))
@@ -97,7 +107,10 @@
 
 (defn login [connection-config]
   (let [store ^Store (connection-config->store connection-config)]
-    (.connect store (:host connection-config) (:user connection-config) (:secret connection-config))
+    (if (oauth2? connection-config)
+      (let [tokens (db/get-oauth-tokens (:id connection-config))]
+        (.connect store (:host connection-config) (:user connection-config) (:access-token tokens)))
+      (.connect store (:host connection-config) (:user connection-config) (:secret connection-config)))
     store))
 
 (defn folder-separator [^Store store] (.getSeparator (.getDefaultFolder store)))
@@ -258,11 +271,13 @@
 (defn disconnect [^AutoCloseable connection-data] (.close connection-data))
 
 (defn reconnect [^AutoCloseable connection-data]
-  (let [new-connection (create-imap-monitor (:config connection-data))]
-    ;; Close the old connection only after a successful new connection. Otherwise health checks are removed and plauna never tries to reestablish the connection again.
-    (.close connection-data)
-    (start-monitoring new-connection)
-    (schedule-health-checks new-connection)))
+  (try
+    (let [new-connection (create-imap-monitor (:config connection-data))]
+      ;; Close the old connection only after a successful new connection. Otherwise health checks are removed and plauna never tries to reestablish the connection again.
+      (.close connection-data)
+      (start-monitoring new-connection)
+      (schedule-health-checks new-connection))
+    (catch AuthenticationFailedException e (do (t/log! :error e) (when (oauth2? (:config connection-data)) (connect (:config connection-data)))))))
 
 (defn start-monitoring [connection-data]
   (try
@@ -333,10 +348,26 @@
                                                                               {:enrich true :move (:move options) :connection-id connection-id :folder folder :original-folder folder-name :message message})))))))
     connection-data))
 
+(defn get-token-pair [connection-config] (db/get-oauth-tokens (:id connection-config)))
+
+(defn refresh-access-token [conn token-data]
+  (let [provider (db/get-auth-provider (:auth-provider conn))
+        new-access-token (oauth/exchange-refresh-token-for-access-token provider (:refresh-token token-data))]
+    (db/update-access-token (:id conn) new-access-token)))
+
 (defn connect [connection-config]
-  (-> (client/create-imap-monitor connection-config)
-      client/start-monitoring
-      client/schedule-health-checks))
+  (if (oauth2? connection-config)
+    (let [token-pair (get-token-pair connection-config)]
+      (if (nil? token-pair)
+        (t/log! :warn ["Connection" (:user connection-config) (:host connection-config) "is set to use oauth2 but has no tokens in the db. You need to login manually from the 'Connections' page first."])
+        (try (-> (create-imap-monitor connection-config)
+                 start-monitoring
+                 schedule-health-checks)
+             (catch AuthenticationFailedException _ (do (refresh-access-token connection-config token-pair)
+                                                        (connect connection-config))))))
+    (-> (create-imap-monitor connection-config)
+        start-monitoring
+        schedule-health-checks)))
 
 (defn handle-incoming-events [event]
   (when (and (true? (:move (:options event))) (some? (:category (:metadata (:payload event)))))

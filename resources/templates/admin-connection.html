@@ -39,6 +39,26 @@
         </div>
       </div>
       <div class="flex gap-2">
+        <label for="auth-type">Authentication</label>
+        <div class="form-control">
+          <select id="auth-select" class="select" name="auth-type">
+            <option value="basic" {% if auth-type = "basic" %}selected{% endif %}>BASIC</option>
+            <option value="oauth2" {% if auth-type = "oauth2" %}selected{% endif %}>OAUTH 2</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-2 oauth-related">
+        <label for="auth-provider">Authentication Provider</label>
+        <div class="form-control">
+          <select class="select" name="auth-provider">
+            <option value="" disabled {% if auth-provider = null %}selected{% endif %}>Please Select One</option>
+            {% for provider in auth-providers %}
+            <option value="{{provider.id}}" {% if auth-provider = id %}selected{% endif %}>{{provider.name}}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-2">
         <label for="check-ssl-certs">Check ssl certificates</label>
         <input class="checkbox" name="check-ssl-certs" type="checkbox" value="false" {% if check-ssl-certs %} checked="true"{% endif %}>
       </div>
@@ -51,21 +71,6 @@
       <button id="update-button" class="btn btn-primary">Update Config</button>
     </div>
   </div>
-  <script>
-    document.getElementById('update-button').addEventListener('click', (e) => {
-        const form = document.querySelector('form'); 
-        const body = new FormData();
-        for (let element of form.elements) {
-            if(element.checked){
-                body.append(element.name, true);
-            } else {
-                body.append(element.name, element.value);
-            }
-        }
-        console.log(body);
-        fetch('/admin/connections/{{id}}', {method: 'PUT', body: body})
-            .then(() => window.location.href = '/admin/connections/{{id}}')});
-  </script>
   {% if folders|not-empty %}
   <div class="grow-2">
     <h4 class="text-lg">Parse E-mails from Folders</h4>
@@ -92,8 +97,103 @@
     </form>
   {% endif %}
   </div>
+  <div class="grow-12 oauth-related">
+    <h4 class="text-lg">Authentication Providers</h4>
+    <table id="auth-providers" class="table-xs lg:table table-zebra">
+      <thead class="table-header-group">
+        <tr>
+          <th class="text-xs lg:text-lg">Name</th>
+          <th class="text-xs lg:text-lg">Auth URL</th>
+          <th class="text-xs lg:text-lg">Token URL</th>
+          <th class="text-xs lg:text-lg">Redirect URL</th>
+          <th class="text-xs lg:text-lg">Client ID</th>
+          <th class="text-xs lg:text-lg">Client Secret</th>
+          <th class="text-xs lg:text-lg">Scope</th>
+          <th></th>
+        </tr>
+      <thead>
+        <tbody>
+          <tr>
+            <form id="new-auth-provider" action="/admin/auth-providers" method="POST">
+              <input name="redirect-url" type="hidden" value="/admin/connections/{{id}}">
+              <td><input class="input" name="name" value=""></td>
+              <td><input class="input" name="auth_url" value=""></td>
+              <td><input class="input" name="token_url" value=""></td>
+              <td><input class="input" name="redirect_url" value=""></td>
+              <td><input class="input" name="client_id" value=""></td>
+              <td><input class="input" name="client_secret" value=""></td>
+              <td><input class="input" name="scope" value=""></td>
+              <td><button form="new-auth-provider" class="btn btn-primary" type="submit">Add New Provider</button></td>
+            </form>
+          </tr>
+          {% for provider in auth-providers %}
+          <tr>
+            <td><input class="input" name="name" value="{{provider.name}}"></td>
+            <td><input class="input" name="auth_url" value="{{provider.auth-url}}"></td>
+            <td><input class="input" name="token_url" value="{{provider.token-url}}"></td>
+            <td><input class="input" name="redirect_url" value="{{provider.redirect-url}}"></td>
+            <td><input class="input" name="client_id" value="{{provider.client-id}}"></td>
+            <td><input class="input" name="client_secret" value="{{provider.client-secret}}"></td>
+            <td><input class="input" name="scope" value="{{provider.scope}}"></td>
+            <td>
+              <label class="btn btn-ghost" for="modal-{{provider.id}}">X</label>
+              <input class="modal-toggle" id="modal-{{provider.id}}" type="checkbox" />
+              <div class="modal">
+	            <label class="modal-overlay" for="modal-{{provider.id}}"></label>
+	            <div class="modal-box flex flex-col gap-5">
+		          <h2 class="text-xl">Delete Provider: {{provider.name}}</h2>
+		          <span>Are you sure you want to delete this authentication provider?</span>
+		          <div class="flex gap-3">
+			        <button id="delete-button-{{provider.id}}" class="btn btn-error">Delete</button>
+		            <label for="modal-{{provider.id}}" class="btn">Cancel</label>
+		          </div>
+                  <script>
+                    document.getElementById('delete-button-{{provider.id}}').addEventListener('click', (e) => {
+                        fetch('/admin/auth-providers/{{provider.id}}', {method: 'DELETE'})
+                            .then(() => window.location.href = '/admin/connections/{{id}}')});
+                  </script>
+	            </div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+  </table>
+  </div>
 </div>
 
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const select = document.getElementById('auth-select');
+        const oauthGroup = Array.from(document.querySelectorAll('.oauth-related'));
+        const oauthInputs = Array.from(oauthGroup.flatMap(el => Array.from(el.querySelectorAll('input, select, button'))));
+        
+        function updateOauthFields() {
+            const enable = select.value === 'oauth2';
+            oauthGroup.forEach(el => el.style.display = enable ? '' : 'none');
+            oauthInputs.forEach(el => el.disabled = !enable);
+        }
+        
+        updateOauthFields();
+        select.addEventListener('change', updateOauthFields);
+
+
+        document.getElementById('update-button').addEventListener('click', (e) => {
+          const form = document.querySelector('form'); 
+          const body = new FormData();
+          for (let element of form.elements) {
+            if (element.checked) {
+                body.append(element.name, true);
+            } else {
+                body.append(element.name, element.value);
+            }
+          }
+          fetch('/admin/connections/{{id}}', {method: 'PUT', body: body})
+            .then(() => window.location.href = '/admin/connections/{{id}}')});
+
+        
+     });
+  </script>
 {% endblock %}
 
 

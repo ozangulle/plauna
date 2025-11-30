@@ -1,10 +1,11 @@
 (ns plauna.server
   (:require [ring.adapter.jetty :as jetty]
-            [ring.util.codec :refer [base64-decode]]
+            [ring.util.codec :refer [base64-decode url-encode]]
             [plauna.markup :as markup]
             [plauna.files :as files]
             [plauna.util.page :as page]
             [plauna.client :as client]
+            [plauna.client.oauth :as oauth]
             [plauna.preferences :as p]
             [plauna.core.email :as core-email]
             [clojure.math :refer [ceil]]
@@ -13,6 +14,9 @@
             [ring.middleware.params :refer [wrap-params]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
+            [ring.middleware.session :refer [wrap-session]]
+            [ring.middleware.session.cookie :refer [cookie-store]]
+            [ring.util.response :refer [response redirect]]
             [taoensso.telemere :as t]
             [clojure.java.io :as io]
             [plauna.analysis :as analysis]
@@ -22,6 +26,7 @@
             [clojure.data :as cd]
             [nrepl.server :as nrepl])
   (:import [java.net ServerSocket]
+           [java.util UUID]
            [org.eclipse.jetty.server Server]))
 
 (set! *warn-on-reflection* true)
@@ -375,10 +380,8 @@
     (db/delete-email-by-message-id (new String ^"[B" (base64-decode id)))
     {:status  200})
 
-  (comp/GET "/admin/connections" []
-    {:status 200
-     :header html-headers
-     :body   (markup/connections-list (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))})
+  (comp/GET "/admin/connections" _
+    (response (markup/connections-list (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))))
 
   (comp/POST "/admin/connections" request
     (let [params (:params request)
@@ -397,32 +400,51 @@
      :header html-headers
      :body   (markup/new-connection)})
 
+  (comp/DELETE "/admin/auth-providers/:id" request
+    (let [params (:params request)]
+      (db/delete-auth-provider (get params :id))
+      {:status 200}))
+
+  (comp/POST "/admin/auth-providers" request
+    (let [params (:params request)]
+      (db/add-auth-provider (dissoc params :redirect-url))
+      (redirect-request request)))
+
   (comp/GET "/admin/connections/:id" [id]
-    (let [conn-info (connection-information id)]
+    (let [conn-info (connection-information id)
+          providers (db/get-auth-providers)]
       (if (seq @global-messages)
         (let [messages @global-messages]
           (swap! global-messages (fn [_] []))
-          (success-html-with-body (markup/connection conn-info (connection-folders conn-info) messages)))
-        (success-html-with-body (markup/connection conn-info (connection-folders conn-info))))))
+          (success-html-with-body (markup/connection (assoc conn-info :auth-providers providers) (connection-folders conn-info) messages)))
+        (success-html-with-body (markup/connection (assoc conn-info :auth-providers providers) (connection-folders conn-info))))))
 
   (comp/PUT "/admin/connections/:id" request
     (let [params (:params request)]
-      (db/update-connection {:id (get params :id) :host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs))})
+      (db/update-connection {:id (get params :id) :host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs)) :auth-type (get params :auth-type) :auth-provider (get params :auth-provider)})
       {:status 200}))
 
   (comp/POST "/admin/connections/:id/controls" request
     (let [id (:id (:route-params request))
           operation (:operation (:params request))]
-      (cond (= "reconnect" operation) (client/reconnect (client/connection-data-from-id id))
-            (= "disconnect" operation) (client/disconnect (client/connection-data-from-id id))
-            (= "connect" operation) (client/connect (db/get-connection id))
+      (cond (= "reconnect" operation) (do (client/reconnect (client/connection-data-from-id id)) (redirect-request request))
+            (= "disconnect" operation) (do (client/disconnect (client/connection-data-from-id id)) (redirect-request request))
+            (= "connect" operation)
+            (let [connection (db/get-connection id)]
+              (if (= "oauth2" (:auth-type connection))
+                (if (nil? (db/get-oauth-tokens id))
+                  (let [csrf (.toString (UUID/randomUUID))
+                        provider (db/get-auth-provider (:auth-provider connection))]
+                    (-> (redirect (oauth/authorize-uri provider csrf) 301) (assoc :session {:oauth-csrf csrf :connection-id id :provider provider})))
+                  (do (client/connect (db/get-connection id)) (redirect-request request)))
+                (do (client/connect (db/get-connection id)) (redirect-request request))))
             (= "parse" operation) (let [params (:params request)
                                         folder (:folder params)
                                         move (some? (:move params))
                                         conn-data (client/connection-data-from-id id)]
                                     (client/parse-all-in-folder conn-data folder {:move move})
-                                    (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)}))))))
-    (redirect-request request))
+                                    (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)})))
+                                    (redirect-request request)))))
 
   (comp/POST "/metadata/languages" request
     (let [limiter (messaging/channel-limiter :enriched-email)
@@ -440,6 +462,18 @@
             :else (t/log! :error ["Unsupported operation" operation "at /repl"]))
       (redirect-request request)))
 
+  (comp/GET "/callback" request
+    (let [params (:params request)
+          session (:session request)]
+      (if (= (:state params) (:oauth-csrf session))
+        (try
+          (let [response (oauth/exchange-code-for-access-token (:provider session) (:code params))]
+            (db/save-oauth-token (assoc response :connection-id (:connection-id session)))
+            (client/connect (:config (client/connection-data-from-id (:connection-id session)))))
+          (redirect "/admin/connections")
+          (catch Exception e (t/log! :error e) (redirect "/admin/connections")))
+        "Bad response - csrf token mismach")))
+
   (route/resources "/"))
 
 (defn upload-progress [_ bytes-read content-length item-count]
@@ -452,7 +486,8 @@
 (def app (-> (fn [req] (routes req))
              wrap-keyword-params
              (wrap-multipart-params {:progress-fn upload-progress})
-             wrap-params))
+             wrap-params
+             (wrap-session {:store (cookie-store)})))
 
 (defn get-random-port []
   (with-open [socket (ServerSocket. 0)]

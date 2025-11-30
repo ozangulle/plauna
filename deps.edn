@@ -18,7 +18,9 @@
                                org.mockito/mockito-core {:mvn/version "5.19.0"}}
                   :main-opts ["-m" "cognitect.test-runner"]
                   :exec-fn cognitect.test-runner.api/test}}
- :deps {commons-codec/commons-codec {:mvn/version "1.18.0"}
+ :deps {clj-http {:mvn/version "3.13.1"}
+        cheshire/cheshire {:mvn/version "6.1.0"}
+        commons-codec/commons-codec {:mvn/version "1.18.0"}
         commons-io/commons-io {:mvn/version "2.20.0"}
         commons-net/commons-net {:mvn/version "3.11.1"}
         compojure/compojure {:mvn/version "1.7.1"}
