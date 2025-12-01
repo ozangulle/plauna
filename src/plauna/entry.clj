@@ -46,8 +46,6 @@
                   (client/create-category-folders! (mapv :name (db/get-categories)))))))))
   (t/log! :debug "Listening to new emails from listen-channel"))
 
-(def args ["--data-folder" "/home/ozan/.local/state/plauna"])
-
 (defn -main
   [& args]
   (setup-logging)
