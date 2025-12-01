@@ -38,7 +38,9 @@
 (defn delete-database-file []
   (let [db-file (io/file (file-dir) database-file)]
     (if (.exists db-file)
-      (io/delete-file db-file)
+      (do (io/delete-file db-file)
+          (io/delete-file (str db-file "-shm") true)
+          (io/delete-file (str db-file "-wal") true))
       nil)))
 
 (defn path-to-db-file []

@@ -6,7 +6,7 @@
             [clojure.java.io :as io]))
 
 (defn setup-clean-db [f]
-  (files/set-custom-config-location! (.getPath (io/resource "test/test.edn")))
+  (swap! files/plauna-config {:config-file (.getPath (io/resource "test/test.edn"))})
   (files/check-and-create-database-file)
   (db/create-db)
   (alter-var-root #'db/batch-size (fn [_] 2))

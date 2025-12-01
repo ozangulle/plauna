@@ -391,3 +391,23 @@
 
 (defn delete-auth-provider [id] (jdbc/execute! (ds) (honey/format {:delete-from [:auth_providers]
                                                                    :where [:= :id id]}) builder-function-kebab))
+
+(defn update-auth-provider [provider]
+  (let [wo-id (dissoc provider :id)]
+    (jdbc/execute! (ds)
+                   (honey/format {:update [:auth_providers]
+                                  :set wo-id
+                                  :where  [:= :id (:id provider)]})
+                   builder-function)))
+
+(defprotocol DB
+  "Database protocol"
+  (fetch-connection [this id] "Get connection for id.")
+  (fetch-oauth-token-data [this id] "Get oauth token data for a connection")
+  (fetch-auth-provider [this id]))
+
+(deftype SqliteDB []
+  DB
+  (fetch-connection [_ id] (get-connection id))
+  (fetch-oauth-token-data [_ connection-id] (get-oauth-tokens connection-id))
+  (fetch-auth-provider [_ id] (get-auth-provider id)))

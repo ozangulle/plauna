@@ -11,6 +11,8 @@
    [plauna.preferences :as preferences]
    [plauna.database :as db]
    [plauna.core.email :as core.email])
+  (:import [plauna.client ImapClient]
+           [plauna.database SqliteDB])
   (:gen-class))
 
 (defn setup-logging []
@@ -31,8 +33,10 @@
     (if (seq connections-in-db)
       (do (t/log! :debug ["Connections table contains" (count connections-in-db) "connection configuration(s)."])
           (doseq [client-config connections-in-db]
-            (-> (client/connect client-config)
-                (client/create-category-folders! (mapv :name (db/get-categories))))))
+            (let [connection (client/connect client-config)]
+              (if (some? connection)
+                (client/create-category-folders! connection (mapv :name (db/get-categories)))
+                (t/log! :info ["Not connected, not creating folders."])))))
       (do (t/log! :debug "Connections table in the db is empty. Trying to read connections from the config file.")
           (doseq [client-config (:clients (:email config))]
             (t/log! :info ["Adding connection data from the config file to the database. Next time Plauna will use the data from the database."])
@@ -42,14 +46,21 @@
                   (client/create-category-folders! (mapv :name (db/get-categories)))))))))
   (t/log! :debug "Listening to new emails from listen-channel"))
 
+(def args ["--data-folder" "/home/ozan/.local/state/plauna"])
+
 (defn -main
   [& args]
   (setup-logging)
-  (let [application-config (files/parse-config-from-cli-arguments args)]
+  (let [application-config (files/parse-config-from-cli-arguments args)
+        context {:config application-config :client (ImapClient.) :db (SqliteDB.)}]
     (files/check-and-create-database-file)
     (db/create-db)
     (t/log! :info "Setting log level according to preferences.")
     (t/set-min-level! (preferences/log-level))
     (start-imap-client application-config)
     (events/start-event-loops event-register)
-    (server/start-server application-config)))
+    (server/start-server context)))
+
+(comment
+  (server/start-server {:config {:server {:port 8080}}}) 
+  (server/stop-server))

@@ -355,19 +355,22 @@
         new-access-token (oauth/exchange-refresh-token-for-access-token provider (:refresh-token token-data))]
     (db/update-access-token (:id conn) new-access-token)))
 
-(defn connect [connection-config]
-  (if (oauth2? connection-config)
-    (let [token-pair (get-token-pair connection-config)]
-      (if (nil? token-pair)
-        (t/log! :warn ["Connection" (:user connection-config) (:host connection-config) "is set to use oauth2 but has no tokens in the db. You need to login manually from the 'Connections' page first."])
-        (try (-> (create-imap-monitor connection-config)
-                 start-monitoring
-                 schedule-health-checks)
-             (catch AuthenticationFailedException _ (do (refresh-access-token connection-config token-pair)
-                                                        (connect connection-config))))))
-    (-> (create-imap-monitor connection-config)
-        start-monitoring
-        schedule-health-checks)))
+(defmulti connect :auth-type)
+
+(defmethod connect "oauth2" [connection-config]
+  (let [token-pair (get-token-pair connection-config)]
+    (if (nil? token-pair)
+      (t/log! :warn ["Connection" (:user connection-config) (:host connection-config) "is set to use oauth2 but has no tokens in the db. You need to login manually from the 'Connections' page first."])
+      (try (-> (create-imap-monitor connection-config)
+               start-monitoring
+               schedule-health-checks)
+           (catch AuthenticationFailedException _ (do (refresh-access-token connection-config token-pair)
+                                                      (connect connection-config)))))))
+
+(defmethod connect :default [connection-config]
+  (-> (create-imap-monitor connection-config)
+      start-monitoring
+      schedule-health-checks))
 
 (defn handle-incoming-events [event]
   (when (and (true? (:move (:options event))) (some? (:category (:metadata (:payload event)))))
@@ -388,6 +391,14 @@
                (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))
                (finally (start-idling-for-id connection-id)))
           connection-id)))))
+
+(defprotocol EmailClient
+  "Email client"
+  (start-monitor [this connection] "Connect to the client"))
+
+(defrecord ImapClient []
+    EmailClient
+  (start-monitor [_ connection-config] (connect connection-config)))
 
 (defn client-event-loop
   "Listens to :enriched-email

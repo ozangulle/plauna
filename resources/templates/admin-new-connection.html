@@ -4,9 +4,29 @@
 {% block content %}
 
 <h3 class="uppercase text-lg my-8">New Connection</h3>
-<div class="flex w-full max-w-sm flex-col gap-6">
+<div class="flex flex-wrap gap-6">
   <form id="create" class="space-y-4" action="/admin/connections" method="POST">
     <input name="redirect-url" type="hidden" value="/admin/connections">
+    <div class="flex gap-2">
+      <label for="auth-type">Authentication</label>
+      <div class="form-control">
+        <select id="auth-select" class="select" name="auth-type">
+          <option value="basic" {% if auth-type = "basic" %}selected{% endif %}>BASIC</option>
+          <option value="oauth2" {% if auth-type = "oauth2" %}selected{% endif %}>OAUTH 2</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex gap-2 oauth-related">
+      <label for="auth-provider">Authentication Provider</label>
+      <div class="form-control">
+        <select class="select" name="auth-provider">
+          <option value="" disabled {% if auth-provider = null %}selected{% endif %}>Please Select One</option>
+          {% for provider in auth-providers %}
+          <option value="{{provider.id}}" {% if auth-provider = id %}selected{% endif %}>{{provider.name}}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
     <div class="flex gap-2">
       <label for="host">Host</label>
       <input class="input" name="host" value="{{host}}">
@@ -49,14 +69,28 @@
       <button form="create" class="btn btn-primary" type="submit">Create Connection</button>
     </div>  
   </form>
+
+  <div class="grow-12 oauth-related">
+    {% include "admin-provider.html" %}
+  </div>
 </div>
 
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const select = document.getElementById('auth-select');
+        const oauthGroup = Array.from(document.querySelectorAll('.oauth-related'));
+        const oauthInputs = Array.from(oauthGroup.flatMap(el => Array.from(el.querySelectorAll('input, select, button'))));
+        
+        function updateOauthFields() {
+            const enable = select.value === 'oauth2';
+            oauthGroup.forEach(el => el.style.display = enable ? '' : 'none');
+            oauthInputs.forEach(el => el.disabled = !enable);
+        }
+        
+        updateOauthFields();
+        select.addEventListener('change', updateOauthFields);
+    });
+</script>
+
 {% endblock %}
-
-
-
-
-
-
-
 
