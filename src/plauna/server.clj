@@ -161,7 +161,6 @@
           (fn [map] (if (= 0 (get map :category)) map (update map :category (fn [cat-key] (get categories cat-key)))))
           (fn [map] (update map :category #(if (int? %) % (Integer/parseInt %))))) statistics)))
 
-
 (defn enriched-email-by-message-id [id] (first (db/fetch-data {:entity :enriched-email :strict false} {:where [:= :message-id id]})))
 
 ;; TODO change name template
@@ -437,10 +436,10 @@
           ["Writing" item-count "files. Read" read-percent "% until now. Total length: " content-length]))
 
 (defn app [context] (-> (fn [req] ((make-routes context) req))
-                 wrap-keyword-params
-                 (wrap-multipart-params {:progress-fn upload-progress})
-                 wrap-params
-                 (wrap-session {:store (cookie-store)})))
+                        wrap-keyword-params
+                        (wrap-multipart-params {:progress-fn upload-progress})
+                        wrap-params
+                        (wrap-session {:store (cookie-store)})))
 
 (defn get-random-port []
   (with-open [socket (ServerSocket. 0)]

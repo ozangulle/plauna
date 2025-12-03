@@ -30,7 +30,7 @@
 (deftest oauth2-auth-2
   (let [database (reify db/DB
                    (fetch-connection [_ id] {:id id :auth-type "oauth2" :auth-provider 2})
-                   (fetch-oauth-token-data [_ id] {:not :empty})
+                   (fetch-oauth-token-data [_ id] {:access-token "not empty" :refresh-token "not empty"})
                    (fetch-auth-provider [_ id] {:id id}))
         client (reify cl/EmailClient (start-monitor [_ config]))
         context {:db database :client client}]
@@ -47,3 +47,14 @@
         context {:db database :client client}]
     (is (thrown? RuntimeException (app/connect-to-client context "abc"))
         "auth-type 'oauth2' with auth provider and token data calls client login and returns ok")))
+
+(deftest oauth2-auth-4
+  (let [database (reify db/DB
+                   (fetch-connection [_ id] {:id id :auth-type "oauth2" :auth-provider 2})
+                   (fetch-oauth-token-data [_ id] {:access-token "not empty"})
+                   (fetch-auth-provider [_ id] {:id id}))
+        client (reify cl/EmailClient (start-monitor [_ config]))
+        context {:db database :client client}]
+    (is (= {:result :redirect, :provider {:id 2}}
+           (app/connect-to-client context "abc"))
+        "auth-type 'oauth2' with auth provider and access token but no refresh token calls client login and returns ok")))

@@ -397,7 +397,7 @@
   (start-monitor [this connection] "Connect to the client"))
 
 (defrecord ImapClient []
-    EmailClient
+  EmailClient
   (start-monitor [_ connection-config] (connect connection-config)))
 
 (defn client-event-loop
