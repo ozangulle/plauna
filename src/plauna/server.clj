@@ -415,13 +415,14 @@
         (redirect-request request)))
 
     (comp/GET "/oauth2/callback" request
+      (println "Here")
       (let [params (:params request)
             session (:session request)]
         (if (= (:state params) (:oauth-csrf session))
           (try
             (let [response (oauth/exchange-code-for-access-token (:provider session) (:code params))]
               (db/save-oauth-token (assoc response :connection-id (:connection-id session)))
-              (client/connect (db/get-connection (:connection-id session))))
+              (app/connect-to-client context (:connection-id session)))
             (redirect "/admin/connections")
             (catch Exception e (t/log! :error e) (redirect "/admin/connections")))
           "Bad response - csrf token mismach")))

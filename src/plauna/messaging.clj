@@ -10,7 +10,6 @@
 (defn restart-main-chan [] (dosync (alter main-chan (fn [old-chan] (close! old-chan)))
                                    (alter main-chan (fn [_] (chan 1000)))
                                    (alter main-publisher (fn [_] (pub @main-chan :type)))))
-
 (def limiter-limit (ref 300))
 
 (defn channel-limiter [target-type]

@@ -10,6 +10,7 @@
    [plauna.messaging :as messaging])
   (:import
    (clojure.lang PersistentVector)
+   (plauna.interfaces EmailClient)
    (jakarta.mail Store Session Folder Message Flags$Flag AuthenticationFailedException)
    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
    (jakarta.mail.event MessageCountAdapter MessageCountEvent MessageCountListener)
@@ -274,10 +275,12 @@
   (try
     (let [new-connection (create-imap-monitor (:config connection-data))]
       ;; Close the old connection only after a successful new connection. Otherwise health checks are removed and plauna never tries to reestablish the connection again.
-      (.close connection-data)
+      (disconnect connection-data)
       (start-monitoring new-connection)
       (schedule-health-checks new-connection))
-    (catch AuthenticationFailedException e (do (t/log! :error e) (when (oauth2? (:config connection-data)) (connect (:config connection-data)))))))
+    (catch AuthenticationFailedException e (do (t/log! :error e)
+                                               (.close ^AutoCloseable (get @connections (:id connection-data)))
+                                               (connect connection-data)))))
 
 (defn start-monitoring [connection-data]
   (try
@@ -359,13 +362,11 @@
 
 (defmethod connect "oauth2" [connection-config]
   (let [token-pair (get-token-pair connection-config)]
-    (if (nil? token-pair)
-      (t/log! :warn ["Connection" (:user connection-config) (:host connection-config) "is set to use oauth2 but has no tokens in the db. You need to login manually from the 'Connections' page first."])
-      (try (-> (create-imap-monitor connection-config)
-               start-monitoring
-               schedule-health-checks)
-           (catch AuthenticationFailedException _ (do (refresh-access-token connection-config token-pair)
-                                                      (connect connection-config)))))))
+    (refresh-access-token connection-config token-pair)
+    (try (-> (create-imap-monitor connection-config)
+             start-monitoring
+             schedule-health-checks)
+         (catch AuthenticationFailedException e (t/log! :error e)))))
 
 (defmethod connect :default [connection-config]
   (-> (create-imap-monitor connection-config)
@@ -392,13 +393,9 @@
                (finally (start-idling-for-id connection-id)))
           connection-id)))))
 
-(defprotocol EmailClient
-  "Email client"
-  (start-monitor [this connection] "Connect to the client"))
-
 (defrecord ImapClient []
   EmailClient
-  (start-monitor [_ connection-config] (connect connection-config)))
+  (start-monitor [_ config] (connect config)))
 
 (defn client-event-loop
   "Listens to :enriched-email
