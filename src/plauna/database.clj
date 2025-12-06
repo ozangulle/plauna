@@ -13,9 +13,9 @@
             [plauna.util.page :as page]
             [plauna.database :as db]
             [taoensso.telemere :as t]
+            [plauna.interfaces :as int]
             [clojure.core.async :as async])
-  (:import (org.flywaydb.core Flyway)
-           (plauna.interfaces DB)))
+  (:import (org.flywaydb.core Flyway)))
 
 (set! *warn-on-reflection* true)
 
@@ -402,7 +402,7 @@
                    builder-function)))
 
 (deftype SqliteDB []
-  DB
+  int/DB
   (fetch-connection [_ id] (get-connection id))
   (fetch-oauth-token-data [_ connection-id] (get-oauth-tokens connection-id))
   (fetch-auth-provider [_ id] (get-auth-provider id)))
