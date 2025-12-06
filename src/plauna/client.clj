@@ -273,14 +273,9 @@
 
 (defn reconnect [^AutoCloseable connection-data]
   (try
-    (let [new-connection (create-imap-monitor (:config connection-data))]
-      ;; Close the old connection only after a successful new connection. Otherwise health checks are removed and plauna never tries to reestablish the connection again.
-      (disconnect connection-data)
-      (start-monitoring new-connection)
-      (schedule-health-checks new-connection))
-    (catch AuthenticationFailedException e (do (t/log! :error e)
-                                               (.close ^AutoCloseable (get @connections (:id connection-data)))
-                                               (connect connection-data)))))
+    (disconnect connection-data)
+    (connect connection-data)
+    (catch AuthenticationFailedException e (t/log! :error e))))
 
 (defn start-monitoring [connection-data]
   (try
