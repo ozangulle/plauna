@@ -2,12 +2,6 @@
   (:require [plauna.interfaces :as int]
             [taoensso.telemere :as t]))
 
-(defmulti connect-with-type (fn [context connection] (:auth-type connection)))
-
-(defmethod connect-with-type "oauth2" [context connection])
-
-(defmethod connect-with-type :default [context connection])
-
 (defn connect-to-client
   "Returns {:result :ok} or {:result :redirect :provider provider} in case of oauth2"
   [context id]

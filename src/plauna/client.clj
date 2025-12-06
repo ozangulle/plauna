@@ -7,10 +7,10 @@
    [plauna.client.oauth :as oauth]
    [clojure.string :as s]
    [taoensso.telemere :as t]
+   [plauna.interfaces :as int]
    [plauna.messaging :as messaging])
   (:import
    (clojure.lang PersistentVector)
-   (plauna.interfaces EmailClient)
    (jakarta.mail Store Session Folder Message Flags$Flag AuthenticationFailedException)
    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
    (jakarta.mail.event MessageCountAdapter MessageCountEvent MessageCountListener)
@@ -394,7 +394,7 @@
           connection-id)))))
 
 (defrecord ImapClient []
-  EmailClient
+  int/EmailClient
   (start-monitor [_ config] (connect config)))
 
 (defn client-event-loop
