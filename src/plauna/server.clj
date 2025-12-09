@@ -80,14 +80,14 @@
   ([request]
    (let [redirect-url (get-in request [:params :redirect-url])]
      (if (some? redirect-url)
-       {:status 301 :headers {"Location" redirect-url}}
-       {:status 301 :headers {"Location" (-> request :uri)}})))
+       {:status 303 :headers {"Location" redirect-url}}
+       {:status 303 :headers {"Location" (-> request :uri)}})))
   ([request messages]
    (swap! global-messages (fn [m] (conj m messages)))
    (let [redirect-url (get-in request [:params :redirect-url])]
      (if (some? redirect-url)
-       {:status 301 :headers {"Location" redirect-url}}
-       {:status 301 :headers {"Location" (-> request :uri)}}))))
+       {:status 303 :headers {"Location" redirect-url}}
+       {:status 303 :headers {"Location" (-> request :uri)}}))))
 
 (defn language-preferences []
   (let [preferences (db/get-language-preferences)
@@ -347,9 +347,10 @@
         {:status 200}))
 
     (comp/GET "/admin/new-connection" []
-      {:status 200
-       :header html-headers
-       :body   (markup/new-connection)})
+      (let [providers (db/get-auth-providers)]
+       {:status 200
+        :header html-headers
+        :body   (markup/new-connection providers)}))
 
     (comp/DELETE "/admin/auth-providers/:id" request
       (let [params (:params request)]
@@ -359,7 +360,9 @@
     (comp/POST "/admin/auth-providers" request
       (let [params (:params request)]
         (db/add-auth-provider (dissoc params :redirect-url))
-        (redirect-request request)))
+        (if (= "/admin/connections/" (:redirect-url params))
+          (redirect-request (assoc-in request [:params :redirect-url] "/admin/new-connection"))
+          (redirect-request request))))
 
     (comp/PUT "/admin/auth-providers/:id" request
       (let [params (:params request)]
@@ -415,7 +418,6 @@
         (redirect-request request)))
 
     (comp/GET "/oauth2/callback" request
-      (println "Here")
       (let [params (:params request)
             session (:session request)]
         (if (= (:state params) (:oauth-csrf session))
