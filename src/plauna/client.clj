@@ -274,7 +274,7 @@
 (defn reconnect [^AutoCloseable connection-data]
   (try
     (disconnect connection-data)
-    (connect connection-data)
+    (connect (:config connection-data))
     (catch AuthenticationFailedException e (t/log! :error e))))
 
 (defn start-monitoring [connection-data]
