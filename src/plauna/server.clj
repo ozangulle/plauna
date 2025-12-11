@@ -18,6 +18,7 @@
             [ring.middleware.session :refer [wrap-session]]
             [ring.middleware.session.cookie :refer [cookie-store]]
             [ring.util.response :refer [response redirect]]
+            [cheshire.core :refer [parse-string]]
             [taoensso.telemere :as t]
             [clojure.java.io :as io]
             [plauna.analysis :as analysis]
@@ -348,14 +349,17 @@
 
     (comp/GET "/admin/new-connection" []
       (let [providers (db/get-auth-providers)]
-       {:status 200
-        :header html-headers
-        :body   (markup/new-connection providers)}))
+        {:status 200
+         :header html-headers
+         :body   (markup/new-connection providers)}))
 
     (comp/DELETE "/admin/auth-providers/:id" request
-      (let [params (:params request)]
+      (let [params (:params request)
+            body (parse-string (slurp (:body request)) true)]
         (db/delete-auth-provider (get params :id))
-        {:status 200}))
+        (if (empty? (:conn-id body))
+          (redirect "/admin/new-connection" 303)
+          (redirect (str "/admin/connections/" (:conn-id body) 303)))))
 
     (comp/POST "/admin/auth-providers" request
       (let [params (:params request)]

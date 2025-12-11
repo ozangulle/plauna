@@ -50,13 +50,13 @@
 		            <h2 class="text-xl">Delete Provider: {{provider.name}}</h2>
 		            <span>Are you sure you want to delete this authentication provider?</span>
 		            <div class="flex gap-3">
-  			          <button id="delete-button-{{provider.id}}" class="btn btn-error">Delete</button>
+  			          <div id="delete-button-{{provider.id}}" class="btn btn-error">Delete</div>
                       <label for="modal-{{provider.id}}" class="btn">Cancel</label>
    		            </div>
                   <script>
                     document.getElementById('delete-button-{{provider.id}}').addEventListener('click', (e) => {
-                        fetch('/admin/auth-providers/{{provider.id}}', {method: 'DELETE'})
-                            .then(() => window.location.href = '/admin/connections/{{id}}')});
+                        fetch('/admin/auth-providers/{{provider.id}}', {method: 'DELETE', body: JSON.stringify({"conn-id": "{{id}}"})})
+                            .then(response => window.location.replace(response.url))});
 
                     document.getElementById('update-button-{{provider.id}}').addEventListener('click', (e) => {
                         event.stopPropagation();
