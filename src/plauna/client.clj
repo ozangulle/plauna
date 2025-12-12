@@ -106,13 +106,16 @@
       (.getStore session "imaps")
       (.getStore session "imap"))))
 
-(defn login [connection-config]
-  (let [store ^Store (connection-config->store connection-config)]
-    (if (oauth2? connection-config)
-      (let [tokens (db/get-oauth-tokens (:id connection-config))]
-        (.connect store (:host connection-config) (:user connection-config) (:access-token tokens)))
-      (.connect store (:host connection-config) (:user connection-config) (:secret connection-config)))
-    store))
+
+(defn login
+  ([connection-config ^Store store]
+   (if (oauth2? connection-config)
+     (let [tokens (db/get-oauth-tokens (:id connection-config))]
+       (.connect store (:host connection-config) (:user connection-config) (:access-token tokens)))
+     (.connect store (:host connection-config) (:user connection-config) (:secret connection-config)))
+   store)
+  ([connection-config]
+   (login connection-config (connection-config->store connection-config))))
 
 (defn folder-separator [^Store store] (.getSeparator (.getDefaultFolder store)))
 
@@ -257,6 +260,13 @@
               (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
               (.moveMessages source-folder (into-array Message found-messages) target-folder))))))))
 
+
+(defn refresh-access-token [connection-config]
+  (let [provider (db/get-auth-provider (:auth-provider connection-config))
+        token-data (db/get-oauth-tokens (:id connection-config))
+        new-access-token (oauth/exchange-refresh-token-for-access-token provider (:refresh-token token-data))]
+    (db/update-access-token (:id connection-config) new-access-token)))
+
 ;; Public Interface
 
 (defn create-imap-monitor [connection-config]
@@ -271,10 +281,11 @@
 
 (defn disconnect [^AutoCloseable connection-data] (.close connection-data))
 
-(defn reconnect [^AutoCloseable connection-data]
+(defn reconnect [^ConnectionData connection-data]
   (try
-    (disconnect connection-data)
-    (connect (:config connection-data))
+    (t/log! :info ["Trying to reconnect to" (-> connection-data .config :host) "as" (-> connection-data .config :user)])
+    (when (oauth2? (.config connection-data)) (refresh-access-token (.config connection-data)))
+    (login (.config connection-data) (.store connection-data))
     (catch AuthenticationFailedException e (t/log! :error e))))
 
 (defn start-monitoring [connection-data]
@@ -303,7 +314,7 @@
             "Created the directories.")
     connection-data))
 
-(defn schedule-health-checks [connection-data]
+(defn schedule-health-checks [^ConnectionData connection-data]
   (let [^Store store (:store connection-data)
         ^Folder folder (:folder connection-data)
         config (:config connection-data)
@@ -312,18 +323,19 @@
                                                   (try
                                                     (t/log! :debug ["Checking if the connection for" (:user config) "is open"])
                                                     (if (.isConnected store)
-                                                      (do (t/log! :debug "Store is still connected.")
-                                                          (t/log! :debug ["Checking if the folder " (:folder config) "is open"])
-                                                          (if (.isOpen folder)
-                                                            (t/log! :debug "Folder is still open.")
-                                                            (do (t/log! :info "Folder is closed. Opening it again.")
-                                                                (.open folder Folder/READ_WRITE))))
-                                                      (do (t/log! :warn "Connection lost. Reconnecting to email server...")
-                                                          (reconnect connection-data)))
+                                                      (t/log! :debug "Store is still connected.")
+                                                      (do
+                                                        (t/log! :warn "Connection lost. Reconnecting to email server...")
+                                                        (login (.config connection-data) (.store connection-data))))
+                                                    (t/log! :debug ["Checking if the folder " (:folder config) "is open"])
+                                                    (if (.isOpen folder)
+                                                      (t/log! :debug "Folder is still open.")
+                                                      (do (t/log! :info "Folder is closed. Opening it again.")
+                                                          (.open folder Folder/READ_WRITE)))
                                                     (t/log! :debug "Idling and waiting for messages after a health check.")
                                                     (start-idling-for-id (:id config))
                                                     (catch Exception e
-                                                      (t/log! {:level :error :error e} "There was an error during health check. The connection is probably in a broken state."))))
+                                                           (t/log! {:level :error :error e} "There was an error during health check. The connection is probably in a broken state."))))
                                                120 (p/client-health-check-interval) TimeUnit/SECONDS)]
     (swap-new-period-check (:id config) scheduled-future)
     connection-data))
@@ -346,22 +358,14 @@
                                                                               {:enrich true :move (:move options) :connection-id connection-id :folder folder :original-folder folder-name :message message})))))))
     connection-data))
 
-(defn get-token-pair [connection-config] (db/get-oauth-tokens (:id connection-config)))
-
-(defn refresh-access-token [conn token-data]
-  (let [provider (db/get-auth-provider (:auth-provider conn))
-        new-access-token (oauth/exchange-refresh-token-for-access-token provider (:refresh-token token-data))]
-    (db/update-access-token (:id conn) new-access-token)))
-
 (defmulti connect :auth-type)
 
 (defmethod connect "oauth2" [connection-config]
-  (let [token-pair (get-token-pair connection-config)]
-    (refresh-access-token connection-config token-pair)
-    (try (-> (create-imap-monitor connection-config)
-             start-monitoring
-             schedule-health-checks)
-         (catch AuthenticationFailedException e (t/log! :error e)))))
+  (refresh-access-token connection-config)
+  (try (-> (create-imap-monitor connection-config)
+           start-monitoring
+           schedule-health-checks)
+       (catch AuthenticationFailedException e (t/log! :error e))))
 
 (defmethod connect :default [connection-config]
   (-> (create-imap-monitor connection-config)
