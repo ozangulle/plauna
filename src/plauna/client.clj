@@ -326,7 +326,7 @@
                                                       (t/log! :debug "Store is still connected.")
                                                       (do
                                                         (t/log! :warn "Connection lost. Reconnecting to email server...")
-                                                        (reconnect (.config connection-data))))
+                                                        (reconnect connection-data)))
                                                     (t/log! :debug ["Checking if the folder " (:folder config) "is open"])
                                                     (if (.isOpen folder)
                                                       (t/log! :debug "Folder is still open.")
