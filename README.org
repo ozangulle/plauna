@@ -110,6 +110,27 @@ The order which configuration is used is determined by the following order:
 3. Environment variables
 4. Default configuration
 
+
+** Authentication
+
+Plauna supports basic (username - password) and oauth2 (XOAUTH2) authentication methods.
+
+**** Basic Authentication
+
+Basic authentication is very straightforward. Leave "Authentication" at "Basic" (it is the default value), enter your username and password. You will need to click at "Connect" on the "Connections" page in order to connect to the server. This is only needed during the initial set up. Plauna automatically tries to connect to every configured e-mail server on startup.
+
+**** Oauth2
+
+Currently only tested for Gmail!
+
+Prerequisites: You need your own application on Google Cloud, or Azure, or whatever e-mail provider you are using.
+
+When you select "Oauth2" on the connection screen, a new section called "Auth Providers" will appear underneath the connection details. You need to fill in a name (only for displaying on Plauna, you can choose whatever you like), the authentication and the token urls of your oauth provider, the client id and secret of your application, the scopes (separated with an empty space), and a redirect url. The redirect url path is "/oauth2/callback". If you're testing on localhost, you need to enter http:///localhost:{port}/oauth2/callback. If you are using a custom domain for Plauna, please adjust accordingly.
+
+After saving the auth provider, you need to select it under connection config and click "update connection". You can leave the "Secret" field in the "Connection Config" form empty. It will not be used for oauth2.
+
+After you set up your configuration, go to the "Connections" page and click on "Connect". On your first login, you will be redirected to your oauth provider in order to authorize the application you created to access your data. If everything is set up correctly, you will then be redirected automatically back to Plauna.
+
 ** Getting Started
 
 When you start Plauna, it starts a web server on the port which you specified (defaults to 8080) and connects to the IMAP servers that you configured. You can use Plauna without configuring any IMAP servers but you would be missing out on the "move e-mail" functionality. On your very first start, the database is empty. You need to fill it with e-mails. There are three non-exclusive ways of doing this:

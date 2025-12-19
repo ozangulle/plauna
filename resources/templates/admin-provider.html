@@ -1,0 +1,81 @@
+{% block content %}
+
+
+    <h4 class="text-lg">Authentication Providers</h4>
+    <table id="auth-providers" class="table-xs lg:table table-zebra">
+      <thead class="table-header-group">
+        <tr>
+          <th class="text-xs lg:text-lg">Name</th>
+          <th class="text-xs lg:text-lg">Auth URL</th>
+          <th class="text-xs lg:text-lg">Token URL</th>
+          <th class="text-xs lg:text-lg">Redirect URL</th>
+          <th class="text-xs lg:text-lg">Client ID</th>
+          <th class="text-xs lg:text-lg">Client Secret</th>
+          <th class="text-xs lg:text-lg">Scope</th>
+          <th></th>
+        </tr>
+      <thead>
+        <tbody>
+          <tr>
+            <form id="new-auth-provider" action="/admin/auth-providers" method="POST">
+              <input name="redirect-url" type="hidden" value="/admin/connections/{{id}}">
+              <td><input class="input" name="name" value=""></td>
+              <td><input class="input" name="auth_url" value=""></td>
+              <td><input class="input" name="token_url" value=""></td>
+              <td><input class="input" name="redirect_url" value=""></td>
+              <td><input class="input" name="client_id" value=""></td>
+              <td><input class="input" name="client_secret" value=""></td>
+              <td><input class="input" name="scope" value=""></td>
+              <td><button form="new-auth-provider" class="btn btn-primary" type="submit">Add New Provider</button></td>
+            </form>
+          </tr>
+          {% for provider in auth-providers %}
+          <form id="provider-{{provider.id}}">
+            <input class="input" name="id" type="hidden" value="{{provider.id}}">
+            <tr>
+              <td><input class="input" name="name" form="provider-{{provider.id}}" value="{{provider.name}}"></td>
+              <td><input class="input" name="auth_url" form="provider-{{provider.id}}" value="{{provider.auth-url}}"></td>
+              <td><input class="input" name="token_url" form="provider-{{provider.id}}" value="{{provider.token-url}}"></td>
+              <td><input class="input" name="redirect_url" form="provider-{{provider.id}}" value="{{provider.redirect-url}}"></td>
+              <td><input class="input" name="client_id" form="provider-{{provider.id}}" value="{{provider.client-id}}"></td>
+              <td><input class="input" name="client_secret" form="provider-{{provider.id}}" value="{{provider.client-secret}}"></td>
+              <td><input class="input" name="scope" form="provider-{{provider.id}}" value="{{provider.scope}}"></td>
+              <td>
+                <div id="update-button-{{provider.id}}" class="btn">Update</div>
+                <label class="btn btn-ghost" for="modal-{{provider.id}}">X</label>
+                <input class="modal-toggle" id="modal-{{provider.id}}" type="checkbox" />
+                <div class="modal">
+	              <label class="modal-overlay" for="modal-{{provider.id}}"></label>
+	              <div class="modal-box flex flex-col gap-5">
+		            <h2 class="text-xl">Delete Provider: {{provider.name}}</h2>
+		            <span>Are you sure you want to delete this authentication provider?</span>
+		            <div class="flex gap-3">
+  			          <div id="delete-button-{{provider.id}}" class="btn btn-error">Delete</div>
+                      <label for="modal-{{provider.id}}" class="btn">Cancel</label>
+   		            </div>
+                  <script>
+                    document.getElementById('delete-button-{{provider.id}}').addEventListener('click', (e) => {
+                        fetch('/admin/auth-providers/{{provider.id}}', {method: 'DELETE', body: JSON.stringify({"conn-id": "{{id}}"})})
+                            .then(response => window.location.replace(response.url))});
+
+                    document.getElementById('update-button-{{provider.id}}').addEventListener('click', (e) => {
+                        event.stopPropagation();
+                        const form = document.getElementById('provider-{{provider.id}}'); 
+                        const body = new FormData();
+                        for (let element of form.elements) {
+                            if (element.localName != "button" && element.type != "checkbox") {
+                              body.append(element.name, element.value);
+                            }
+                        };
+                        return fetch('/admin/auth-providers/{{provider.id}}', {method: 'PUT', body: body}).then(() => window.location.href = '/admin/connections/{{id}}');
+                    });
+                  </script>
+	            </div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+    </table>
+
+{% endblock %}

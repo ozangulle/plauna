@@ -3,13 +3,15 @@
    [clojure.core.async :as async]
    [plauna.core.events :as events]
    [plauna.preferences :as p]
+   [plauna.database :as db]
+   [plauna.client.oauth :as oauth]
    [clojure.string :as s]
    [taoensso.telemere :as t]
-   [plauna.messaging :as messaging]
-   [plauna.client :as client])
+   [plauna.interfaces :as int]
+   [plauna.messaging :as messaging])
   (:import
    (clojure.lang PersistentVector)
-   (jakarta.mail Store Session Folder Message Flags$Flag)
+   (jakarta.mail Store Session Folder Message Flags$Flag AuthenticationFailedException)
    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
    (jakarta.mail.event MessageCountAdapter MessageCountEvent MessageCountListener)
    (jakarta.mail.search MessageIDTerm)
@@ -45,6 +47,8 @@
 (defn default-port-for-security [security]
   (if (= security "ssl") 993 143))
 
+(defn oauth2? [connection-config] (= "oauth2" (:auth-type connection-config)))
+
 (defn security [connection-config]
   (let [security (get connection-config :security "ssl")]
     (if (some #(= security %) ["ssl" "starttls" "plain"])
@@ -64,17 +68,23 @@
     (.setProperty "mail.imap.partialfetch" "false")
     (.setProperty "mail.imap.fetchsize" "1048576")))
 
+(defn oauth-properties [connection-config]
+  (fn [^Properties properties]
+    (if (oauth2? connection-config)
+      (doto properties (.setProperty "mail.imap.auth.mechanisms" "XOAUTH2"))
+      properties)))
+
 (defn security-properties [connection-config]
   (let [security-key (security connection-config)]
     (fn [^Properties properties]
-      (cond (= security-key "ssl") (doto properties (.setProperty "mail.imap.ssl.enable", "true"))
-            (= security-key "starttls") (doto properties (.setProperty "mail.imap.starttls.enable", "true"))
+      (cond (= security-key "ssl") (doto properties (.setProperty "mail.imap.ssl.enable" "true"))
+            (= security-key "starttls") (doto properties (.setProperty "mail.imap.starttls.enable" "true"))
             (= security-key "plain") properties
-            :else (doto properties (.setProperty "mail.imap.ssl.enable", "true"))))))
+            :else (doto properties (.setProperty "mail.imap.ssl.enable" "true"))))))
 
 (defn certification-check-properties [connection-config]
   (if (not (check-ssl-certs? connection-config))
-    (fn [^Properties properties] (doto properties (.setProperty "mail.imap.ssl.trust", "*")))
+    (fn [^Properties properties] (doto properties (.setProperty "mail.imap.ssl.trust" "*")))
     (fn [^Properties properties] properties)))
 
 (defn set-debug-mode [connection-config]
@@ -85,6 +95,7 @@
 (defn config->session [connection-config]
   (-> (default-imap-properties connection-config)
       ((security-properties connection-config))
+      ((oauth-properties connection-config))
       ((certification-check-properties connection-config))
       Session/getInstance
       ((set-debug-mode connection-config))))
@@ -95,10 +106,15 @@
       (.getStore session "imaps")
       (.getStore session "imap"))))
 
-(defn login [connection-config]
-  (let [store ^Store (connection-config->store connection-config)]
-    (.connect store (:host connection-config) (:user connection-config) (:secret connection-config))
-    store))
+(defn login
+  ([connection-config ^Store store]
+   (if (oauth2? connection-config)
+     (let [tokens (db/get-oauth-tokens (:id connection-config))]
+       (.connect store (:host connection-config) (:user connection-config) (:access-token tokens)))
+     (.connect store (:host connection-config) (:user connection-config) (:secret connection-config)))
+   store)
+  ([connection-config]
+   (login connection-config (connection-config->store connection-config))))
 
 (defn folder-separator [^Store store] (.getSeparator (.getDefaultFolder store)))
 
@@ -243,6 +259,12 @@
               (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
               (.moveMessages source-folder (into-array Message found-messages) target-folder))))))))
 
+(defn refresh-access-token [connection-config]
+  (let [provider (db/get-auth-provider (:auth-provider connection-config))
+        token-data (db/get-oauth-tokens (:id connection-config))
+        new-access-token (oauth/exchange-refresh-token-for-access-token provider (:refresh-token token-data))]
+    (db/update-access-token (:id connection-config) new-access-token)))
+
 ;; Public Interface
 
 (defn create-imap-monitor [connection-config]
@@ -257,12 +279,12 @@
 
 (defn disconnect [^AutoCloseable connection-data] (.close connection-data))
 
-(defn reconnect [^AutoCloseable connection-data]
-  (let [new-connection (create-imap-monitor (:config connection-data))]
-    ;; Close the old connection only after a successful new connection. Otherwise health checks are removed and plauna never tries to reestablish the connection again.
-    (.close connection-data)
-    (start-monitoring new-connection)
-    (schedule-health-checks new-connection)))
+(defn reconnect [^ConnectionData connection-data]
+  (try
+    (t/log! :info ["Trying to reconnect to" (-> connection-data .config :host) "as" (-> connection-data .config :user)])
+    (when (oauth2? (.config connection-data)) (refresh-access-token (.config connection-data)))
+    (login (.config connection-data) (.store connection-data))
+    (catch AuthenticationFailedException e (t/log! :error e))))
 
 (defn start-monitoring [connection-data]
   (try
@@ -290,7 +312,7 @@
             "Created the directories.")
     connection-data))
 
-(defn schedule-health-checks [connection-data]
+(defn schedule-health-checks [^ConnectionData connection-data]
   (let [^Store store (:store connection-data)
         ^Folder folder (:folder connection-data)
         config (:config connection-data)
@@ -299,14 +321,15 @@
                                                   (try
                                                     (t/log! :debug ["Checking if the connection for" (:user config) "is open"])
                                                     (if (.isConnected store)
-                                                      (do (t/log! :debug "Store is still connected.")
-                                                          (t/log! :debug ["Checking if the folder " (:folder config) "is open"])
-                                                          (if (.isOpen folder)
-                                                            (t/log! :debug "Folder is still open.")
-                                                            (do (t/log! :info "Folder is closed. Opening it again.")
-                                                                (.open folder Folder/READ_WRITE))))
-                                                      (do (t/log! :warn "Connection lost. Reconnecting to email server...")
-                                                          (reconnect connection-data)))
+                                                      (t/log! :debug "Store is still connected.")
+                                                      (do
+                                                        (t/log! :warn "Connection lost. Reconnecting to email server...")
+                                                        (reconnect connection-data)))
+                                                    (t/log! :debug ["Checking if the folder " (:folder config) "is open"])
+                                                    (if (.isOpen folder)
+                                                      (t/log! :debug "Folder is still open.")
+                                                      (do (t/log! :info "Folder is closed. Opening it again.")
+                                                          (.open folder Folder/READ_WRITE)))
                                                     (t/log! :debug "Idling and waiting for messages after a health check.")
                                                     (start-idling-for-id (:id config))
                                                     (catch Exception e
@@ -333,10 +356,19 @@
                                                                               {:enrich true :move (:move options) :connection-id connection-id :folder folder :original-folder folder-name :message message})))))))
     connection-data))
 
-(defn connect [connection-config]
-  (-> (client/create-imap-monitor connection-config)
-      client/start-monitoring
-      client/schedule-health-checks))
+(defmulti connect :auth-type)
+
+(defmethod connect "oauth2" [connection-config]
+  (refresh-access-token connection-config)
+  (try (-> (create-imap-monitor connection-config)
+           start-monitoring
+           schedule-health-checks)
+       (catch AuthenticationFailedException e (t/log! :error e))))
+
+(defmethod connect :default [connection-config]
+  (-> (create-imap-monitor connection-config)
+      start-monitoring
+      schedule-health-checks))
 
 (defn handle-incoming-events [event]
   (when (and (true? (:move (:options event))) (some? (:category (:metadata (:payload event)))))
@@ -357,6 +389,10 @@
                (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))
                (finally (start-idling-for-id connection-id)))
           connection-id)))))
+
+(defrecord ImapClient []
+  int/EmailClient
+  (start-monitor [_ config] (connect config)))
 
 (defn client-event-loop
   "Listens to :enriched-email

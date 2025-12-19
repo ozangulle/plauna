@@ -8,6 +8,26 @@
     <form id="update" class="space-y-4" actions="/admin/connections/{{id}}" method="POST">
       <h4 class="text-lg">Connection Config</h4>
       <div class="flex gap-2">
+        <label for="auth-type">Authentication</label>
+        <div class="form-control">
+          <select id="auth-select" class="select" name="auth-type">
+            <option value="basic" {% if auth-type = "basic" %}selected{% endif %}>BASIC</option>
+            <option value="oauth2" {% if auth-type = "oauth2" %}selected{% endif %}>OAUTH 2</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-2 oauth-related">
+        <label for="auth-provider">Authentication Provider</label>
+        <div class="form-control">
+          <select class="select" name="auth-provider">
+            <option value="" disabled {% if auth-provider = null %}selected{% endif %}>Please Select One</option>
+            {% for provider in auth-providers %}
+            <option value="{{provider.id}}" {% if auth-provider = id %}selected{% endif %}>{{provider.name}}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-2">
         <label for="host">Host</label>
         <input class="input" name="host" value="{{host}}">
         <input name="id" type="hidden" value="{{id}}">
@@ -51,21 +71,6 @@
       <button id="update-button" class="btn btn-primary">Update Config</button>
     </div>
   </div>
-  <script>
-    document.getElementById('update-button').addEventListener('click', (e) => {
-        const form = document.querySelector('form'); 
-        const body = new FormData();
-        for (let element of form.elements) {
-            if(element.checked){
-                body.append(element.name, true);
-            } else {
-                body.append(element.name, element.value);
-            }
-        }
-        console.log(body);
-        fetch('/admin/connections/{{id}}', {method: 'PUT', body: body})
-            .then(() => window.location.href = '/admin/connections/{{id}}')});
-  </script>
   {% if folders|not-empty %}
   <div class="grow-2">
     <h4 class="text-lg">Parse E-mails from Folders</h4>
@@ -92,8 +97,43 @@
     </form>
   {% endif %}
   </div>
+  <div class="grow-12 oauth-related">
+    {% include "admin-provider.html" %}
+  </div>
 </div>
 
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const select = document.getElementById('auth-select');
+        const oauthGroup = Array.from(document.querySelectorAll('.oauth-related'));
+        const oauthInputs = Array.from(oauthGroup.flatMap(el => Array.from(el.querySelectorAll('input, select, button'))));
+        
+        function updateOauthFields() {
+            const enable = select.value === 'oauth2';
+            oauthGroup.forEach(el => el.style.display = enable ? '' : 'none');
+            oauthInputs.forEach(el => el.disabled = !enable);
+        }
+        
+        updateOauthFields();
+        select.addEventListener('change', updateOauthFields);
+
+
+        document.getElementById('update-button').addEventListener('click', (e) => {
+          const form = document.querySelector('form'); 
+          const body = new FormData();
+          for (let element of form.elements) {
+            if (element.checked) {
+                body.append(element.name, true);
+            } else {
+                body.append(element.name, element.value);
+            }
+          }
+          fetch('/admin/connections/{{id}}', {method: 'PUT', body: body})
+            .then(() => window.location.href = '/admin/connections/{{id}}')});
+
+        
+     });
+  </script>
 {% endblock %}
 
 

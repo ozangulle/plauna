@@ -181,5 +181,5 @@
 (defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}] :active-nav :admin}]
                                 (render-file "admin-preferences.html" (conj data log-levels))))
 
-(defn new-connection []
-  (render-file "admin-new-connection.html" {}))
+(defn new-connection [providers]
+  (render-file "admin-new-connection.html" {:auth-providers providers}))

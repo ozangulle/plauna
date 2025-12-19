@@ -13,6 +13,7 @@
             [plauna.util.page :as page]
             [plauna.database :as db]
             [taoensso.telemere :as t]
+            [plauna.interfaces :as int]
             [clojure.core.async :as async])
   (:import (org.flywaydb.core Flyway)))
 
@@ -339,6 +340,26 @@
 
 (defn get-connection [id] (db-connection->model (jdbc/execute-one! (ds) (honey/format {:select [:*] :from [:connections] :where [:= :id id]}) builder-function-kebab)))
 
+(defn get-oauth-tokens [connection-id] (jdbc/execute-one! (ds) (honey/format {:select [:*] :from [:oauth-tokens] :where [:= :connection-id connection-id]}) builder-function-kebab))
+
+(defn save-oauth-token [token-response]
+  (jdbc/execute! (ds)
+                 (-> {:insert-into [:oauth_tokens]
+                      :columns     [:access_token :connection-id :expires_in :refresh_token :scope :token_type]
+                      :values      [[(:access_token token-response) (:connection-id token-response) (:expires_in token-response) (:refresh_token token-response) (:scope token-response) (:token_type token-response)]]}
+                     (honey/format))))
+
+(defn update-access-token [connection-id token-response]
+  (if (nil? (:refresh_token token-response))
+    (jdbc/execute! (ds) (-> {:update [:oauth_tokens]
+                             :set {:access_token (:access_token token-response) :expires_in (:expires_in token-response)}
+                             :where [:= :connection_id connection-id]}
+                            (honey/format)))
+    (jdbc/execute! (ds) (-> {:update [:oauth_tokens]
+                             :set {:access_token (:access_token token-response) :expires_in (:expires_in token-response) :refresh_token (:refresh_token token-response)}
+                             :where [:= :connection_id connection-id]}
+                            (honey/format)))))
+
 (defn add-connection [connection]
   (jdbc/execute! (ds)
                  (honey/format {:insert-into [:connections]
@@ -350,10 +371,38 @@
 (defn update-connection [connection]
   (jdbc/execute! (ds)
                  (honey/format {:update [:connections]
-                                :set {:host (:host connection) :user (:user connection) :secret (:secret connection) :folder (:folder connection) :debug (:debug connection) :port (:port connection) :security (:security connection) :check-ssl-certs (:check-ssl-certs connection)}
+                                :set {:host (:host connection) :user (:user connection) :secret (:secret connection) :folder (:folder connection) :debug (:debug connection) :port (:port connection) :security (:security connection) :check-ssl-certs (:check-ssl-certs connection) :auth_type (:auth-type connection) :auth-provider (:auth-provider connection)}
                                 :where  [:= :id (:id connection)]})
                  builder-function))
 
 (defn delete-connection [id] (jdbc/execute! (ds) (honey/format {:delete-from [:connections]
                                                                 :where [:= :id id]}) builder-function-kebab))
 
+(defn add-auth-provider [provider]
+  (jdbc/execute! (ds)
+                 (honey/format {:insert-into [:auth_providers]
+                                :values [provider]})
+                 builder-function))
+
+(defn get-auth-providers []
+  (jdbc/execute! (ds) (honey/format {:select [:*] :from [:auth_providers]}) builder-function-kebab))
+
+(defn get-auth-provider [id]
+  (jdbc/execute-one! (ds) (honey/format {:select [:*] :from [:auth_providers] :where [:= :id id]}) builder-function-kebab))
+
+(defn delete-auth-provider [id] (jdbc/execute! (ds) (honey/format {:delete-from [:auth_providers]
+                                                                   :where [:= :id id]}) builder-function-kebab))
+
+(defn update-auth-provider [provider]
+  (let [wo-id (dissoc provider :id)]
+    (jdbc/execute! (ds)
+                   (honey/format {:update [:auth_providers]
+                                  :set wo-id
+                                  :where  [:= :id (:id provider)]})
+                   builder-function)))
+
+(deftype SqliteDB []
+  int/DB
+  (fetch-connection [_ id] (get-connection id))
+  (fetch-oauth-token-data [_ connection-id] (get-oauth-tokens connection-id))
+  (fetch-auth-provider [_ id] (get-auth-provider id)))

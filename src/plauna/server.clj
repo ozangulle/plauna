@@ -1,10 +1,12 @@
 (ns plauna.server
   (:require [ring.adapter.jetty :as jetty]
             [ring.util.codec :refer [base64-decode]]
+            [plauna.application :as app]
             [plauna.markup :as markup]
             [plauna.files :as files]
             [plauna.util.page :as page]
             [plauna.client :as client]
+            [plauna.client.oauth :as oauth]
             [plauna.preferences :as p]
             [plauna.core.email :as core-email]
             [clojure.math :refer [ceil]]
@@ -13,6 +15,10 @@
             [ring.middleware.params :refer [wrap-params]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
+            [ring.middleware.session :refer [wrap-session]]
+            [ring.middleware.session.cookie :refer [cookie-store]]
+            [ring.util.response :refer [response redirect]]
+            [cheshire.core :refer [parse-string]]
             [taoensso.telemere :as t]
             [clojure.java.io :as io]
             [plauna.analysis :as analysis]
@@ -22,6 +28,7 @@
             [clojure.data :as cd]
             [nrepl.server :as nrepl])
   (:import [java.net ServerSocket]
+           [java.util UUID]
            [org.eclipse.jetty.server Server]))
 
 (set! *warn-on-reflection* true)
@@ -70,21 +77,18 @@
    :headers {"Content-Type" "text/html; charset=UTF-8"}
    :body    body})
 
-(defn find-running-clients []
-  (mapv (fn [[id connection-data]] [id (client/monitor->map connection-data) connection-data]) @client/connections))
-
 (defn redirect-request
   ([request]
    (let [redirect-url (get-in request [:params :redirect-url])]
      (if (some? redirect-url)
-       {:status 301 :headers {"Location" redirect-url}}
-       {:status 301 :headers {"Location" (-> request :uri)}})))
+       {:status 303 :headers {"Location" redirect-url}}
+       {:status 303 :headers {"Location" (-> request :uri)}})))
   ([request messages]
    (swap! global-messages (fn [m] (conj m messages)))
    (let [redirect-url (get-in request [:params :redirect-url])]
      (if (some? redirect-url)
-       {:status 301 :headers {"Location" redirect-url}}
-       {:status 301 :headers {"Location" (-> request :uri)}}))))
+       {:status 303 :headers {"Location" redirect-url}}
+       {:status 303 :headers {"Location" (-> request :uri)}}))))
 
 (defn language-preferences []
   (let [preferences (db/get-language-preferences)
@@ -98,11 +102,6 @@
            (mapv vector (second diff) (repeat (count (second diff)) false)))
           (db/get-language-preferences))
         preferences))))
-
-(defn params->interval-request [params]
-  (if (and (some? (:interval params)) (some? (:year params)))
-    {:interval (keyword (:interval params)) :year (Integer/parseInt (get params :year))}
-    {:interval :yearly}))
 
 (defn languages-to-use-in-training []
   (sequence (comp (filter #(= 1 (:use_in_training %))) (map :language)) (db/get-language-preferences)))
@@ -142,23 +141,6 @@
                 :group-by [:interval :bodies.mime-type]
                 :order-by [[:count :desc]]}))
 
-(defn email-type-statistics-overview []
-  (db/query-db {:select [[[:count :headers.message-id] :count] :bodies.mime-type] :from [:bodies]
-                :join [:headers [:= :bodies.message-id :headers.message_id]]
-                :group-by [:bodies.mime-type]
-                :order-by [[:count :desc]]}))
-
-(defn statistics-overall-for-language []
-  (db/query-db {:select [[[:count :language] :count] :language] :from [:metadata]
-                :group-by [:language]
-                :order-by [[:count :desc]]}))
-
-(defn statistics-overall-for-categories []
-  (db/query-db {:select [[[:count :category] :count] [:categories.name :category]] :from [:metadata]
-                :join [:categories [:= :metadata.category :categories.id]]
-                :group-by [:category]
-                :order-by [[:count :desc]]}))
-
 (defn language-statistics-by-period [period]
   (db/query-db {:select [[[:count :metadata.language] :count] :metadata.language [(db/interval-for-honey period) :interval]] :from [:metadata]
                 :join [:headers [:= :metadata.message-id :headers.message_id]]
@@ -179,32 +161,6 @@
     (map (comp
           (fn [map] (if (= 0 (get map :category)) map (update map :category (fn [cat-key] (get categories cat-key)))))
           (fn [map] (update map :category #(if (int? %) % (Integer/parseInt %))))) statistics)))
-
-(defn email-from-count
-  ([] (db/query-db {:select [[[:count :address] :count] :address] :from [:communications]
-                    :join [:contacts [:= :contacts.contact-key :communications.contact-key]
-                           :headers [:= :communications.message-id :headers.message_id]]
-                    :group-by [:address]
-                    :where [:and [:= :type ":sender"] [:not-in :address @db/my-addresses]]
-                    :limit 10
-                    :order-by [[:count :desc]]}))
-  ([year] (db/query-db {:select [[[:count :address] :count] :address [(db/interval-for-honey :yearly) :interval]] :from [:communications]
-                        :join [:contacts [:= :contacts.contact-key :communications.contact-key]
-                               :headers [:= :communications.message-id :headers.message_id]]
-                        :group-by [:address]
-                        :where [:and [:= :type ":sender"] [:like :interval year] [:not-in :address @db/my-addresses]]
-                        :limit 10
-                        :order-by [[:count :desc]]})))
-
-(defn email-from-statistics [interval-request]
-  (let [where-clause (if (and (some? (:year interval-request)) (not (= (:interval interval-request) :yearly)))
-                       [:and [:= :type ":sender"] [:like :interval (str (:year interval-request) "%")] [:not-in :address @db/my-addresses] [:<> :interval nil]]
-                       [:and [:= :type ":sender"] [:not-in :address @db/my-addresses]])]
-    (db/query-db {:select [[[:count :address] :count] [(db/interval-for-honey (:interval interval-request)) :interval]] :from [:communications]
-                  :join [:contacts [:= :contacts.contact-key :communications.contact-key]
-                         :headers [:= :communications.message-id :headers.message_id]]
-                  :group-by [:interval]
-                  :where where-clause})))
 
 (defn enriched-email-by-message-id [id] (first (db/fetch-data {:entity :enriched-email :strict false} {:where [:= :message-id id]})))
 
@@ -241,206 +197,243 @@
     (client/folders-in-store (:store (client/connection-data-from-id (:id conn))))
     []))
 
-(comp/defroutes routes
+(defn make-routes [context]
+  (comp/defroutes routes
 
-  (route/resources "/")
+    (route/resources "/")
 
-  (comp/GET "/" {} (let [data (db/yearly-email-stats)]
-                     (if (> (count data) 0)
-                       {:status  302
-                        :headers {"Location" "/emails"}}
-                       {:status  302
-                        :headers {"Location" "/admin"}})))
+    (comp/GET "/" {} (let [data (db/yearly-email-stats)]
+                       (if (> (count data) 0)
+                         {:status  302
+                          :headers {"Location" "/emails"}}
+                         {:status  302
+                          :headers {"Location" "/admin"}})))
 
-  (comp/GET "/admin" {}
-    (if (seq @global-messages)
-      (let [messages @global-messages]
-        (swap! global-messages (fn [_] []))
-        (success-html-with-body (markup/administration messages)))
-      (success-html-with-body (markup/administration {:repl (get-status-repl-server)}))))
+    (comp/GET "/admin" {}
+      (if (seq @global-messages)
+        (let [messages @global-messages]
+          (swap! global-messages (fn [_] []))
+          (success-html-with-body (markup/administration messages)))
+        (success-html-with-body (markup/administration {:repl (get-status-repl-server)}))))
 
-  (comp/POST "/emails/parse" request
-    (let [temp-file (get-in request [:params :filename :tempfile])]
-      (files/read-emails-from-mbox (io/input-stream temp-file) @messaging/main-chan)
-      (redirect-request request {:type :success :content (str "Starting to parse file: " temp-file)})))
+    (comp/POST "/emails/parse" request
+      (let [temp-file (get-in request [:params :filename :tempfile])]
+        (files/read-emails-from-mbox (io/input-stream temp-file) @messaging/main-chan)
+        (redirect-request request {:type :success :content (str "Starting to parse file: " temp-file)})))
 
-  (comp/GET "/admin/categories" {}
-    (let [categories (db/get-categories)]
-      (success-html-with-body (markup/categories-page categories))))
+    (comp/GET "/admin/categories" {}
+      (let [categories (db/get-categories)]
+        (success-html-with-body (markup/categories-page categories))))
 
-  (comp/GET "/admin/languages" {}
-    (success-html-with-body
-     (markup/languages-admin-page (language-preferences))))
+    (comp/GET "/admin/languages" {}
+      (success-html-with-body
+       (markup/languages-admin-page (language-preferences))))
 
-  (comp/GET "/admin/preferences" {}
-    (let [language-datection-threshold (p/language-detection-threshold)
-          categorization-threshold (p/categorization-threshold)
-          client-health-check-interval (p/client-health-check-interval)
-          log-level (p/log-level)]
-      (success-html-with-body (markup/preferences-page
-                               {:language-detection-threshold language-datection-threshold
-                                :categorization-threshold categorization-threshold
-                                :log-level log-level
-                                :client-health-check-interval client-health-check-interval}))))
+    (comp/GET "/admin/preferences" {}
+      (let [language-datection-threshold (p/language-detection-threshold)
+            categorization-threshold (p/categorization-threshold)
+            client-health-check-interval (p/client-health-check-interval)
+            log-level (p/log-level)]
+        (success-html-with-body (markup/preferences-page
+                                 {:language-detection-threshold language-datection-threshold
+                                  :categorization-threshold categorization-threshold
+                                  :log-level log-level
+                                  :client-health-check-interval client-health-check-interval}))))
 
-  (comp/POST "/admin/preferences" request
-    (doseq [param (dissoc (:params request) :redirect-url)]
-      (p/update-preference (first param) (second param)))
-    (t/set-min-level! (p/log-level))
-    (redirect-request request))
+    (comp/POST "/admin/preferences" request
+      (doseq [param (dissoc (:params request) :redirect-url)]
+        (p/update-preference (first param) (second param)))
+      (t/set-min-level! (p/log-level))
+      (redirect-request request))
 
-  (comp/POST "/admin/languages" {params :params}
-    (let [langs-to-use (if (vector? (:use params)) (:use params) [(:use params)])]
-      (doseq [preference (mapv (fn [id language]
-                                 {:id id :language language :use (some? (some #(= language %) langs-to-use))})
-                               (vectorize (:id params))
-                               (vectorize (:language params)))]
-        (db/update-language-preference preference)))
-    (let [language-preferences (language-preferences)]
-      (success-html-with-body (markup/languages-admin-page language-preferences))))
+    (comp/POST "/admin/languages" {params :params}
+      (let [langs-to-use (if (vector? (:use params)) (:use params) [(:use params)])]
+        (doseq [preference (mapv (fn [id language]
+                                   {:id id :language language :use (some? (some #(= language %) langs-to-use))})
+                                 (vectorize (:id params))
+                                 (vectorize (:language params)))]
+          (db/update-language-preference preference)))
+      (let [language-preferences (language-preferences)]
+        (success-html-with-body (markup/languages-admin-page language-preferences))))
 
-  (comp/POST "/admin/categories" {params :params}
-    (db/create-category (:name params))
-    (doseq [connection-data (client/get-connections)]
-      (client/create-category-folders! connection-data [(:name params)]))
-    {:status  301
-     :headers {"Location" "/admin/categories"}
-     :body    (markup/administration {:repl (get-status-repl-server)})})
+    (comp/POST "/admin/categories" {params :params}
+      (db/create-category (:name params))
+      (doseq [connection-data (client/get-connections)]
+        (client/create-category-folders! connection-data [(:name params)]))
+      {:status  301
+       :headers {"Location" "/admin/categories"}
+       :body    (markup/administration {:repl (get-status-repl-server)})})
 
-  (comp/DELETE "/admin/categories/:id" {route-params :route-params}
-    (db/delete-category-by-id (:id route-params))
-    {:status  301
-     :headers {"Location" "/admin/categories"}
-     :body    (markup/administration {:repl (get-status-repl-server)})})
+    (comp/DELETE "/admin/categories/:id" {route-params :route-params}
+      (db/delete-category-by-id (:id route-params))
+      {:status  301
+       :headers {"Location" "/admin/categories"}
+       :body    (markup/administration {:repl (get-status-repl-server)})})
 
-  (comp/POST "/admin/database" {}
-    (files/check-and-create-database-file)
-    (db/create-db)
-    {:status  301
-     :headers {"Location" "/admin"}
-     :body    (markup/administration {:repl (get-status-repl-server)})})
+    (comp/POST "/admin/database" {}
+      (files/check-and-create-database-file)
+      (db/create-db)
+      {:status  301
+       :headers {"Location" "/admin"}
+       :body    (markup/administration {:repl (get-status-repl-server)})})
 
-  (comp/GET "/statistics" {}
-    (success-html-with-body (markup/statistics-overall (db/yearly-email-stats) (mime-type-statistics :yearly) (language-statistics-by-period :yearly) (category-statistics-by-period {:interval :yearly}))))
+    (comp/GET "/statistics" {}
+      (success-html-with-body (markup/statistics-overall (db/yearly-email-stats) (mime-type-statistics :yearly) (language-statistics-by-period :yearly) (category-statistics-by-period {:interval :yearly}))))
 
-  (comp/POST "/metadata" request
-    (if (some? (:move (:params request)))
-      (let [message-id (:message-id (:params request))
-            email-before-update (enriched-email-by-message-id message-id)]
-        (save-metadata-form (:params request))
-        (doseq [key-val @client/connections
-                :let [updated-email (enriched-email-by-message-id message-id)
-                      id (first key-val)]]
+    (comp/POST "/metadata" request
+      (if (some? (:move (:params request)))
+        (let [message-id (:message-id (:params request))
+              email-before-update (enriched-email-by-message-id message-id)]
+          (save-metadata-form (:params request))
+          (doseq [key-val @client/connections
+                  :let [updated-email (enriched-email-by-message-id message-id)
+                        id (first key-val)]]
+            (try
+              (t/log! :debug ["Move message-id" message-id])
+              (client/move-messages-by-id-between-category-folders id
+                                                                   message-id
+                                                                   (-> email-before-update :metadata :category)
+                                                                   (-> updated-email :metadata :category))
+              (catch jakarta.mail.FolderNotFoundException e (t/log! :debug e)))))
+        (save-metadata-form (:params request)))
+      (redirect-request request))
+
+    (comp/POST "/training" request
+      (let [result (write-emails-to-training-files-and-train)]
+        (when (some? result) (swap! global-messages (fn [mess] (conj mess result))))
+        (redirect-request request)))
+
+    (comp/POST "/training/new" request
+      (let [n (get (:route-params request) :new 20)]
+        (categorize-uncategorized-n-emails n)
+        (redirect-request request)))
+
+    (comp/GET "/emails" {params :params}
+      (let [parse-fn (template->request-parameters emails-template)
+            {page-size :page-size page :page filter :filter} (parse-fn params)
+            categories (conj (db/get-categories) {:id nil :name "n/a"})
+            sql-clause (filter->sql-clause filter)
+            result (db/fetch-data {:entity :enriched-email :strict false :page (page/page-request page page-size)} sql-clause)]
+        (if (seq @global-messages)
+          (let [messages @global-messages]
+            (swap! global-messages (fn [_] []))
+            (success-html-with-body (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories messages)))
+          (success-html-with-body (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories)))))
+
+    (comp/GET "/emails/:id" [id]
+      (let [decoded-id (new String ^"[B" (base64-decode id))
+            email-data (add-sanitized-text-to-enriched-email (enriched-email-by-message-id decoded-id))
+            categories (conj (db/get-categories) {:id nil :name "n/a"})]
+        {:status 200
+         :header html-headers
+         :body   (markup/list-email-contents email-data categories)}))
+
+    (comp/DELETE "/emails/:id" [id]
+      (db/delete-email-by-message-id (new String ^"[B" (base64-decode id)))
+      {:status  200})
+
+    (comp/GET "/admin/connections" _
+      (response (markup/connections-list (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))))
+
+    (comp/POST "/admin/connections" request
+      (let [params (:params request)
+            config {:host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs))}
+            id (client/id-from-config config)]
+        (db/add-connection (merge config {:id id}))
+        (redirect-request request)))
+
+    (comp/DELETE "/admin/connections/:id" request
+      (let [params (:params request)]
+        (db/delete-connection (get params :id))
+        {:status 200}))
+
+    (comp/GET "/admin/new-connection" []
+      (let [providers (db/get-auth-providers)]
+        {:status 200
+         :header html-headers
+         :body   (markup/new-connection providers)}))
+
+    (comp/DELETE "/admin/auth-providers/:id" request
+      (let [params (:params request)
+            body (parse-string (slurp (:body request)) true)]
+        (db/delete-auth-provider (get params :id))
+        (if (empty? (:conn-id body))
+          (redirect "/admin/new-connection" 303)
+          (redirect (str "/admin/connections/" (:conn-id body) 303)))))
+
+    (comp/POST "/admin/auth-providers" request
+      (let [params (:params request)]
+        (db/add-auth-provider (dissoc params :redirect-url))
+        (if (= "/admin/connections/" (:redirect-url params))
+          (redirect-request (assoc-in request [:params :redirect-url] "/admin/new-connection"))
+          (redirect-request request))))
+
+    (comp/PUT "/admin/auth-providers/:id" request
+      (let [params (:params request)]
+        (db/update-auth-provider params)))
+
+    (comp/GET "/admin/connections/:id" [id]
+      (let [conn-info (connection-information id)
+            providers (db/get-auth-providers)]
+        (if (seq @global-messages)
+          (let [messages @global-messages]
+            (swap! global-messages (fn [_] []))
+            (success-html-with-body (markup/connection (assoc conn-info :auth-providers providers) (connection-folders conn-info) messages)))
+          (success-html-with-body (markup/connection (assoc conn-info :auth-providers providers) (connection-folders conn-info))))))
+
+    (comp/PUT "/admin/connections/:id" request
+      (let [params (:params request)]
+        (db/update-connection {:id (get params :id) :host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs)) :auth-type (get params :auth-type) :auth-provider (get params :auth-provider)})
+        {:status 200}))
+
+    (comp/POST "/admin/connections/:id/controls" request
+      (let [id (:id (:route-params request))
+            operation (:operation (:params request))]
+        (cond (= "reconnect" operation) (do (client/reconnect (client/connection-data-from-id id)) (redirect-request request))
+              (= "disconnect" operation) (do (client/disconnect (client/connection-data-from-id id)) (redirect-request request))
+              (= "connect" operation)
+              (let [action (app/connect-to-client context id)]
+                (if (= :redirect (:result action))
+                  (let [csrf (.toString (UUID/randomUUID))]
+                    (-> (redirect (oauth/authorize-uri (:provider action) csrf)) (assoc :session {:oauth-csrf csrf :connection-id id :provider (:provider action)})))
+                  (redirect-request request)))
+              (= "parse" operation) (let [params (:params request)
+                                          folder (:folder params)
+                                          move (some? (:move params))
+                                          conn-data (client/connection-data-from-id id)]
+                                      (client/parse-all-in-folder conn-data folder {:move move})
+                                      (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)})))
+                                      (redirect-request request)))))
+
+    (comp/POST "/metadata/languages" request
+      (let [limiter (messaging/channel-limiter :enriched-email)
+            process-fn (fn [enriched-emails]
+                         (doseq [enriched-email enriched-emails]
+                           (async/>!! limiter :token)
+                           (async/>!! @messaging/main-chan {:type :language-detection-request :options {} :payload enriched-email})))]
+        (core-email/iterate-over-all-pages db/fetch-data process-fn {:entity :enriched-email :strict false :page {:page 1 :size 500}} {:where [:= :language nil]} true))
+      (redirect-request request))
+
+    (comp/POST "/repl" request
+      (let [operation (get-in request [:params :operation])]
+        (cond (= operation "start") (swap! repl-server (fn [_] (t/log! :info "Starting repl server") (nrepl/start-server :bind "0.0.0.0" :port 7888)))
+              (= operation "stop") (swap! repl-server (fn [_] (t/log! :info "Stopping repl server") (nrepl/stop-server @repl-server) nil))
+              :else (t/log! :error ["Unsupported operation" operation "at /repl"]))
+        (redirect-request request)))
+
+    (comp/GET "/oauth2/callback" request
+      (let [params (:params request)
+            session (:session request)]
+        (if (= (:state params) (:oauth-csrf session))
           (try
-            (t/log! :debug ["Move message-id" message-id])
-            (client/move-messages-by-id-between-category-folders id
-                                                                 message-id
-                                                                 (-> email-before-update :metadata :category)
-                                                                 (-> updated-email :metadata :category))
-            (catch jakarta.mail.FolderNotFoundException e (t/log! :debug e)))))
-      (save-metadata-form (:params request)))
-    (redirect-request request))
+            (let [response (oauth/exchange-code-for-access-token (:provider session) (:code params))]
+              (db/save-oauth-token (assoc response :connection-id (:connection-id session)))
+              (app/connect-to-client context (:connection-id session)))
+            (redirect "/admin/connections")
+            (catch Exception e (t/log! :error e) (redirect "/admin/connections")))
+          "Bad response - csrf token mismach")))
 
-  (comp/POST "/training" request
-    (let [result (write-emails-to-training-files-and-train)]
-      (when (some? result) (swap! global-messages (fn [mess] (conj mess result))))
-      (redirect-request request)))
-
-  (comp/POST "/training/new" request
-    (let [n (get (:route-params request) :new 20)]
-      (categorize-uncategorized-n-emails n)
-      (redirect-request request)))
-
-  (comp/GET "/emails" {params :params}
-    (let [parse-fn (template->request-parameters emails-template)
-          {page-size :page-size page :page filter :filter} (parse-fn params)
-          categories (conj (db/get-categories) {:id nil :name "n/a"})
-          sql-clause (filter->sql-clause filter)
-          result (db/fetch-data {:entity :enriched-email :strict false :page (page/page-request page page-size)} sql-clause)]
-      (if (seq @global-messages)
-        (let [messages @global-messages]
-          (swap! global-messages (fn [_] []))
-          (success-html-with-body (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories messages)))
-        (success-html-with-body (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories)))))
-
-  (comp/GET "/emails/:id" [id]
-    (let [decoded-id (new String ^"[B" (base64-decode id))
-          email-data (add-sanitized-text-to-enriched-email (enriched-email-by-message-id decoded-id))
-          categories (conj (db/get-categories) {:id nil :name "n/a"})]
-      {:status 200
-       :header html-headers
-       :body   (markup/list-email-contents email-data categories)}))
-
-  (comp/DELETE "/emails/:id" [id]
-    (db/delete-email-by-message-id (new String ^"[B" (base64-decode id)))
-    {:status  200})
-
-  (comp/GET "/admin/connections" []
-    {:status 200
-     :header html-headers
-     :body   (markup/connections-list (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))})
-
-  (comp/POST "/admin/connections" request
-    (let [params (:params request)
-          config {:host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs))}
-          id (client/id-from-config config)]
-      (db/add-connection (merge config {:id id}))
-      (redirect-request request)))
-
-  (comp/DELETE "/admin/connections/:id" request
-    (let [params (:params request)]
-      (db/delete-connection (get params :id))
-      {:status 200}))
-
-  (comp/GET "/admin/new-connection" []
-    {:status 200
-     :header html-headers
-     :body   (markup/new-connection)})
-
-  (comp/GET "/admin/connections/:id" [id]
-    (let [conn-info (connection-information id)]
-      (if (seq @global-messages)
-        (let [messages @global-messages]
-          (swap! global-messages (fn [_] []))
-          (success-html-with-body (markup/connection conn-info (connection-folders conn-info) messages)))
-        (success-html-with-body (markup/connection conn-info (connection-folders conn-info))))))
-
-  (comp/PUT "/admin/connections/:id" request
-    (let [params (:params request)]
-      (db/update-connection {:id (get params :id) :host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs))})
-      {:status 200}))
-
-  (comp/POST "/admin/connections/:id/controls" request
-    (let [id (:id (:route-params request))
-          operation (:operation (:params request))]
-      (cond (= "reconnect" operation) (client/reconnect (client/connection-data-from-id id))
-            (= "disconnect" operation) (client/disconnect (client/connection-data-from-id id))
-            (= "connect" operation) (client/connect (db/get-connection id))
-            (= "parse" operation) (let [params (:params request)
-                                        folder (:folder params)
-                                        move (some? (:move params))
-                                        conn-data (client/connection-data-from-id id)]
-                                    (client/parse-all-in-folder conn-data folder {:move move})
-                                    (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)}))))))
-    (redirect-request request))
-
-  (comp/POST "/metadata/languages" request
-    (let [limiter (messaging/channel-limiter :enriched-email)
-          process-fn (fn [enriched-emails]
-                       (doseq [enriched-email enriched-emails]
-                         (async/>!! limiter :token)
-                         (async/>!! @messaging/main-chan {:type :language-detection-request :options {} :payload enriched-email})))]
-      (core-email/iterate-over-all-pages db/fetch-data process-fn {:entity :enriched-email :strict false :page {:page 1 :size 500}} {:where [:= :language nil]} true))
-    (redirect-request request))
-
-  (comp/POST "/repl" request
-    (let [operation (get-in request [:params :operation])]
-      (cond (= operation "start") (swap! repl-server (fn [_] (t/log! :info "Starting repl server") (nrepl/start-server :bind "0.0.0.0" :port 7888)))
-            (= operation "stop") (swap! repl-server (fn [_] (t/log! :info "Stopping repl server") (nrepl/stop-server @repl-server) nil))
-            :else (t/log! :error ["Unsupported operation" operation "at /repl"]))
-      (redirect-request request)))
-
-  (route/resources "/"))
+    (route/resources "/")))
 
 (defn upload-progress [_ bytes-read content-length item-count]
   (t/log! {:level :info
@@ -449,20 +442,23 @@
            :let [read-percent  (* 100 (float (/ bytes-read content-length)))]}
           ["Writing" item-count "files. Read" read-percent "% until now. Total length: " content-length]))
 
-(def app (-> (fn [req] (routes req))
-             wrap-keyword-params
-             (wrap-multipart-params {:progress-fn upload-progress})
-             wrap-params))
+(defn app [context] (-> (fn [req] ((make-routes context) req))
+                        wrap-keyword-params
+                        (wrap-multipart-params {:progress-fn upload-progress})
+                        wrap-params
+                        (wrap-session {:store (cookie-store)})))
 
 (defn get-random-port []
   (with-open [socket (ServerSocket. 0)]
     (.getLocalPort socket)))
 
-(defn start-server [config]
-  (let [port (if (some? (-> (:server config) :port)) (-> (:server config) :port) (get-random-port))]
+(defn start-server [context]
+  (let [config (:config context)
+        port (if (some? (-> (:server config) :port)) (-> (:server config) :port) (get-random-port))
+        new-app (app context)]
     (t/log! :info [(str "Starting server: http://0.0.0.0:" port)])
     (reset! server
-            (jetty/run-jetty (fn [req] (app req))
+            (jetty/run-jetty (fn [req] (new-app req))
                              {:port        port
                               :join?       false
                               :min-threads 2}))))
