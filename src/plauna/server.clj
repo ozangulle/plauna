@@ -294,7 +294,9 @@
                                                                    message-id
                                                                    (-> email-before-update :metadata :category)
                                                                    (-> updated-email :metadata :category))
-              (catch jakarta.mail.FolderNotFoundException e (t/log! :debug e)))))
+              (catch jakarta.mail.FolderNotFoundException e (t/log! :debug e))
+              ;; If the store is not connected it throws an IllegalStateException
+              (catch java.lang.IllegalStateException e (t/log! :debug e)))))
         (save-metadata-form (:params request)))
       (redirect-request request))
 
