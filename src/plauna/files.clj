@@ -5,8 +5,7 @@
             [clojure.string :as string]
             [taoensso.telemere :as t]
             [plauna.messaging :as messaging]
-            [plauna.core.events :as events]
-            [plauna.files :as files])
+            [plauna.core.events :as events])
   (:import [java.io File]))
 
 (set! *warn-on-reflection* true)

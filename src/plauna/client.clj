@@ -262,8 +262,11 @@
 (defn refresh-access-token [connection-config]
   (let [provider (db/get-auth-provider (:auth-provider connection-config))
         token-data (db/get-oauth-tokens (:id connection-config))
-        new-access-token (oauth/exchange-refresh-token-for-access-token provider (:refresh-token token-data))]
-    (db/update-access-token (:id connection-config) new-access-token)))
+        new-access-token (try (oauth/exchange-refresh-token-for-access-token provider (:refresh-token token-data)) (catch Exception e (t/log! :error e)))]
+    (if (some? new-access-token)
+      (db/update-access-token (:id connection-config) new-access-token)
+      (do (t/log! :info ["Data for new access token was nil. Deleting the access token data in the database. The user will need to log in manually again."])
+          (db/delete-access-token (:id connection-config))))))
 
 ;; Public Interface
 

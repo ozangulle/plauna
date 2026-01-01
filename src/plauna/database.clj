@@ -11,7 +11,6 @@
             [honey.sql.helpers :refer [insert-into upsert values on-conflict do-update-set]]
             [next.jdbc.sql.builder :as builder]
             [plauna.util.page :as page]
-            [plauna.database :as db]
             [taoensso.telemere :as t]
             [plauna.interfaces :as int]
             [clojure.core.async :as async])
@@ -359,6 +358,10 @@
                              :set {:access_token (:access_token token-response) :expires_in (:expires_in token-response) :refresh_token (:refresh_token token-response)}
                              :where [:= :connection_id connection-id]}
                             (honey/format)))))
+
+(defn delete-access-token [connection-id]
+  (jdbc/execute! (ds) (honey/format {:delete-from [:oauth_tokens]
+                                     :where [:= :connection_id connection-id]}) builder-function-kebab))
 
 (defn add-connection [connection]
   (jdbc/execute! (ds)
