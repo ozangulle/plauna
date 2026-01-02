@@ -373,14 +373,18 @@
       start-monitoring
       schedule-health-checks))
 
-(defn handle-incoming-events [event]
+(defmulti handle-incoming-events :type)
+
+(defmethod handle-incoming-events :enriched-email [event]
   (when (and (true? (:move (:options event))) (some? (:category (:metadata (:payload event)))))
     (let [category-name (get-in event [:payload :metadata :category])]
       (when (some? category-name)
         (t/log! :info (str "Moving email: " (get-in event [:payload :header :subject]) " categorized as: " (get-in event [:payload :metadata :category])))
         (let [connection-id (get-in event [:options :connection-id])
-              ^IMAPMessage message (get-in event [:options :message])
-              ^IMAPFolder folder (get-in event [:options :folder])]
+              message-id (get-in event [:payload :header :message-id])
+              ^IMAPFolder folder (get-in event [:options :folder])
+              ;; Message classes are not thread safe. Fetch it again. Get the first one found
+              ^IMAPMessage message (aget (.search folder (MessageIDTerm. message-id)) 0)]
           (try (move-message connection-id message folder category-name)
                (catch jakarta.mail.FolderClosedException e
                  (do (t/log! {:level :error :error e})
