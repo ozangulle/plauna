@@ -1,10 +1,9 @@
 (ns plauna.client-test
   (:require [clojure.test :refer :all]
-            [plauna.client :as client])
+            [plauna.client :as client :refer [->ConnectionData]]
+            [plauna.core.email :as core-email :refer [->Email ->Participant]])
   (:import (java.util Properties)
-           (jakarta.mail Session)
-           (org.mockito Mockito)
-           (org.mockito ArgumentMatchers)))
+           (jakarta.mail Session)))
 
 (deftest ssl-properties-set-correctly
   (let [session ^Session (client/config->session {:security "ssl" :port 993})
@@ -87,23 +86,24 @@
     (client/add-to-connections test-con-data)
     (is (= (get @client/connections "test-id") test-con-data))))
 
-(comment
-  "Not true anymore"
-  (deftest folder-throws-exception-on-move
-    (with-redefs [client/reconnect (fn [_] true)
-                  client/move-messages-by-id-between-category-folders (fn [_ _ _ _] true)]
-      (let [test-config {:id "test-id" :host "imap.testmail.com" :user "test@testmail.com" :secret "12345" :folder "Inbox" :debug false :security "starttls"}
-            store (Mockito/mock org.eclipse.angus.mail.imap.IMAPStore)
-            folder (Mockito/mock org.eclipse.angus.mail.imap.IMAPFolder)
-            idle-manager (Mockito/mock org.eclipse.angus.mail.imap.IdleManager)
-            message (Mockito/mock org.eclipse.angus.mail.imap.IMAPMessage)
-            conn-data (client/->ConnectionData test-config store folder idle-manager [:move] nil)
-            mock-event {:payload {:metadata {:category "yes"}}
-                        :options {:move true
-                                  :connection-id "test-id"
-                                  :folder folder
-                                  :message message}}]
-        (.thenReturn (Mockito/when (.getDefaultFolder store)) (Mockito/mock org.eclipse.angus.mail.imap.IMAPFolder))
-        (.thenThrow (Mockito/when (.moveMessages folder (ArgumentMatchers/any) (ArgumentMatchers/any))) jakarta.mail.FolderClosedException) nil
-        (client/add-to-connections conn-data)
-        (is (= (client/handle-incoming-events mock-event) true))))))
+(deftest connection-id-from-email-success-single-connection
+  (let [email (->Email nil nil
+                       [(->Participant "test@test.com" nil nil :receiver nil)
+                        (->Participant "nope@test.com" nil nil :sender nil)])
+        connection-data (->ConnectionData {:user "test@test.com" :id "correct-id"} nil nil nil nil nil)]
+    (is (= "correct-id" (client/connection-id-for-email {"correct-id" connection-data} email)))))
+
+(deftest connection-id-from-email-success-multiple-connections
+  (let [email (->Email nil nil
+                       [(->Participant "test@test.com" nil nil :receiver nil)
+                        (->Participant "nope@test.com" nil nil :sender nil)])
+        connection-data (->ConnectionData {:user "test@test.com" :id "correct-id"} nil nil nil nil nil)
+        connection-data2 (->ConnectionData {:user "nope@test.com" :id "wrong-id"} nil nil nil nil nil)]
+    (is (= "correct-id" (client/connection-id-for-email {"correct-id" connection-data} email)))))
+
+(deftest connection-id-from-email-fail
+  (let [email (->Email nil nil
+                       [(->Participant "test@test.com" nil nil :receiver nil)
+                        (->Participant "nope@test.com" nil nil :sender nil)])
+        connection-data (->ConnectionData {:user "test2@test.com" :id "some-id"} nil nil nil nil nil)]
+    (is (nil? (client/connection-id-for-email {"correct-id" connection-data} email)))))

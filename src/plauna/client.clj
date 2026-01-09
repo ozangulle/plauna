@@ -239,25 +239,29 @@
 (defn inbox-or-category-folder-name [^Store store ^String folder-name default]
   (if (nil? folder-name) default (structured-folder-name store folder-name)))
 
+(defn connected? [^ConnectionData connection-data] (.isConnected ^Store (:store connection-data)))
+
 (defn move-messages-by-id-between-category-folders [^String id message-id ^String source-name ^String target-name]
-  (let [^ConnectionData connection-data (connection-data-from-id id)
-        ^Store store (:store connection-data)
-        ^String source-folder-name (inbox-or-category-folder-name store source-name (-> connection-data :config :folder))
-        ^String target-folder-name (inbox-or-category-folder-name store target-name (-> connection-data :config :folder))]
-    (with-open [^IMAPFolder target-folder (doto (.getFolder store target-folder-name) (.open Folder/READ_WRITE))
-                ^IMAPFolder source-folder (doto (.getFolder store source-folder-name) (.open Folder/READ_WRITE))]
-      (let [found-messages (.search source-folder (MessageIDTerm. message-id))]
-        (t/log! :debug ["Found" (count found-messages) "messages when searched for the message-id:" message-id])
-        (when (seq found-messages)
-          (if (= target-folder-name (:folder (:config connection-data)))
-            (do
-              (stop-monitoring connection-data)
-              (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
-              (.moveMessages source-folder (into-array Message found-messages) target-folder)
-              (start-monitoring connection-data))
-            (do
-              (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
-              (.moveMessages source-folder (into-array Message found-messages) target-folder))))))))
+  (let [^ConnectionData connection-data (connection-data-from-id id)]
+    (if (connected? connection-data)
+      (let [^Store store (:store connection-data)
+            ^String source-folder-name (inbox-or-category-folder-name store source-name (-> connection-data :config :folder))
+            ^String target-folder-name (inbox-or-category-folder-name store target-name (-> connection-data :config :folder))]
+        (with-open [^IMAPFolder target-folder (doto (.getFolder store target-folder-name) (.open Folder/READ_WRITE))
+                    ^IMAPFolder source-folder (doto (.getFolder store source-folder-name) (.open Folder/READ_WRITE))]
+          (let [found-messages (.search source-folder (MessageIDTerm. message-id))]
+            (t/log! :debug ["Found" (count found-messages) "messages when searched for the message-id:" message-id])
+            (when (seq found-messages)
+              (if (= target-folder-name (:folder (:config connection-data)))
+                (do
+                  (stop-monitoring connection-data)
+                  (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
+                  (.moveMessages source-folder (into-array Message found-messages) target-folder)
+                  (start-monitoring connection-data))
+                (do
+                  (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
+                  (.moveMessages source-folder (into-array Message found-messages) target-folder)))))))
+      (t/log! :info ["IMAP store in connection" (:id (:config connection-data)) "is not connected. Cancelling the move attempt."]))))
 
 (defn refresh-access-token [connection-config]
   (let [provider (db/get-auth-provider (:auth-provider connection-config))
@@ -396,6 +400,19 @@
                (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))
                (finally (start-idling-for-id connection-id)))
           connection-id)))))
+
+(defn connection-id-for-email
+  "Tries to find out the id of the connection the email belongs to. Returns nil if no active connection is found."
+  [connection-data-vec email]
+  (loop  [connections connection-data-vec
+          result nil]
+    (if (or (some? result) (nil? (seq connections)))
+      result
+      (let [^ConnectionData connection (first (vals connections))
+            recipients (filterv #(= :receiver (:type %)) (:participants email))
+            connection-user (get-in connection [:config :user])
+            match (get (filterv (fn [sender] (= (:address sender) connection-user)) recipients) 0)]
+        (if (some? match) (recur (rest connections) (get-in connection [:config :id])) (recur (rest connections) nil))))))
 
 (defrecord ImapClient []
   int/EmailClient
