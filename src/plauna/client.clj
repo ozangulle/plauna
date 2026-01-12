@@ -44,12 +44,6 @@
 
 (declare schedule-health-checks)
 
-(defn folder-to-monitor "Defaults to INBOX if nothing is provided by the user"
-  [folder-name]
-  (if (or (nil? folder-name) (empty? folder-name))
-    "INBOX"
-    folder-name))
-
 (defn default-port-for-security [security]
   (if (= security "ssl") 993 143))
 
@@ -284,9 +278,8 @@
   (let [idle-manager (IdleManager. (config->session connection-config) (Executors/newCachedThreadPool))
         store (login connection-config)
         id (:id connection-config)
-        monitor-folder (folder-to-monitor (:folder connection-config)) 
-        folder (open-folder-in-store store monitor-folder)
-        listener (message-count-listener id folder monitor-folder)
+        folder (open-folder-in-store store (:folder connection-config))
+        listener (message-count-listener id folder (:folder connection-config))
         connection-data (->ConnectionData connection-config store folder idle-manager (capabilities store) listener)]
     (add-to-connections connection-data)
     connection-data))
@@ -302,7 +295,7 @@
 
 (defn start-monitoring [connection-data]
   (try
-    (.addMessageCountListener ^IMAPFolder (:folder connection-data) (message-count-listener (:id (:config connection-data)) (folder-to-monitor (:folder connection-data)) (-> connection-data :config :folder)))
+    (.addMessageCountListener ^IMAPFolder (:folder connection-data) (message-count-listener (:id (:config connection-data)) (:folder connection-data) (-> connection-data :config :folder)))
     (t/log! :info ["Started monitoring for" (:folder (:config connection-data)) "in" (.getURLName ^Store (:store connection-data))])
     (.watch ^IdleManager (:idle-manager connection-data) ^Folder (:folder connection-data))
     (catch Exception e
