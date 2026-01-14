@@ -44,8 +44,8 @@
                    (fetch-auth-provider [_ id] nil))
         client (reify int/EmailClient (start-monitor [_ config]))
         context {:db database :client client}]
-    (is (thrown? RuntimeException (app/connect-to-client context "abc"))
-        "auth-type 'oauth2' with auth provider and token data calls client login and returns ok")))
+    (is (= :error (:result (app/connect-to-client context "abc"))))
+    "auth-type 'oauth2' with no auth provider returns an errorq"))
 
 (deftest oauth2-auth-4
   (let [database (reify int/DB

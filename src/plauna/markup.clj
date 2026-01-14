@@ -171,8 +171,9 @@
 (defn languages-admin-page [language-preferences]
   (render-file "admin-languages.html" {:language-preferences language-preferences :active-nav :admin}))
 
-(defn connections-list [connections]
-  (render-file "admin-connections.html" {:configs connections :active-nav :admin}))
+(defn connections-list
+  ([connections] (render-file "admin-connections.html" {:configs connections :active-nav :admin}))
+  ([connections messages] (render-file "admin-connections.html" {:configs connections :active-nav :admin :messages (mapv type->toast-role messages)})))
 
 (defn connection
   ([config folders] (render-file "admin-connection.html" (merge config {:folders folders :active-nav :admin})))

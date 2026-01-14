@@ -197,6 +197,8 @@
     (client/folders-in-store (:store (client/connection-data-from-id (:id conn))))
     []))
 
+(defn empty-global-messages [] (swap! global-messages (fn [_] [])))
+
 (defn make-routes [context]
   (comp/defroutes routes
 
@@ -341,7 +343,11 @@
       {:status  200})
 
     (comp/GET "/admin/connections" _
-      (response (markup/connections-list (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))))
+      (let [messages @global-messages]
+        (empty-global-messages)
+        (if (seq messages)
+          (response (markup/connections-list (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)) messages))
+          (response (markup/connections-list (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))))))
 
     (comp/POST "/admin/connections" request
       (let [params (:params request)
@@ -401,15 +407,19 @@
               (= "disconnect" operation) (do (client/disconnect (client/connection-data-from-id id)) (redirect-request request))
               (= "connect" operation)
               (let [action (app/connect-to-client context id)]
-                (if (= :redirect (:result action))
+                (cond
+                  (= :redirect (:result action))
                   (let [csrf (.toString (UUID/randomUUID))]
                     (-> (redirect (oauth/authorize-uri (:provider action) csrf)) (assoc :session {:oauth-csrf csrf :connection-id id :provider (:provider action)})))
-                  (redirect-request request)))
+                  (= :ok (:result action))
+                  (redirect-request request)
+                  (= :error (:result action))
+                  (redirect-request request {:type :alert :content "Connection failed. Please see the logs for the details."})))
               (= "parse" operation) (let [params (:params request)
                                           folder (:folder params)
                                           move (some? (:move params))
                                           conn-data (client/connection-data-from-id id)]
-                                      (client/parse-all-in-folder conn-data folder {:move move})
+                                      (client/parse-all-in-folder conn-data folder move)
                                       (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)})))
                                       (redirect-request request)))))
 

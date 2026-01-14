@@ -1,7 +1,9 @@
 (ns plauna.client-test
   (:require [clojure.test :refer :all]
+            [clojure.core.async :as async]
             [plauna.client :as client :refer [->ConnectionData]]
-            [plauna.core.email :as core-email :refer [->Email ->Participant]])
+            [plauna.core.email :as core-email :refer [->Email ->Participant]]
+            [plauna.core.events :as events])
   (:import (java.util Properties)
            (jakarta.mail Session)))
 
@@ -99,7 +101,7 @@
                         (->Participant "nope@test.com" nil nil :sender nil)])
         connection-data (->ConnectionData {:user "test@test.com" :id "correct-id"} nil nil nil nil nil)
         connection-data2 (->ConnectionData {:user "nope@test.com" :id "wrong-id"} nil nil nil nil nil)]
-    (is (= "correct-id" (client/connection-id-for-email {"correct-id" connection-data} email)))))
+    (is (= "correct-id" (client/connection-id-for-email {"correct-id" connection-data "wrong-id" connection-data2} email)))))
 
 (deftest connection-id-from-email-fail
   (let [email (->Email nil nil
@@ -107,3 +109,22 @@
                         (->Participant "nope@test.com" nil nil :sender nil)])
         connection-data (->ConnectionData {:user "test2@test.com" :id "some-id"} nil nil nil nil nil)]
     (is (nil? (client/connection-id-for-email {"correct-id" connection-data} email)))))
+
+(deftest something
+  (let [test-chan (async/chan)]
+    (with-redefs [client/loop-over-messages-in-folder (fn [_ body] (body "message"))
+                  client/doto-message->byte-array (fn [_ do-func & args] (apply do-func "test" args))
+                  client/put-to-main-chan (fn [event] (async/>!! test-chan event))
+                  client/folder-from-connection (fn [_ _] :test-folder)]
+      (let [expected-event (events/create-event :received-email "test" {:enrich true :move true :connection-id "1234" :folder :test-folder})
+            test-connection (->ConnectionData {:id "1234"} nil nil nil nil nil)]
+        (client/parse-all-in-folder test-connection "test-folder" true)
+        (is (= expected-event (async/<!! test-chan)))))))
+
+(deftest folder-monitor-tests
+  (let [null (client/monitor-folder-name nil)
+        empty (client/monitor-folder-name "")
+        valid (client/monitor-folder-name "MyInbox")]
+    (is (= null "INBOX"))
+    (is (= empty "INBOX"))
+    (is (= valid "MyInbox"))))

@@ -2,11 +2,10 @@
   (:require [clojure.test :refer :all]
             [clojure.core.async :as async]
             [plauna.database :as db]
-            [plauna.files :as files]
-            [clojure.java.io :as io]))
+            [plauna.files :as files]))
 
 (defn setup-clean-db [f]
-  (swap! files/plauna-config {:config-file (.getPath (io/resource "test/test.edn"))})
+  (swap! files/plauna-config (fn [_] {:data-folder "tmp/"}))
   (files/check-and-create-database-file)
   (db/create-db)
   (alter-var-root #'db/batch-size (fn [_] 2))
@@ -23,8 +22,7 @@
     (db/database-event-loop test-publisher)
     (doseq [test-event to-insert] (async/>!! test-channel test-event))
     (Thread/sleep 1000)
-    (async/close! test-channel)
-    (println "Done")))
+    (async/close! test-channel)))
 
 (deftest enriched-email-simple
   (let [sql (db/data->sql {:entity :enriched-email :strict false})]

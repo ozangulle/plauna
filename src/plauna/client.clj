@@ -272,14 +272,18 @@
       (do (t/log! :info ["Data for new access token was nil. Deleting the access token data in the database. The user will need to log in manually again."])
           (db/delete-access-token (:id connection-config))))))
 
+(defn monitor-folder-name [folder-name]
+  (if (or (nil? folder-name) (s/blank? folder-name)) "INBOX" folder-name))
+
 ;; Public Interface
 
-(defn create-imap-monitor [connection-config]
+(defn construct-connection-data [connection-config]
   (let [idle-manager (IdleManager. (config->session connection-config) (Executors/newCachedThreadPool))
         store (login connection-config)
         id (:id connection-config)
-        folder (open-folder-in-store store (:folder connection-config))
-        listener (message-count-listener id folder (:folder connection-config))
+        folder-name-to-monitor (monitor-folder-name (:folder connection-config))
+        folder (open-folder-in-store store folder-name-to-monitor)
+        listener (message-count-listener id folder folder-name-to-monitor)
         connection-data (->ConnectionData connection-config store folder idle-manager (capabilities store) listener)]
     (add-to-connections connection-data)
     connection-data))
@@ -345,35 +349,48 @@
     (swap-new-period-check (:id config) scheduled-future)
     connection-data))
 
-(defn parse-all-in-folder [connection-data folder-name options]
-  (let [^Store store (:store connection-data)
-        config (:config connection-data)
-        ^Folder folder (open-folder-in-store store folder-name)]
-    (t/log! :info ["Read all e-mails from:" folder-name "with options:" options])
-    (async/go (let [^Folder read-folder (doto (.getFolder store ^String folder-name)
-                                          (.open Folder/READ_WRITE))
-                    connection-id (:id config)]
-                (vec (doseq [message-num (range 1 (inc (.getMessageCount read-folder)))
-                             :let [^Message message (.getMessage read-folder message-num)]]
-                       (t/log! :debug ["Reading message number" message-num "from" folder-name])
-                       (with-open [os (ByteArrayOutputStream.)]
-                         (.writeTo message os)
-                         (async/>!! @messaging/main-chan (events/create-event :received-email
-                                                                              (.toByteArray os)
-                                                                              {:enrich true :move (:move options) :connection-id connection-id :folder folder :original-folder folder-name :message message})))))))
-    connection-data))
+(defn folder-from-connection [connection-data folder-name]
+  (let [^Store store (:store connection-data)]
+    (open-folder-in-store store folder-name)))
+
+(defn id-from-connection [connection-data] (get-in connection-data [:config :id]))
+
+(defn doto-message->byte-array [^Message message do-func & args]
+  (with-open [os (ByteArrayOutputStream.)]
+    (.writeTo message os)
+    (apply do-func (.toByteArray os) args)))
+
+(defn loop-over-messages-in-folder [^Folder folder body]
+  (doseq [message-num (range 1 (inc (.getMessageCount folder)))
+          :let [^Message message (.getMessage folder message-num)]]
+    (t/log! :debug ["Reading message number" message-num "from" (.getName ^Folder folder)])
+    (body message)))
+
+(defn put-to-main-chan [event] (async/>!! @messaging/main-chan event))
+
+(defn parse-all-in-folder
+  "Read all emails from a folder, convert them to outputstream and send them via :received-email channels"
+  [connection-data folder-name move?]
+  (t/log! :info ["Read all e-mails from:" folder-name "with move option:" move?])
+  (let [folder (folder-from-connection  connection-data folder-name)
+        connection-id (id-from-connection connection-data)
+        transport-function (fn [byte-array options-seq] (put-to-main-chan (events/create-event :received-email byte-array options-seq)))]
+    (async/go (loop-over-messages-in-folder folder (fn [message] (doto-message->byte-array
+                                                                  message
+                                                                  transport-function
+                                                                  {:enrich true :move move? :connection-id connection-id :folder folder}))))))
 
 (defmulti connect :auth-type)
 
 (defmethod connect "oauth2" [connection-config]
   (refresh-access-token connection-config)
-  (try (-> (create-imap-monitor connection-config)
+  (try (-> (construct-connection-data connection-config)
            start-monitoring
            schedule-health-checks)
        (catch AuthenticationFailedException e (t/log! :error e))))
 
 (defmethod connect :default [connection-config]
-  (-> (create-imap-monitor connection-config)
+  (-> (construct-connection-data connection-config)
       start-monitoring
       schedule-health-checks))
 
