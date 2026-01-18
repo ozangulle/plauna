@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-01-18.0] - 2026-01-18
+
+### 🚀 Features
+
+- IMAP connections are managed in the ui instead of the config file
+- Use environment variables for configuration
+- Add oauth2 authentication for imap
+
+### 🐛 Bug Fixes
+
+- Imap parsing, add new connection, statistics page
+- Client deletes access token after a non-200 response from the oauth server
+- Parsing emails from IMAP folders now handles all emails
+- Moving an email does not go through all connections if the connection id can be guessed
+- Client falls back to INBOX if the folder to monitor is empty in the config
+- *(client)* Monitored folder falls back to "Inbox" when no name is provided
+
+### ⚙️ Miscellaneous Tasks
+
+- *(ui)* Clean up statistics page
+
 ## [2025-09-06.0] - 2025-09-06
 
 ### 🚀 Features
