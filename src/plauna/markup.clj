@@ -83,11 +83,11 @@
 
 (defn list-emails
   ([emails page-info categories]
-   (let [last-page {:last-page (quot (:total page-info) (:size page-info))}
+   (let [last-page {:last-page (quot (:total page-info) (:page-size page-info))}
          emails-with-java-date (map #(update-in % [:header :date] timestamp->date) emails)]
      (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories :active-nav :emails})))
   ([emails page-info categories messages]
-   (let [last-page {:last-page (quot (:total page-info) (:size page-info))}
+   (let [last-page {:last-page (quot (:total page-info) (:page-size page-info))}
          emails-with-java-date (map #(update-in % [:header :date] timestamp->date) emails)]
      (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories :messages (mapv type->toast-role messages) :active-nav :emails}))))
 

@@ -247,8 +247,8 @@
       (let [^Store store (:store connection-data)
             ^String source-folder-name (inbox-or-category-folder-name store source-name (-> connection-data :config :folder))
             ^String target-folder-name (inbox-or-category-folder-name store target-name (-> connection-data :config :folder))]
-        (with-open [^IMAPFolder target-folder (doto (.getFolder store target-folder-name) (.open Folder/READ_WRITE))
-                    ^IMAPFolder source-folder (doto (.getFolder store source-folder-name) (.open Folder/READ_WRITE))]
+        (with-open [^IMAPFolder target-folder (open-folder-in-store store target-folder-name)
+                    ^IMAPFolder source-folder (open-folder-in-store store source-folder-name)]
           (let [found-messages (.search source-folder (MessageIDTerm. message-id))]
             (t/log! :debug ["Found" (count found-messages) "messages when searched for the message-id:" message-id])
             (when (seq found-messages)

@@ -109,7 +109,7 @@
 (defn write-all-categorized-emails-to-training-files []
   (files/delete-files-with-type :train)
   (doseq [language (languages-to-use-in-training)
-          :let [entity-query {:entity :enriched-email :page {:size 100 :page 1}}
+          :let [entity-query {:entity :enriched-email :page {:page-size 100 :page 1}}
                 sql-query {:where [:and [:<> :category nil] [:= :language language]]}
                 write-func (fn [data] (files/write-to-training-file language (analysis/format-training-data data)))]]
     (core-email/iterate-over-all-pages db/fetch-data write-func entity-query sql-query false)))
@@ -167,7 +167,9 @@
 ;; TODO change name template
 (def emails-template {:page-size {:default 20 :type-fn Integer/parseInt}
                       :page {:default 1 :type-fn Integer/parseInt}
-                      :filter {:default "all" :type-fn (fn [x] x)}})
+                      :filter {:default "all" :type-fn identity}
+                      :search-field {:default "subject" :type-fn identity}
+                      :search-text {:default nil :type-fn identity}})
 
 (defn template->request-parameters [template]
   (fn [rp] (reduce (fn [acc [k v]] (if (contains? rp k)
@@ -320,15 +322,12 @@
 
     (comp/GET "/emails" {params :params}
       (let [parse-fn (template->request-parameters emails-template)
-            {page-size :page-size page :page filter :filter} (parse-fn params)
-            categories (conj (db/get-categories) {:id nil :name "n/a"})
-            sql-clause (filter->sql-clause filter)
-            result (db/fetch-data {:entity :enriched-email :strict false :page (page/page-request page page-size)} sql-clause)]
+            result (app/fetch-emails context (parse-fn params))]
         (if (seq @global-messages)
           (let [messages @global-messages]
             (swap! global-messages (fn [_] []))
-            (success-html-with-body (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories messages)))
-          (success-html-with-body (markup/list-emails (:data result) {:filter filter :total-pages (inc (int (ceil (quot (:total result) page-size)))) :size page-size :page (:page result) :total (:total result)} categories)))))
+            (success-html-with-body (markup/list-emails (:data result) (:parameters result) (:categories (:optional result)) messages)))
+          (success-html-with-body (markup/list-emails (:data result) (:parameters result) (:categories (:optional result)))))))
 
     (comp/GET "/emails/:id" [id]
       (let [decoded-id (new String ^"[B" (base64-decode id))

@@ -4,82 +4,83 @@
 
 {% if emails|not-empty %}
 
-<div class="collapse collapse-arrow bg-base-100 border border-base-300">
-  <input type="checkbox" id="enrichment"/>
-  <div class="collapse-title font-semibold">Filter Options</div>
-  <div class="collapse-content text-sm">
-	<div class="min-h-0">
-      <select class="select" onchange="window.location.href=this.options[this.selectedIndex].value">
-        <option {% if page.filter = "all" %} selected {% endif %} value="/emails?page=1&page-size={{page.size}}&filter=all">
-          All
-        </option>
-        <option {% if page.filter = "enriched-only" %} selected {% endif %}  value="/emails?page=1&page-size={{page.size}}&filter=enriched-only">
-          Enriched E-mails Only
-        </option>
-        <option {% if page.filter = "without-category" %} selected {% endif %} value="/emails?page=1&page-size={{page.size}}&filter=without-category">
-          E-mails without Category Only</a>
-</option>
-</select>
-</div>
-</div>
-<div class="collapse collapse-arrow bg-base-100 border border-base-300">
-	<input type="checkbox" id="training" />
-    <div class="collapse-title font-semibold">Data Training</div>
-    <div class="collapse-content text-sm">
-	  <div class="min-h-0">
-        <form action="/training" method="post">
-          <input hidden="true" name="redirect-url" type="text" value="/emails">
-          <input class="btn btn-primary" type="submit" value="Train with Existing Data">
-        </form>
+<div class="flex">
+  <div class="card grow place-items-center">
+    <h3>Filter</h3>
+    <form action="/emails" method="get" id="page-form">
+      <input type="hidden" name="search-field" value="subject" />
+      <input type="hidden" name="page" value="1" /> <!-- whenever the filter is used, we want to go back to page 1 -->
+      <div class="flex" style="gap: 4px; flex-wrap: wrap;">
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Metadata</legend>
+          <select class="select" name="filter">
+            <option {% if page.filter = "all" %} selected {% endif %} value="all">
+              All
+            </option>
+            <option {% if page.filter = "enriched-only" %} selected {% endif %}  value="enriched-only">
+              Enriched E-mails Only
+            </option>
+            <option {% if page.filter = "without-category" %} selected {% endif %} value="without-category">
+              E-mails without A Category Only</a>
+            </option>
+          </select>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Search Text</legend>
+          <input type="text" name="search-text" class="input" value="{{page.search-text}}" />
+          <p class="label">Currently you can only search in email subjects.</p>
+        </fieldset>
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">Page Size</legend>
+          <select class="select" name="page-size">
+            <div tabindex="0" role="button" class="btn">Page Size: {{page.page-size}}</div>
+            <option {% if page.page-size = 10 %}selected{% endif %}>10</option>
+            <option {% if page.page-size = 20 %}selected{% endif %}>20</option>
+            <option {% if page.page-size = 30 %}selected{% endif %}>30</option>
+          </select>
+        </fieldset>
       </div>
-    </div>
+      <button class="btn btn-primary" type="submit">Apply</button>
+    </form>
+  </div>
+  <div class="card grow place-items-center">
+    <h3>Data Training</h3>
+    <form class="my-4" action="/training" method="post">
+      <input hidden="true" name="redirect-url" type="text" value="/emails">
+      <input class="btn" type="submit" value="Train with Existing Data">
+    </form>
   </div>
 </div>
-
 
 <div class="grid grid-cols-1 lg:grid-cols-3 lg:justify-items-stretch">
   <div class="hidden lg:block"></div>
   <div class="lg:justify-self-center-safe my-2">
     <div class="pagination flex flex-nowrap text-xs lg:text-md items-center">
     {% if page.page > 1 %}
-    <a href="/emails?page={{page.page|add:-1}}&page-size={{page.size}}&filter={{page.filter}}">
-	    <button class="btn join-item text-xs lg:text-md text-nowrap">< Back</button>
-                                                                       </a>
+    <form action="/emails" method="get">
+      <input type="hidden" name="page-size" value="{{page.page-size}}" />
+      <input type="hidden" name="search-field" value="subject" />
+      <input type="hidden" name="search-text" value="{{page.search-text}}" />
+      <input type="hidden" name="page" value="{{page.page|add:-1}}" />
+      <button class="btn join-item text-xs lg:text-md text-nowrap">Back</button>
+    </form>
     {% else %}
-    <a href="#">
-      <button disabled class="btn join-item text-xs lg:text-md text-nowrap">< Back</button>
-    </a>
+    <button disabled class="btn join-item text-xs lg:text-md text-nowrap">< Back</button>
     {% endif %}
     <p class="text-sm lg:text-md text-nowrap mx-2">{{page.page}} of {{page.total-pages}}</p>
     {% if page.page <= page.last-page %}
-    <a href="/emails?page={{page.page|add:1}}&page-size={{page.size}}&filter={{page.filter}}">
-      <button class="btn join-item text-xs lg:text-md text-nowrap">Next ></button>
-    </a>
+                       
+    <form action="/emails" method="get">
+      <input type="hidden" name="page-size" value="{{page.page-size}}" />
+      <input type="hidden" name="search-field" value="subject" />
+      <input type="hidden" name="search-text" value="{{page.search-text}}" />
+      <input type="hidden" name="page" value="{{page.page|add:1}}" />
+      <button class="btn join-item text-xs lg:text-md text-nowrap">Next</button>
+    </form>
     {% else %}
-    <a href="#">
-      <button disabled class="btn join-item text-xs lg:text-md text-nowrap">Next ></button>
-    </a>
+    <button disabled class="btn join-item text-xs lg:text-md text-nowrap">Next ></button>
     {% endif %}
     </div>
-  </div>
-
-
-  <div class="justify-self-begin-safe lg:justify-self-end-safe text-xs lg:text-md my-2">
-  <div class="dropdown">
-    <div tabindex="0" role="button" class="btn">Page Size: {{page.size}}</div>
-  
-    <ul tab-index="0" class="dropdown-content menu bg-base-100 rounded-box z-1 w-52 p-2 shadow-sm">
-      <li>
-        <a href="/emails?page={{page.page}}&page-size=10&filter={{page.filter}}" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">10</a>
-      </li>
-      <li>
-        <a href="/emails?page={{page.page}}&page-size=20&filter={{page.filter}}" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">20</a>
-      </li>
-      <li>
-        <a href="/emails?page={{page.page}}&page-size=30&filter={{page.filter}}" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">30</a>
-      </li>
-    </ul>
-  </div>
   </div>
 </div>
 

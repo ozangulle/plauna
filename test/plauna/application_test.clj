@@ -57,3 +57,37 @@
     (is (= {:result :redirect, :provider {:id 2}}
            (app/connect-to-client context "abc"))
         "auth-type 'oauth2' with auth provider and access token but no refresh token calls client login and returns ok")))
+
+(deftest emails-query-filter-wo-search
+  (let [query (atom "")
+        database (reify int/DB
+                   (fetch-categories [_] {})
+                   (fetch-emails [_ _ important-query]
+                     (swap! query (fn [_] important-query))
+                     {:total 10 :page-size 1 :page 1}))]
+    (app/fetch-emails {:db database} {:filter "enriched-only" :page-size 1})
+    (is (= @query {:where [:and [:<> :metadata.category nil] [:<> :metadata.language nil]], :order-by [[:date :desc]]}))
+    (app/fetch-emails {:db database} {:filter "without-category" :page-size 1})
+    (is (= @query {:where [:= :metadata.category nil] :order-by [[:date :desc]]}))
+    (app/fetch-emails {:db database} {:page-size 1})
+    (is (= {:order-by [[:date :desc]]} @query))))
+
+(deftest emails-query-search-wo-filter
+  (let [query (atom "")
+        database (reify int/DB
+                   (fetch-categories [_] {})
+                   (fetch-emails [_ _ important-query]
+                     (swap! query (fn [_] important-query))
+                     {:total 10 :page-size 1 :page 1}))]
+    (app/fetch-emails {:db database} {:search-field "subject" :search-text "test text" :page-size 1})
+    (is (= {:where [:like :headers.subject "%test text%"] :order-by [[:date :desc]]} @query))))
+
+(deftest emails-query-search-filter
+  (let [query (atom "")
+        database (reify int/DB
+                   (fetch-categories [_] {})
+                   (fetch-emails [_ _ important-query]
+                     (swap! query (fn [_] important-query))
+                     {:total 10 :page-size 1 :page 1}))]
+    (app/fetch-emails {:db database} {:filter "enriched-only" :search-field "subject" :search-text "test text" :page-size 1})
+    (is (= {:where [:and [:and [:<> :metadata.category nil] [:<> :metadata.language nil]][:like :headers.subject "%test text%"]] :order-by [[:date :desc]]} @query))))
