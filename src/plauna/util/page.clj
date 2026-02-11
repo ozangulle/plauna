@@ -6,7 +6,7 @@
 (defn page-request [page size]
   (->PageRequest (or page 1) (or size 10)))
 
-(defn calculate-pages-total [total page-size] (inc (int (ceil (quot total page-size)))))
+(defn calculate-pages-total [total size] (inc (int (ceil (quot total size)))))
 
 (defn page-request->limit-offset [page-request]
   {:limit (:size page-request) :offset (* (:size page-request) (dec (:page page-request)))})

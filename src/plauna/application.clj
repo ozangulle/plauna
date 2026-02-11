@@ -49,17 +49,24 @@
 
 (defn fetch-emails
   "Returns a list of emails. Customizable by parameters which can contain the following keys:
-   :page-size, :page, :filter (all, enrieched-only, or without-category), :search-field (subject), :search-text"
+   :size, :page, :filter (all, enrieched-only, or without-category), :search-field (subject), :search-text"
   [context parameters]
   (let [db (:db context)
         cat-list (categories db)
         customization-clause (combine-maps-with (filter->sql-clause (:filter parameters)) (search->sql-clause (:search-field parameters) (:search-text parameters)) :where :and)
-        result (int/fetch-emails db {:entity :enriched-email :strict false :page (page/page-request (:page parameters) (:page-size parameters))} customization-clause)]
+        result (int/fetch-emails db {:entity :enriched-email :strict false :page (page/page-request (:page parameters) (:size parameters))} customization-clause)]
     {:data (:data result)
      :parameters {:filter (:filter parameters)
-                  :total-pages (page/calculate-pages-total (:total result) (:page-size parameters)) 
-                  :page-size (:page-size parameters)
+                  :total-pages (page/calculate-pages-total (:total result) (:size parameters))
+                  :size (:size parameters)
                   :page (:page result)
                   :total (:total result)
                   :search-text (:search-text parameters)}
      :optional {:categories cat-list}}))
+
+(defn create-new-category! [context category]
+  (let [db (:db context)
+        client (:client context)]
+    (int/save-category db category)
+    (doseq [connection-data (int/connections client)]
+      (int/create-category-directories! client connection-data [category]))))

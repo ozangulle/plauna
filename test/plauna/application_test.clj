@@ -64,12 +64,12 @@
                    (fetch-categories [_] {})
                    (fetch-emails [_ _ important-query]
                      (swap! query (fn [_] important-query))
-                     {:total 10 :page-size 1 :page 1}))]
-    (app/fetch-emails {:db database} {:filter "enriched-only" :page-size 1})
+                     {:total 10 :size 1 :page 1}))]
+    (app/fetch-emails {:db database} {:filter "enriched-only" :size 1})
     (is (= @query {:where [:and [:<> :metadata.category nil] [:<> :metadata.language nil]], :order-by [[:date :desc]]}))
-    (app/fetch-emails {:db database} {:filter "without-category" :page-size 1})
+    (app/fetch-emails {:db database} {:filter "without-category" :size 1})
     (is (= @query {:where [:= :metadata.category nil] :order-by [[:date :desc]]}))
-    (app/fetch-emails {:db database} {:page-size 1})
+    (app/fetch-emails {:db database} {:size 1})
     (is (= {:order-by [[:date :desc]]} @query))))
 
 (deftest emails-query-search-wo-filter
@@ -78,8 +78,8 @@
                    (fetch-categories [_] {})
                    (fetch-emails [_ _ important-query]
                      (swap! query (fn [_] important-query))
-                     {:total 10 :page-size 1 :page 1}))]
-    (app/fetch-emails {:db database} {:search-field "subject" :search-text "test text" :page-size 1})
+                     {:total 10 :size 1 :page 1}))]
+    (app/fetch-emails {:db database} {:search-field "subject" :search-text "test text" :size 1})
     (is (= {:where [:like :headers.subject "%test text%"] :order-by [[:date :desc]]} @query))))
 
 (deftest emails-query-search-filter
@@ -88,6 +88,17 @@
                    (fetch-categories [_] {})
                    (fetch-emails [_ _ important-query]
                      (swap! query (fn [_] important-query))
-                     {:total 10 :page-size 1 :page 1}))]
-    (app/fetch-emails {:db database} {:filter "enriched-only" :search-field "subject" :search-text "test text" :page-size 1})
-    (is (= {:where [:and [:and [:<> :metadata.category nil] [:<> :metadata.language nil]][:like :headers.subject "%test text%"]] :order-by [[:date :desc]]} @query))))
+                     {:total 10 :size 1 :page 1}))]
+    (app/fetch-emails {:db database} {:filter "enriched-only" :search-field "subject" :search-text "test text" :size 1})
+    (is (= {:where [:and [:and [:<> :metadata.category nil] [:<> :metadata.language nil]] [:like :headers.subject "%test text%"]] :order-by [[:date :desc]]} @query))))
+
+(deftest create-a-category
+  (let [db-called (atom false)
+        client-called (atom false)
+        database (reify int/DB (save-category [_ _] (swap! db-called (fn [_] true))))
+        client (reify int/EmailClient
+                 (connections [_] ["does not matter"])
+                 (create-category-directories! [_ _ _] (swap! client-called (fn [_] true))))]
+    (app/create-new-category! {:db database :client client} "test")
+    (is (= true @db-called))
+    (is (= true @client-called))))
