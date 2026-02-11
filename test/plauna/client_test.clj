@@ -110,7 +110,7 @@
         connection-data (->ConnectionData {:user "test2@test.com" :id "some-id"} nil nil nil nil nil)]
     (is (nil? (client/connection-id-for-email {"correct-id" connection-data} email)))))
 
-(deftest something
+(deftest parsing-folder-creates-correct-event
   (let [test-chan (async/chan)]
     (with-redefs [client/loop-over-messages-in-folder (fn [_ body] (body "message"))
                   client/doto-message->byte-array (fn [_ do-func & args] (apply do-func "test" args))
@@ -128,3 +128,17 @@
     (is (= null "INBOX"))
     (is (= empty "INBOX"))
     (is (= valid "MyInbox"))))
+
+(deftest create-category-does-nothing-when-not-connected
+  (let [create-folder-called (atom nil)]
+    (with-redefs [client/connected? (fn [_] false)
+                  client/create-folders (fn [_ category] (swap! create-folder-called (fn [_] category)))]
+      (client/create-category-folders! {:store nil} "my-cat")
+      (is (= nil @create-folder-called)))))
+
+(deftest create-category-calls-function-when-connected
+  (let [create-folder-called (atom nil)]
+    (with-redefs [client/connected? (fn [_] true)
+                  client/create-folders (fn [_ category] (swap! create-folder-called (fn [_] category)))]
+      (client/create-category-folders! {:store nil} "my-cat")
+      (is (= "my-cat" @create-folder-called)))))

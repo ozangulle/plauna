@@ -410,4 +410,5 @@
   (fetch-oauth-token-data [_ connection-id] (get-oauth-tokens connection-id))
   (fetch-auth-provider [_ id] (get-auth-provider id))
   (fetch-categories [_] (get-categories))
-  (fetch-emails [_ entity customization] (fetch-data entity customization)))
+  (fetch-emails [_ entity customization] (fetch-data entity customization))
+  (save-category [_ category-name] (create-category category-name)))

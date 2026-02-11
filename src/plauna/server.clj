@@ -77,6 +77,10 @@
    :headers {"Content-Type" "text/html; charset=UTF-8"}
    :body    body})
 
+(defn redirect-to-referer [request]
+  {:status 303
+   :headers {"Location" (get (:headers request) "referer")}})
+
 (defn redirect-request
   ([request]
    (let [redirect-url (get-in request [:params :redirect-url])]
@@ -109,7 +113,7 @@
 (defn write-all-categorized-emails-to-training-files []
   (files/delete-files-with-type :train)
   (doseq [language (languages-to-use-in-training)
-          :let [entity-query {:entity :enriched-email :page {:page-size 100 :page 1}}
+          :let [entity-query {:entity :enriched-email :page {:size 100 :page 1}}
                 sql-query {:where [:and [:<> :category nil] [:= :language language]]}
                 write-func (fn [data] (files/write-to-training-file language (analysis/format-training-data data)))]]
     (core-email/iterate-over-all-pages db/fetch-data write-func entity-query sql-query false)))
@@ -165,7 +169,7 @@
 (defn enriched-email-by-message-id [id] (first (db/fetch-data {:entity :enriched-email :strict false} {:where [:= :message-id id]})))
 
 ;; TODO change name template
-(def emails-template {:page-size {:default 20 :type-fn Integer/parseInt}
+(def emails-template {:size {:default 20 :type-fn Integer/parseInt}
                       :page {:default 1 :type-fn Integer/parseInt}
                       :filter {:default "all" :type-fn identity}
                       :search-field {:default "subject" :type-fn identity}
@@ -176,12 +180,6 @@
                                      (conj acc {k ((:type-fn v) (get rp k))})
                                      (conj acc {k (:default v)})))
                    {} template)))
-
-(defn filter->sql-clause [filter]
-  (cond
-    (= filter "enriched-only") {:where [:and [:<> :metadata.category nil] [:<> :metadata.language nil]] :order-by [[:date :desc]]}
-    (= filter "without-category") {:where [:= :metadata.category nil] :order-by [[:date :desc]]}
-    :else {:order-by [[:date :desc]]}))
 
 (defn add-sanitized-text-to-enriched-email [email]
   {:header (:header email)
@@ -261,9 +259,7 @@
         (success-html-with-body (markup/languages-admin-page language-preferences))))
 
     (comp/POST "/admin/categories" {params :params}
-      (db/create-category (:name params))
-      (doseq [connection-data (client/get-connections)]
-        (client/create-category-folders! connection-data [(:name params)]))
+      (app/create-new-category! context (:name params))
       {:status  301
        :headers {"Location" "/admin/categories"}
        :body    (markup/administration {:repl (get-status-repl-server)})})
@@ -308,12 +304,12 @@
                                                                      (-> updated-email :metadata :category))
                 (catch jakarta.mail.FolderNotFoundException e (t/log! :debug e))))))
         (save-metadata-form (:params request)))
-      (redirect-request request))
+      (redirect-to-referer request))
 
     (comp/POST "/training" request
       (let [result (write-emails-to-training-files-and-train)]
         (when (some? result) (swap! global-messages (fn [mess] (conj mess result))))
-        (redirect-request request)))
+        (redirect-to-referer request)))
 
     (comp/POST "/training/new" request
       (let [n (get (:route-params request) :new 20)]

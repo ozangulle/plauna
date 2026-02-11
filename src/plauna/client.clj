@@ -314,14 +314,16 @@
   (.removeMessageCountListener ^IMAPFolder (:folder connection-data) (:message-count-listener connection-data))
   connection-data)
 
-(defn create-category-folders! [connection-data categories]
-  (let [store ^Store (:store connection-data)
-        result (create-folders store categories)]
-    (t/log! :info ["Creating directories from category names" categories])
-    (t/log! {:level :info
-             :data  {:result result}}
-            "Created the directories.")
-    connection-data))
+(defn create-category-folders!
+  "Creates folders for the selected categories. Checks if the connection is still intact. Does nothing, if the connection is not intact."
+  [connection-data categories]
+  (if (connected? connection-data)
+    (do (t/log! :info ["Creating directories from category names" categories])
+        (t/log! {:level :info
+                 :data  {:result (create-folders (:store connection-data) categories)}}
+                "Created the directories."))
+    (t/log! :info "Could not create directories on the IMAP server: The store is not connected."))
+  connection-data)
 
 (defn schedule-health-checks [^ConnectionData connection-data]
   (let [^Store store (:store connection-data)
@@ -433,11 +435,13 @@
 
 (defrecord ImapClient []
   int/EmailClient
-  (start-monitor [_ config] (connect config)))
+  (start-monitor [_ config] (connect config))
+  (connections [_] @connections)
+  (create-category-directories! [_ connection-data category-names] (create-category-folders! connection-data category-names)))
 
 (defn client-event-loop
   "Listens to :enriched-email
-
+  
   Options:
   :move - boolean
 

@@ -171,3 +171,8 @@ You must have selected at least one language in "Admin" -> "Manage Languages" in
 *** Automatic Categorization
 
 After training your models on the categories you created, Plauna will categorize each e-mail you receive and moved it automatically to its corresponding folder.
+
+
+* Debugging
+
+Plauna comes with a built-in REPL that can be activated on the administration page. It is hard-coded to listen to port 7888. If you know your way around Clojure and the codebase, you can use it to inspect the current state of the application or even make changes while it's running. Be aware that all your changes will be lost when you restart the application. If you are not debugging or do not know how to use the Clojure REPL, there is absolutely no reason to start it. There are no further features hidden behind it.

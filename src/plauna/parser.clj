@@ -105,6 +105,7 @@
 (defn parse-headers [^MessageImpl message]
   (t/log! :debug "Parsing headers.")
   (let [in-reply-to-field ^Field (.getField ^Header (.getHeader message) "In-Reply-To")]
+    (println (bean message))
     {:message-id (message-id message)
      :in-reply-to (if (some? in-reply-to-field) (.getBody in-reply-to-field) nil)
      :subject (.getSubject message)

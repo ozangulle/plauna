@@ -32,11 +32,11 @@
         </fieldset>
         <fieldset class="fieldset">
           <legend class="fieldset-legend">Page Size</legend>
-          <select class="select" name="page-size">
-            <div tabindex="0" role="button" class="btn">Page Size: {{page.page-size}}</div>
-            <option {% if page.page-size = 10 %}selected{% endif %}>10</option>
-            <option {% if page.page-size = 20 %}selected{% endif %}>20</option>
-            <option {% if page.page-size = 30 %}selected{% endif %}>30</option>
+          <select class="select" name="size">
+            <div tabindex="0" role="button" class="btn">Page Size: {{page.size}}</div>
+            <option {% if page.size = 10 %}selected{% endif %}>10</option>
+            <option {% if page.size = 20 %}selected{% endif %}>20</option>
+            <option {% if page.size = 30 %}selected{% endif %}>30</option>
           </select>
         </fieldset>
       </div>
@@ -46,7 +46,6 @@
   <div class="card grow place-items-center">
     <h3>Data Training</h3>
     <form class="my-4" action="/training" method="post">
-      <input hidden="true" name="redirect-url" type="text" value="/emails">
       <input class="btn" type="submit" value="Train with Existing Data">
     </form>
   </div>
@@ -58,10 +57,11 @@
     <div class="pagination flex flex-nowrap text-xs lg:text-md items-center">
     {% if page.page > 1 %}
     <form action="/emails" method="get">
-      <input type="hidden" name="page-size" value="{{page.page-size}}" />
+      <input type="hidden" name="size" value="{{page.size}}" />
       <input type="hidden" name="search-field" value="subject" />
       <input type="hidden" name="search-text" value="{{page.search-text}}" />
       <input type="hidden" name="page" value="{{page.page|add:-1}}" />
+      <input type="hidden" name="filter" value="{{page.filter}}" />
       <button class="btn join-item text-xs lg:text-md text-nowrap">Back</button>
     </form>
     {% else %}
@@ -71,10 +71,11 @@
     {% if page.page <= page.last-page %}
                        
     <form action="/emails" method="get">
-      <input type="hidden" name="page-size" value="{{page.page-size}}" />
+      <input type="hidden" name="size" value="{{page.size}}" />
       <input type="hidden" name="search-field" value="subject" />
       <input type="hidden" name="search-text" value="{{page.search-text}}" />
       <input type="hidden" name="page" value="{{page.page|add:1}}" />
+      <input type="hidden" name="filter" value="{{page.filter}}" />
       <button class="btn join-item text-xs lg:text-md text-nowrap">Next</button>
     </form>
     {% else %}
@@ -85,7 +86,12 @@
 </div>
 
 <form action="/metadata" id="emails" method="post"></form>
-<input form="emails" hidden="true" name="redirect-url" type="text" value="/emails?page={{page.page}}&page-size={{page.size}}&filter={{page.filter}}">
+<input type="hidden" name="size" value="{{page.size}}" />
+<input type="hidden" name="search-field" value="subject" />
+<input type="hidden" name="search-text" value="{{page.search-text}}" />
+<input type="hidden" name="page" value="{{page.page|add:1}}" />
+<input type="hidden" name="filter" value="{{page.filter}}" />
+<input form="emails" hidden="true" name="redirect-url" type="text" value="/emails">
 <div class="w-full">
   {% for email in emails %}
   <input form="emails" hidden="true" name="message-id" type="text" value="{{email.header.message-id}}">
