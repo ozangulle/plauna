@@ -314,7 +314,9 @@
   (.removeMessageCountListener ^IMAPFolder (:folder connection-data) (:message-count-listener connection-data))
   connection-data)
 
-(defn create-category-folders! [connection-data categories]
+(defn create-category-folders!
+  "Creates folders for the selected categories. Checks if the connection is still intact. Does nothing, if the connection is not intact."
+  [connection-data categories]
   (if (connected? connection-data)
     (do (t/log! :info ["Creating directories from category names" categories])
         (t/log! {:level :info
