@@ -68,5 +68,5 @@
   (let [db (:db context)
         client (:client context)]
     (int/save-category db category)
-    (doseq [connection-data (int/connections client)]
+    (doseq [connection-data (vals (int/connections client))]
       (int/create-category-directories! client connection-data [category]))))
