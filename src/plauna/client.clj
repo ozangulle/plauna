@@ -407,17 +407,18 @@
               message-id (get-in event [:payload :header :message-id])
               ^IMAPFolder folder (get-in event [:options :folder])
               ;; Message classes are not thread safe. Fetch it again. Get the first one found
-              ^IMAPMessage message (aget (.search folder (MessageIDTerm. message-id)) 0)]
-          (try (move-message connection-id message folder category-name)
-               (catch jakarta.mail.FolderClosedException e
-                 (do (t/log! {:level :error :error e})
-                     (let [folder-name (.getName folder)
-                           message-id (.getMessageID message)]
-                       (t/log! :debug ["Lost connection to folder" folder-name "with connection-id" connection-id ". Trying to reconnect and move the message again."])
-                       (reconnect (connection-data-from-id connection-id))
-                       (move-messages-by-id-between-category-folders connection-id message-id folder-name category-name))))
-               (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))
-               (finally (start-idling-for-id connection-id)))
+              message-array (.search folder (MessageIDTerm. message-id))]
+          (if (> (alength message-array) 0)
+            (try (move-message connection-id (aget message-array 0) folder category-name)
+                 (catch jakarta.mail.FolderClosedException e
+                   (do (t/log! {:level :error :error e})
+                       (let [folder-name (.getName folder)]
+                         (t/log! :debug ["Lost connection to folder" folder-name "with connection-id" connection-id ". Trying to reconnect and move the message again."])
+                         (reconnect (connection-data-from-id connection-id))
+                         (move-messages-by-id-between-category-folders connection-id message-id folder-name category-name))))
+                 (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))
+                 (finally (start-idling-for-id connection-id)))
+            (t/log! :error ["Cannot move email because no emails were found with message id" message-id "in folder" (.getName folder)]))
           connection-id)))))
 
 (defn connection-id-for-email
