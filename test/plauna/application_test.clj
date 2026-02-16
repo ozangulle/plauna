@@ -101,4 +101,5 @@
                  (create-category-directories! [_ _ _] (swap! client-called (fn [_] true))))]
     (app/create-new-category! {:db database :client client} "test")
     (is (= true @db-called))
-    (is (= true @client-called))))
+    (is (= true @client-called)))
+  "Creating a new category makes correct database and client calls")

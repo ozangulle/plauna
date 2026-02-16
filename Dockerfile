@@ -4,6 +4,7 @@ COPY . /usr/src/app/
 WORKDIR /usr/src/app
 RUN npm install
 RUN npm run build
+RUN clojure -M:test
 RUN clojure -T:build uber
 
 FROM eclipse-temurin:23.0.2_7-jre-ubi9-minimal
