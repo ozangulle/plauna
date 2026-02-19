@@ -142,3 +142,23 @@
                   client/create-folders (fn [_ category] (swap! create-folder-called (fn [_] category)))]
       (client/create-category-folders! {:store nil} "my-cat")
       (is (= "my-cat" @create-folder-called)))))
+
+(deftest connection-id-for-email-happy-path
+  (let [test-email (->Email nil nil
+                            [(->Participant "find@me.com" nil nil :receiver nil)
+                             (->Participant "nope@test.com" nil nil :sender nil)])
+        test-connection1 (->ConnectionData {:id "id1" :user "find@me.com"} nil nil nil nil nil)
+        test-connection2 (->ConnectionData {:id "id2" :user "wrong@one.com"} nil nil nil nil nil)
+        result (client/connection-id-for-email [test-connection1 test-connection2] test-email)]
+    (is (= "id1" result)))
+  "Given a vector of ConnectionData, the function finds the correct ConnectionData id.")
+
+(deftest connection-id-for-email-sad-path
+  (let [test-email (->Email nil nil
+                            [(->Participant "cannotfind@me.com" nil nil :receiver nil)
+                             (->Participant "nope@test.com" nil nil :sender nil)])
+        test-connection1 (->ConnectionData {:id "id1" :user "find@me.com"} nil nil nil nil nil)
+        test-connection2 (->ConnectionData {:id "id2" :user "wrong@one.com"} nil nil nil nil nil)
+        result (client/connection-id-for-email [test-connection1 test-connection2] test-email)]
+    (is (nil? result)))
+  "Given a vector of ConnectionData, the function returns nil if it cannot find the correct id.")

@@ -428,7 +428,7 @@
           result nil]
     (if (or (some? result) (nil? (seq connections)))
       result
-      (let [^ConnectionData connection (first (vals connections))
+      (let [^ConnectionData connection (first connections)
             recipients (filterv #(= :receiver (:type %)) (:participants email))
             connection-user (get-in connection [:config :user])
             match (get (filterv (fn [sender] (= (:address sender) connection-user)) recipients) 0)]
@@ -438,7 +438,9 @@
   int/EmailClient
   (start-monitor [_ config] (connect config))
   (connections [_] @connections)
-  (create-category-directories! [_ connection-data category-names] (create-category-folders! connection-data category-names)))
+  (create-category-directories! [_ connection-data category-names] (create-category-folders! connection-data category-names))
+  (connection-id-for-email [_ connections email] (connection-id-for-email connections email))
+  (move-email-between-categories [_ connection-id message-id old-category new-category] (move-messages-by-id-between-category-folders connection-id message-id old-category new-category)))
 
 (defn client-event-loop
   "Listens to :enriched-email

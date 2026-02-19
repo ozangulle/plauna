@@ -70,3 +70,21 @@
     (int/save-category db category)
     (doseq [connection-data (vals (int/connections client))]
       (int/create-category-directories! client connection-data [category]))))
+
+(defn move-email-to-category
+  "Email address of the recipient is usually the 'username' in the connection data. It may be different, if the user is using some kind of email masking service. If the email and the username match, we know where to look for. If not, we have to loop over the connections and try to find the email by id before moving it to its new directory. This all pressupposes that the message-id is really unique."
+  [email category {:keys [db client] :as context}]
+  (let [connections (vals (int/connections client))
+        connection-id-guess (int/connection-id-for-email client connections email)
+        message-id (-> email :header :message-id)
+        old-category (-> email :metadata :category)]
+    (if (some? connection-id-guess)
+      (do
+        (t/log! :debug ["Email seems to belong to the connection with the id" connection-id-guess])
+        (int/move-email-between-categories client connection-id-guess message-id old-category category))
+      (doseq [key-val connections
+              :let [id (get-in key-val [:config :id])]]
+        (try
+          (t/log! :debug ["Move message-id" message-id])
+          (int/move-email-between-categories client id message-id old-category category)
+          (catch jakarta.mail.FolderNotFoundException e (t/log! :debug e)))))))

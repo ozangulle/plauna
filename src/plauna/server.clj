@@ -284,25 +284,10 @@
       (if (some? (:move (:params request)))
         (let [message-id (:message-id (:params request))
               email-before-update (enriched-email-by-message-id message-id)
-              _ (save-metadata-form (:params request))
-              updated-email (enriched-email-by-message-id message-id)
-              connection-id-guess (client/connection-id-for-email @client/connections email-before-update)]
-          (if (some? connection-id-guess)
-            (do
-              (t/log! :debug ["Email seems to belong to the connection with the id" connection-id-guess])
-              (client/move-messages-by-id-between-category-folders connection-id-guess
-                                                                   message-id
-                                                                   (-> email-before-update :metadata :category)
-                                                                   (-> updated-email :metadata :category)))
-            (doseq [key-val @client/connections
-                    :let [id (first key-val)]]
-              (try
-                (t/log! :debug ["Move message-id" message-id])
-                (client/move-messages-by-id-between-category-folders id
-                                                                     message-id
-                                                                     (-> email-before-update :metadata :category)
-                                                                     (-> updated-email :metadata :category))
-                (catch jakarta.mail.FolderNotFoundException e (t/log! :debug e))))))
+              new-category-id (Integer/parseInt (:category (:params request)))
+              new-category-name (get (first (filter #(= (:id %) new-category-id) (db/get-categories))) :name "")]
+          (app/move-email-to-category email-before-update new-category-name context)
+          (save-metadata-form (:params request)))
         (save-metadata-form (:params request)))
       (redirect-to-referer request))
 
