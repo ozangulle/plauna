@@ -91,8 +91,11 @@
          emails-with-java-date (map #(update-in % [:header :date] timestamp->date) emails)]
      (render-file "emails.html" {:emails emails-with-java-date :page (conj page-info last-page) :header "Emails" :categories categories :messages (mapv type->toast-role messages) :active-nav :emails}))))
 
-(defn list-email-contents [email-data categories]
-  (render-file "email.html" {:email (update-in email-data [:header :date] timestamp->date) :categories categories :active-nav :emails}))
+(defn list-email-contents
+  ([email-data categories]
+   (render-file "email.html" {:email (update-in email-data [:header :date] timestamp->date) :categories categories :active-nav :emails}))
+  ([email-data categories messages]
+   (render-file "email.html" {:email (update-in email-data [:header :date] timestamp->date) :categories categories :active-nav :emails :messages (mapv type->toast-role messages)})))
 
 (defmacro pie-chart [data-values key key-label description]
   `{:data {:values ~data-values}

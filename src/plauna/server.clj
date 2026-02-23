@@ -4,12 +4,10 @@
             [plauna.application :as app]
             [plauna.markup :as markup]
             [plauna.files :as files]
-            [plauna.util.page :as page]
             [plauna.client :as client]
             [plauna.client.oauth :as oauth]
             [plauna.preferences :as p]
             [plauna.core.email :as core-email]
-            [clojure.math :refer [ceil]]
             [compojure.core :as comp]
             [compojure.route :as route]
             [ring.middleware.params :refer [wrap-params]]
@@ -40,6 +38,8 @@
 (def html-headers {"Content-Type" "text/html; charset=UTF-8"})
 
 (defonce global-messages (atom []))
+
+(defn add-to-messages [message] (swap! global-messages (fn [messages] (conj messages message))))
 
 (defn interleave-all [& seqs]
   (reduce (fn [acc index] (into acc (map #(get % index) seqs)))
@@ -197,7 +197,14 @@
     (client/folders-in-store (:store (client/connection-data-from-id (:id conn))))
     []))
 
-(defn empty-global-messages [] (swap! global-messages (fn [_] [])))
+(defn empty-global-messages [] (reset! global-messages []))
+
+(defmacro result-with-messages [markup-call messages-var]
+  `(if (seq @~messages-var)
+     (let [messages# @~messages-var]
+       (reset! ~messages-var [])
+       (~@markup-call messages#))
+     ~markup-call))
 
 (defn make-routes [context]
   (comp/defroutes routes
@@ -284,25 +291,12 @@
       (if (some? (:move (:params request)))
         (let [message-id (:message-id (:params request))
               email-before-update (enriched-email-by-message-id message-id)
-              _ (save-metadata-form (:params request))
-              updated-email (enriched-email-by-message-id message-id)
-              connection-id-guess (client/connection-id-for-email @client/connections email-before-update)]
-          (if (some? connection-id-guess)
-            (do
-              (t/log! :debug ["Email seems to belong to the connection with the id" connection-id-guess])
-              (client/move-messages-by-id-between-category-folders connection-id-guess
-                                                                   message-id
-                                                                   (-> email-before-update :metadata :category)
-                                                                   (-> updated-email :metadata :category)))
-            (doseq [key-val @client/connections
-                    :let [id (first key-val)]]
-              (try
-                (t/log! :debug ["Move message-id" message-id])
-                (client/move-messages-by-id-between-category-folders id
-                                                                     message-id
-                                                                     (-> email-before-update :metadata :category)
-                                                                     (-> updated-email :metadata :category))
-                (catch jakarta.mail.FolderNotFoundException e (t/log! :debug e))))))
+              new-category-id (Integer/parseInt (:category (:params request)))
+              new-category-name (get (first (filter #(= (:id %) new-category-id) (db/get-categories))) :name "")
+              process (app/move-email-to-category email-before-update new-category-name context)]
+          (if (= :error (:result process))
+            (add-to-messages (:message process))
+            (save-metadata-form (:params request))))
         (save-metadata-form (:params request)))
       (redirect-to-referer request))
 
@@ -319,19 +313,13 @@
     (comp/GET "/emails" {params :params}
       (let [parse-fn (template->request-parameters emails-template)
             result (app/fetch-emails context (parse-fn params))]
-        (if (seq @global-messages)
-          (let [messages @global-messages]
-            (swap! global-messages (fn [_] []))
-            (success-html-with-body (markup/list-emails (:data result) (:parameters result) (:categories (:optional result)) messages)))
-          (success-html-with-body (markup/list-emails (:data result) (:parameters result) (:categories (:optional result)))))))
+        (success-html-with-body (result-with-messages (markup/list-emails (:data result) (:parameters result) (:categories (:optional result))) global-messages))))
 
     (comp/GET "/emails/:id" [id]
       (let [decoded-id (new String ^"[B" (base64-decode id))
             email-data (add-sanitized-text-to-enriched-email (enriched-email-by-message-id decoded-id))
             categories (conj (db/get-categories) {:id nil :name "n/a"})]
-        {:status 200
-         :header html-headers
-         :body   (markup/list-email-contents email-data categories)}))
+        (success-html-with-body (result-with-messages (markup/list-email-contents email-data categories) global-messages))))
 
     (comp/DELETE "/emails/:id" [id]
       (db/delete-email-by-message-id (new String ^"[B" (base64-decode id)))

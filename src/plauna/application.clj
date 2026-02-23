@@ -21,6 +21,10 @@
           (nil? val2) map1
           :else (conj map1 {key [combination-key val1 val2]}))))
 
+(defn- success-result [result-type data] (conj {:result result-type} data))
+
+(defn- error-result [exception alert-content] {:result :error :exception exception :message {:type :alert :content alert-content}})
+
 (defn categories
   "There is no entry for 'no entry' in the database. This function adds a 'n/a' entry to the actual list."
   [db] (conj (int/fetch-categories db) {:id nil :name "n/a"}))
@@ -40,12 +44,11 @@
             (or (nil? oauth-data) (nil? (:access-token oauth-data)) (nil? (:refresh-token oauth-data)))
             (do
               (t/log! :warn ["Connection" (:user connection) (:host connection) "is set to use oauth2 but has no tokens in the db. You need to login manually from the 'Connections' page first."])
-              {:result :redirect
-               :provider (int/fetch-auth-provider db (:auth-provider connection))})
-            :else (do (int/start-monitor client connection) {:result :ok})))
+              (success-result :redirect {:provider (int/fetch-auth-provider db (:auth-provider connection))}))
+            :else (do (int/start-monitor client connection) (success-result :ok nil))))
         (do (int/start-monitor client connection) {:result :ok})))
     (catch Exception e (do (t/log! :error ["There was an error when trying to log in:" e])
-                           {:result :error :exception e}))))
+                           (error-result e "There was an error when trying to log in.")))))
 
 (defn fetch-emails
   "Returns a list of emails. Customizable by parameters which can contain the following keys:
@@ -70,3 +73,32 @@
     (int/save-category db category)
     (doseq [connection-data (vals (int/connections client))]
       (int/create-category-directories! client connection-data [category]))))
+
+(defn move-email-to-category
+  "Email address of the recipient is usually the 'username' in the connection data. It may be different, if the user is using some kind of email masking service. If the email and the username match, we know where to look for. If not, we have to loop over the connections and try to find the email by id before moving it to its new directory. This all pressupposes that the message-id is really unique."
+  [email category {:keys [client]}]
+  (let [connections (vals (int/connections client))
+        connection-id-guess (int/connection-id-for-email client connections email)
+        message-id (-> email :header :message-id)
+        old-category (-> email :metadata :category)]
+    (try
+      (cond (nil? (seq connections))
+            (error-result nil "There are no active connections.")
+
+            (some? connection-id-guess)
+            (do
+              (t/log! :debug ["Email seems to belong to the connection with the id" connection-id-guess])
+              (if (true? (int/move-email-between-categories client connection-id-guess message-id old-category category))
+                (success-result :ok nil)
+                (error-result nil "Moving email failed. Please check the logs.")))
+
+            :else
+            (let [results (for [conn connections
+                                :let [id (get-in conn [:config :id])]]
+                            (do (t/log! :debug ["Move message-id" message-id])
+                                (int/move-email-between-categories client id message-id old-category category)))]
+              (if (some true? results)
+                (success-result :ok nil)
+                (error-result nil "Moving email failed. Please check the logs."))))
+
+      (catch Exception e (t/log! :error e) (error-result e "Moving email failed. Please check the logs.")))))

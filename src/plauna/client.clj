@@ -241,7 +241,9 @@
 
 (defn connected? [^ConnectionData connection-data] (.isConnected ^Store (:store connection-data)))
 
-(defn move-messages-by-id-between-category-folders [^String id message-id ^String source-name ^String target-name]
+(defn move-messages-by-id-between-category-folders
+  "Return true if the message could be moved. False if not."
+  [^String id message-id ^String source-name ^String target-name]
   (let [^ConnectionData connection-data (connection-data-from-id id)]
     (if (connected? connection-data)
       (let [^Store store (:store connection-data)
@@ -251,17 +253,23 @@
                     ^IMAPFolder source-folder (open-folder-in-store store source-folder-name)]
           (let [found-messages (.search source-folder (MessageIDTerm. message-id))]
             (t/log! :debug ["Found" (count found-messages) "messages when searched for the message-id:" message-id])
-            (when (seq found-messages)
+            (if (some? (seq found-messages))
               (if (= target-folder-name (:folder (:config connection-data)))
                 (do
                   (stop-monitoring connection-data)
                   (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
                   (.moveMessages source-folder (into-array Message found-messages) target-folder)
-                  (start-monitoring connection-data))
+                  (start-monitoring connection-data)
+                  true)
                 (do
                   (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
-                  (.moveMessages source-folder (into-array Message found-messages) target-folder)))))))
-      (t/log! :info ["IMAP store in connection" (:id (:config connection-data)) "is not connected. Cancelling the move attempt."]))))
+                  (.moveMessages source-folder (into-array Message found-messages) target-folder)
+                  true))
+              (do (t/log! :info ["No messages found in" source-folder-name "in store" (.getURLName store)])
+                  false)))))
+      (do
+        (t/log! :info ["IMAP store in connection" (:id (:config connection-data)) "is not connected. Cancelling the move attempt."])
+        false))))
 
 (defn refresh-access-token [connection-config]
   (let [provider (db/get-auth-provider (:auth-provider connection-config))
@@ -319,9 +327,10 @@
   [connection-data categories]
   (if (connected? connection-data)
     (do (t/log! :info ["Creating directories from category names" categories])
-        (t/log! {:level :info
-                 :data  {:result (create-folders (:store connection-data) categories)}}
-                "Created the directories."))
+        (let [result (create-folders (:store connection-data) categories)]
+          (t/log! {:level :info
+                   :data  {:result result}}
+                  "Created the directories.")))
     (t/log! :info "Could not create directories on the IMAP server: The store is not connected."))
   connection-data)
 
@@ -428,7 +437,7 @@
           result nil]
     (if (or (some? result) (nil? (seq connections)))
       result
-      (let [^ConnectionData connection (first (vals connections))
+      (let [^ConnectionData connection (first connections)
             recipients (filterv #(= :receiver (:type %)) (:participants email))
             connection-user (get-in connection [:config :user])
             match (get (filterv (fn [sender] (= (:address sender) connection-user)) recipients) 0)]
@@ -438,7 +447,9 @@
   int/EmailClient
   (start-monitor [_ config] (connect config))
   (connections [_] @connections)
-  (create-category-directories! [_ connection-data category-names] (create-category-folders! connection-data category-names)))
+  (create-category-directories! [_ connection-data category-names] (create-category-folders! connection-data category-names))
+  (connection-id-for-email [_ connections email] (connection-id-for-email connections email))
+  (move-email-between-categories [_ connection-id message-id old-category new-category] (move-messages-by-id-between-category-folders connection-id message-id old-category new-category)))
 
 (defn client-event-loop
   "Listens to :enriched-email

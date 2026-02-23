@@ -13,4 +13,6 @@
   "Email client"
   (start-monitor [this config] "Connect to the client")
   (connections [this] "Get a list of connections")
-  (create-category-directories! [this connection-data category-names]))
+  (create-category-directories! [this connection-data category-names])
+  (connection-id-for-email [this connections email])
+  (move-email-between-categories [this connection-id message-id old-category new-category]))

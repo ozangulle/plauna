@@ -3,9 +3,12 @@
             [clojure.core.async :as async]
             [plauna.client :as client :refer [->ConnectionData]]
             [plauna.core.email :as core-email :refer [->Email ->Participant]]
+            [taoensso.telemere :as t]
             [plauna.core.events :as events])
   (:import (java.util Properties)
            (jakarta.mail Session)))
+
+(t/set-min-level! :error)
 
 (deftest ssl-properties-set-correctly
   (let [session ^Session (client/config->session {:security "ssl" :port 993})
@@ -93,7 +96,7 @@
                        [(->Participant "test@test.com" nil nil :receiver nil)
                         (->Participant "nope@test.com" nil nil :sender nil)])
         connection-data (->ConnectionData {:user "test@test.com" :id "correct-id"} nil nil nil nil nil)]
-    (is (= "correct-id" (client/connection-id-for-email {"correct-id" connection-data} email)))))
+    (is (= "correct-id" (client/connection-id-for-email [connection-data] email)))))
 
 (deftest connection-id-from-email-success-multiple-connections
   (let [email (->Email nil nil
@@ -101,7 +104,7 @@
                         (->Participant "nope@test.com" nil nil :sender nil)])
         connection-data (->ConnectionData {:user "test@test.com" :id "correct-id"} nil nil nil nil nil)
         connection-data2 (->ConnectionData {:user "nope@test.com" :id "wrong-id"} nil nil nil nil nil)]
-    (is (= "correct-id" (client/connection-id-for-email {"correct-id" connection-data "wrong-id" connection-data2} email)))))
+    (is (= "correct-id" (client/connection-id-for-email [connection-data connection-data2] email)))))
 
 (deftest connection-id-from-email-fail
   (let [email (->Email nil nil
@@ -142,3 +145,29 @@
                   client/create-folders (fn [_ category] (swap! create-folder-called (fn [_] category)))]
       (client/create-category-folders! {:store nil} "my-cat")
       (is (= "my-cat" @create-folder-called)))))
+
+(deftest connection-id-for-email-happy-path
+  (let [test-email (->Email nil nil
+                            [(->Participant "find@me.com" nil nil :receiver nil)
+                             (->Participant "nope@test.com" nil nil :sender nil)])
+        test-connection1 (->ConnectionData {:id "id1" :user "find@me.com"} nil nil nil nil nil)
+        test-connection2 (->ConnectionData {:id "id2" :user "wrong@one.com"} nil nil nil nil nil)
+        result (client/connection-id-for-email [test-connection1 test-connection2] test-email)]
+    (is (= "id1" result)))
+  "Given a vector of ConnectionData, the function finds the correct ConnectionData id.")
+
+(deftest connection-id-for-email-sad-path
+  (let [test-email (->Email nil nil
+                            [(->Participant "cannotfind@me.com" nil nil :receiver nil)
+                             (->Participant "nope@test.com" nil nil :sender nil)])
+        test-connection1 (->ConnectionData {:id "id1" :user "find@me.com"} nil nil nil nil nil)
+        test-connection2 (->ConnectionData {:id "id2" :user "wrong@one.com"} nil nil nil nil nil)
+        result (client/connection-id-for-email [test-connection1 test-connection2] test-email)]
+    (is (nil? result)))
+  "Given a vector of ConnectionData, the function returns nil if it cannot find the correct id.")
+
+(deftest move-emails-test-no-connection
+  (with-redefs [client/connected? (fn [_] false)
+                client/connection-data-from-id (fn [_] {})]
+    (is (false? (client/move-messages-by-id-between-category-folders "fake" "does-no-exist" "test" "test2"))))
+  "If the store is not connected, return false immediately.")

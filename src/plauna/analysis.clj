@@ -14,7 +14,6 @@
    (opennlp.tools.util MarkableFileInputStreamFactory PlainTextByLineStream TrainingParameters)
    (opennlp.tools.doccat DocumentSampleStream DocumentCategorizerME DoccatFactory DoccatModel)
    (opennlp.tools.ml.naivebayes NaiveBayesTrainer)
-   (opennlp.tools.ml.maxent GISTrainer)
    (java.util Locale)
    (java.util.regex Pattern)
    (java.io File OutputStream)))

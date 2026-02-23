@@ -3,10 +3,13 @@
             [clojure.java.io :as io]
             [clojure.string :as s]
             [plauna.files :as files]
+            [taoensso.telemere :as t]
             [plauna.util.async :as async-utils]
             [plauna.core.email :as core-email]
             [plauna.parser :as parser]
             [clojure.core.async :refer [pub sub chan >!!] :as async]))
+
+(t/set-min-level! :error)
 
 (defn resource->is [resource-path]
   (io/input-stream (io/resource resource-path)))

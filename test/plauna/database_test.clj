@@ -2,7 +2,10 @@
   (:require [clojure.test :refer :all]
             [clojure.core.async :as async]
             [plauna.database :as db]
+            [taoensso.telemere :as t]
             [plauna.files :as files]))
+
+(t/set-min-level! :error)
 
 (defn setup-clean-db [f]
   (swap! files/plauna-config (fn [_] {:data-folder "tmp/"}))

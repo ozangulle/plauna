@@ -103,3 +103,47 @@
     (is (= true @db-called))
     (is (= true @client-called)))
   "Creating a new category makes correct database and client calls")
+
+(deftest move-email-without-connections
+  (let [client (reify int/EmailClient
+                 (connections [_] {})
+                 (connection-id-for-email [_ _ _] nil))
+        test-result (app/move-email-to-category {} "test" {:client client})]
+    (is (= :error (:result test-result))))
+  "If there are no connections, just moving email returns an error result.")
+
+(deftest move-email-with-guessed-connection-id-success
+  (let [client (reify int/EmailClient
+                 (connections [_] {"test" {}})
+                 (connection-id-for-email [_ _ _] "test")
+                 (move-email-between-categories [_ _ _ _ _] true))
+        test-result (app/move-email-to-category {} "test-cat" {:client client})]
+    (is (= :ok (:result test-result))))
+  "Successfully moving an email with a guessed connection id returns result :ok")
+
+(deftest move-email-with-guessed-connection-id-error
+  (let [client (reify int/EmailClient
+                 (connections [_] {"test" {}})
+                 (connection-id-for-email [_ _ _] "test")
+                 (move-email-between-categories [_ _ _ _ _] false))
+        test-result (app/move-email-to-category {} "test-cat" {:client client})]
+    (is (= :error (:result test-result))))
+  "Unsuccessfully moving an email with a guessed connection id returns result :error")
+
+(deftest move-email-without-guessed-connection-id-success
+  (let [client (reify int/EmailClient
+                 (connections [_] {"test1" {:config {:id "test1"}} "test2" {:config {:id "test2"}}})
+                 (connection-id-for-email [_ _ _] nil)
+                 (move-email-between-categories [_ id _ _ _] (= id "test2")))
+        test-result (app/move-email-to-category {} "test-cat" {:client client})]
+    (is (= :ok (:result test-result))))
+  "Successfully moving an email without guessed connection id returns result :ok even if the process failed in some other connection.")
+
+(deftest move-email-without-guessed-connection-id-error
+  (let [client (reify int/EmailClient
+                 (connections [_] {"test1" {:config {:id "test1"}} "test2" {:config {:id "test2"}}})
+                 (connection-id-for-email [_ _ _] nil)
+                 (move-email-between-categories [_ id _ _ _] (= id "test3")))
+        test-result (app/move-email-to-category {} "test-cat" {:client client})]
+    (is (= :error (:result test-result))))
+  "Unsuccessfully moving an email without guessed connection id returns result :error")
