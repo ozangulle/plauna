@@ -5,13 +5,13 @@
 
 (deftest basic-auth
   (let [database (reify int/DB (fetch-connection [_ id] {:id id :auth-type "basic"}))
-        client (reify int/EmailClient (start-monitor [_ config]))
+        client (reify int/EmailClient (start-monitor [_ config context]))
         context {:db database :client client}]
     (is (= {:result :ok} (app/connect-to-client context "abc"))  "Basic authentication calls email-client's login method and returns ok")))
 
 (deftest basic-auth-2
   (let [database (reify int/DB (fetch-connection [_ id] {:id id}))
-        client (reify int/EmailClient (start-monitor [_ config]))
+        client (reify int/EmailClient (start-monitor [_ config context]))
         context {:db database :client client}]
     (is (= {:result :ok} (app/connect-to-client context "abc"))  "If no auth-type is defined, fall back on basic auth and return ok")))
 
@@ -20,7 +20,7 @@
                    (fetch-connection [_ id] {:id id :auth-type "oauth2" :auth-provider 2})
                    (fetch-oauth-token-data [_ id] nil)
                    (fetch-auth-provider [_ id] {:id id}))
-        client (reify int/EmailClient (start-monitor [_ config]))
+        client (reify int/EmailClient (start-monitor [_ config context]))
         context {:db database :client client}]
     (is (= {:result :redirect, :provider {:id 2}}
            (app/connect-to-client context "abc"))
@@ -31,7 +31,7 @@
                    (fetch-connection [_ id] {:id id :auth-type "oauth2" :auth-provider 2})
                    (fetch-oauth-token-data [_ id] {:access-token "not empty" :refresh-token "not empty"})
                    (fetch-auth-provider [_ id] {:id id}))
-        client (reify int/EmailClient (start-monitor [_ config]))
+        client (reify int/EmailClient (start-monitor [_ config context]))
         context {:db database :client client}]
     (is (= {:result :ok}
            (app/connect-to-client context "abc"))
@@ -42,7 +42,7 @@
                    (fetch-connection [_ id] {:id id :auth-type "oauth2" :auth-provider 2})
                    (fetch-oauth-token-data [_ id] nil)
                    (fetch-auth-provider [_ id] nil))
-        client (reify int/EmailClient (start-monitor [_ config]))
+        client (reify int/EmailClient (start-monitor [_ config context]))
         context {:db database :client client}]
     (is (= :error (:result (app/connect-to-client context "abc"))))
     "auth-type 'oauth2' with no auth provider returns an errorq"))
@@ -52,7 +52,7 @@
                    (fetch-connection [_ id] {:id id :auth-type "oauth2" :auth-provider 2})
                    (fetch-oauth-token-data [_ id] {:access-token "not empty"})
                    (fetch-auth-provider [_ id] {:id id}))
-        client (reify int/EmailClient (start-monitor [_ config]))
+        client (reify int/EmailClient (start-monitor [_ config context]))
         context {:db database :client client}]
     (is (= {:result :redirect, :provider {:id 2}}
            (app/connect-to-client context "abc"))
@@ -116,7 +116,7 @@
   (let [client (reify int/EmailClient
                  (connections [_] {"test" {}})
                  (connection-id-for-email [_ _ _] "test")
-                 (move-email-between-categories [_ _ _ _ _] true))
+                 (move-email-between-categories [_ _ _ _ _ _] true))
         test-result (app/move-email-to-category {} "test-cat" {:client client})]
     (is (= :ok (:result test-result))))
   "Successfully moving an email with a guessed connection id returns result :ok")
@@ -125,7 +125,7 @@
   (let [client (reify int/EmailClient
                  (connections [_] {"test" {}})
                  (connection-id-for-email [_ _ _] "test")
-                 (move-email-between-categories [_ _ _ _ _] false))
+                 (move-email-between-categories [_ _ _ _ _ _] false))
         test-result (app/move-email-to-category {} "test-cat" {:client client})]
     (is (= :error (:result test-result))))
   "Unsuccessfully moving an email with a guessed connection id returns result :error")
@@ -134,7 +134,7 @@
   (let [client (reify int/EmailClient
                  (connections [_] {"test1" {:config {:id "test1"}} "test2" {:config {:id "test2"}}})
                  (connection-id-for-email [_ _ _] nil)
-                 (move-email-between-categories [_ id _ _ _] (= id "test2")))
+                 (move-email-between-categories [_ id _ _ _ _] (= id "test2")))
         test-result (app/move-email-to-category {} "test-cat" {:client client})]
     (is (= :ok (:result test-result))))
   "Successfully moving an email without guessed connection id returns result :ok even if the process failed in some other connection.")
@@ -143,7 +143,7 @@
   (let [client (reify int/EmailClient
                  (connections [_] {"test1" {:config {:id "test1"}} "test2" {:config {:id "test2"}}})
                  (connection-id-for-email [_ _ _] nil)
-                 (move-email-between-categories [_ id _ _ _] (= id "test3")))
+                 (move-email-between-categories [_ id _ _ _ _] (= id "test3")))
         test-result (app/move-email-to-category {} "test-cat" {:client client})]
     (is (= :error (:result test-result))))
   "Unsuccessfully moving an email without guessed connection id returns result :error")

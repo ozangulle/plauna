@@ -14,7 +14,8 @@
    [plauna.core.email :as core.email]
    [plauna.interfaces :as int])
   (:import [plauna.client ImapClient]
-           [plauna.database SqliteDB])
+           [plauna.database SqliteDB]
+           [plauna.analysis BasicAnalyzer])
   (:gen-class))
 
 (defn setup-logging []
@@ -25,7 +26,7 @@
 (set! *warn-on-reflection* true)
 
 (def event-register {:enrichment-event-loop (fn [] (analysis/enrichment-event-loop @messaging/main-publisher @messaging/main-chan))
-                     :client-event-loop (fn [] (client/client-event-loop @messaging/main-publisher))
+                     ;:client-event-loop (fn [] (client/client-event-loop @messaging/main-publisher))
                      :database-event-loop (fn [] (db/database-event-loop @messaging/main-publisher))
                      :parser-event-loop (fn [] (parser/parser-event-loop @messaging/main-publisher @messaging/main-chan))})
 
@@ -54,7 +55,7 @@
   [& args]
   (setup-logging)
   (let [application-config (files/parse-config-from-cli-arguments args)
-        context {:config application-config :client (ImapClient.) :db (SqliteDB.)}]
+        context {:config application-config :client (ImapClient.) :db (SqliteDB.) :analyzer (BasicAnalyzer.)}]
     (files/check-and-create-database-file)
     (db/create-db)
     (t/log! :info "Setting log level according to preferences.")
@@ -65,4 +66,8 @@
 
 (comment
   (server/start-server {:config {:server {:port 8080}}})
-  (server/stop-server))
+  (server/stop-server)
+  (require '[flow-storm.api :as fs-api])
+  (fs-api/local-connect)
+  (client/disconnect-all))
+

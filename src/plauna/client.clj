@@ -8,10 +8,13 @@
    [clojure.string :as s]
    [taoensso.telemere :as t]
    [plauna.interfaces :as int]
-   [plauna.messaging :as messaging])
+   [plauna.messaging :as messaging]
+   [plauna.application :as app])
   (:import
+   (plauna.core.email Header Body-Part Participant Email)
    (clojure.lang PersistentVector)
-   (jakarta.mail Store Session Folder Message Flags$Flag AuthenticationFailedException)
+   (jakarta.mail Store Session Folder BodyPart Multipart Message Message$RecipientType Flags$Flag AuthenticationFailedException)
+   (jakarta.mail.internet InternetAddress)
    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
    (jakarta.mail.event MessageCountAdapter MessageCountEvent MessageCountListener)
    (jakarta.mail.search MessageIDTerm)
@@ -168,6 +171,52 @@
 (defn add-to-connections [^ConnectionData connection-data]
   (swap! connections conj {(:id (.config connection-data)) connection-data}))
 
+;; Construct email from message
+
+(defn mime-type [content-type] (s/lower-case (first (s/split content-type #";"))))
+
+(defn charset [content-type] (s/lower-case (or (second (s/split (second (s/split content-type #";")) #"=")) "ascii")))
+
+(defn create-header [^IMAPMessage message]
+  (new Header (.getMessageID message) (.getInReplyTo message) (.getSubject message) (mime-type (.getContentType message)) (quot (.getTime (.getSentDate message)) 1000)))
+
+(defmulti create-body-part (fn [body-part _] (type body-part)))
+
+(defmethod create-body-part String [content ^IMAPMessage message]
+  (new Body-Part (.getMessageID message) (charset (.getContentType message)) (mime-type (.getContentType message)) (first (.getHeader message "Content-transfer-encoding")) content (.getFileName message) (.getDisposition message)))
+
+(defmethod create-body-part BodyPart [^BodyPart bodypart ^IMAPMessage message]
+  (new Body-Part (.getMessageID message) (charset (.getContentType bodypart)) (mime-type (.getContentType bodypart)) (first (.getHeader bodypart "Content-transfer-encoding")) (.getContent bodypart) (.getFileName bodypart) (.getDisposition bodypart)))
+
+(defmethod create-body-part Multipart [^Multipart multipart ^IMAPMessage message]
+  (for [i (range 0 (.getCount multipart))] (doall (create-body-part (.getBodyPart multipart i) message))))
+
+;; TODO remove duplication with parser.clj
+(defn uuid [^String name] (str (java.util.UUID/nameUUIDFromBytes (.getBytes name))))
+
+(defmulti create-participant (fn [address _ _] (type address)))
+
+(defmethod create-participant InternetAddress [^InternetAddress address contact-type message-id]
+  (let [name (.getPersonal address)
+        address (.getAddress address)
+        contact-key (uuid (str name address))]
+    (new Participant address name contact-key contact-type message-id)))
+
+(defn create-participants [^IMAPMessage message]
+  (let [sender (.getSender message)
+        message-id (.getMessageID message)
+        sender-participant (create-participant sender :sender message-id)
+        recipient-participants (mapv (fn [address] (create-participant address :receiver message-id)) (.getRecipients message Message$RecipientType/TO))
+        cc-participants (mapv (fn [address] (create-participant address :cc message-id)) (.getRecipients message Message$RecipientType/CC))
+        bcc-participants (mapv (fn [address] (create-participant address :cc message-id)) (.getRecipients message Message$RecipientType/BCC))]
+    (flatten [sender-participant recipient-participants cc-participants bcc-participants])))
+
+(defn message->email [^IMAPMessage message]
+  (new Email
+       (create-header message)
+       (flatten [(create-body-part (.getContent message) message)])
+       (create-participants message)))
+
 ;; Calls
 
 (defn capability-name [^IMAPStore store ^String cap-name]
@@ -182,16 +231,16 @@
     (t/log! :debug ["Starting to idle for id:" id "using connection-data" connection-data])
     (.watch ^IdleManager (.idle-manager connection-data) (.folder connection-data))))
 
-(defn message-count-listener [connection-id folder folder-name]
+(defn message-count-listener [connection-id folder folder-name context]
   (proxy [MessageCountAdapter] []
     (messagesAdded [^MessageCountEvent event]
       (t/log! :info "Received new message event.")
       (doseq [message ^IMAPMessage (.getMessages event)]
         (t/log! :debug ["Processing message:" message])
         (.setPeek ^IMAPMessage message true)
-        (with-open [os ^OutputStream (ByteArrayOutputStream.)]
-          (.writeTo ^IMAPMessage message os)
-          (async/>!! @messaging/main-chan (events/create-event :received-email (.toByteArray os) {:enrich true :move true :connection-id connection-id :folder folder :original-folder folder-name :message message})))
+        (app/handle-incoming-imap-email (message->email message)
+                                        {:connection-id connection-id :move true :origin-folder folder :message message}
+                                        context)
         (let [conn-data ^ConnectionData (connection-data-from-id connection-id)]
           (t/log! :debug ["Idling on the folder" folder-name "while waiting for new messages."])
           (.watch ^IdleManager (.idle-manager conn-data) (.folder conn-data)))))))
@@ -243,7 +292,7 @@
 
 (defn move-messages-by-id-between-category-folders
   "Return true if the message could be moved. False if not."
-  [^String id message-id ^String source-name ^String target-name]
+  [^String id message-id ^String source-name ^String target-name context]
   (let [^ConnectionData connection-data (connection-data-from-id id)]
     (if (connected? connection-data)
       (let [^Store store (:store connection-data)
@@ -259,7 +308,7 @@
                   (stop-monitoring connection-data)
                   (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
                   (.moveMessages source-folder (into-array Message found-messages) target-folder)
-                  (start-monitoring connection-data)
+                  (start-monitoring connection-data context)
                   true)
                 (do
                   (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
@@ -285,18 +334,20 @@
 
 ;; Public Interface
 
-(defn construct-connection-data [connection-config]
+(defn construct-connection-data [connection-config context]
   (let [idle-manager (IdleManager. (config->session connection-config) (Executors/newCachedThreadPool))
         store (login connection-config)
         id (:id connection-config)
         folder-name-to-monitor (monitor-folder-name (:folder connection-config))
         folder (open-folder-in-store store folder-name-to-monitor)
-        listener (message-count-listener id folder folder-name-to-monitor)
+        listener (message-count-listener id folder folder-name-to-monitor context)
         connection-data (->ConnectionData connection-config store folder idle-manager (capabilities store) listener)]
     (add-to-connections connection-data)
     connection-data))
 
 (defn disconnect [^AutoCloseable connection-data] (.close connection-data))
+
+(defn disconnect-all [] (doseq [connection (vals @connections)] (disconnect connection)))
 
 (defn reconnect [^ConnectionData connection-data]
   (try
@@ -305,9 +356,9 @@
     (login (.config connection-data) (.store connection-data))
     (catch AuthenticationFailedException e (t/log! :error e))))
 
-(defn start-monitoring [connection-data]
+(defn start-monitoring [connection-data context]
   (try
-    (.addMessageCountListener ^IMAPFolder (:folder connection-data) (message-count-listener (:id (:config connection-data)) (:folder connection-data) (-> connection-data :config :folder)))
+    (.addMessageCountListener ^IMAPFolder (:folder connection-data) (message-count-listener (:id (:config connection-data)) (:folder connection-data) (-> connection-data :config :folder) context))
     (t/log! :info ["Started monitoring for" (:folder (:config connection-data)) "in" (.getURLName ^Store (:store connection-data))])
     (.watch ^IdleManager (:idle-manager connection-data) ^Folder (:folder connection-data))
     (catch Exception e
@@ -391,44 +442,19 @@
                                                                   transport-function
                                                                   {:enrich true :move move? :connection-id connection-id :folder folder}))))))
 
-(defmulti connect :auth-type)
+(defmulti connect (fn [config _] (:auth-type config)))
 
-(defmethod connect "oauth2" [connection-config]
+(defmethod connect "oauth2" [connection-config context]
   (refresh-access-token connection-config)
-  (try (-> (construct-connection-data connection-config)
-           start-monitoring
+  (try (-> (construct-connection-data connection-config context)
+           (start-monitoring context)
            schedule-health-checks)
        (catch AuthenticationFailedException e (t/log! :error e))))
 
-(defmethod connect :default [connection-config]
-  (-> (construct-connection-data connection-config)
-      start-monitoring
+(defmethod connect :default [connection-config context]
+  (-> (construct-connection-data connection-config context)
+      (start-monitoring context)
       schedule-health-checks))
-
-(defmulti handle-incoming-events :type)
-
-(defmethod handle-incoming-events :enriched-email [event]
-  (when (and (true? (:move (:options event))) (some? (:category (:metadata (:payload event)))))
-    (let [category-name (get-in event [:payload :metadata :category])]
-      (when (some? category-name)
-        (t/log! :info (str "Moving email: " (get-in event [:payload :header :subject]) " categorized as: " (get-in event [:payload :metadata :category])))
-        (let [connection-id (get-in event [:options :connection-id])
-              message-id (get-in event [:payload :header :message-id])
-              ^IMAPFolder folder (get-in event [:options :folder])
-              ;; Message classes are not thread safe. Fetch it again. Get the first one found
-              message-array (.search folder (MessageIDTerm. message-id))]
-          (if (> (alength message-array) 0)
-            (try (move-message connection-id (aget message-array 0) folder category-name)
-                 (catch jakarta.mail.FolderClosedException e
-                   (do (t/log! {:level :error :error e})
-                       (let [folder-name (.getName folder)]
-                         (t/log! :debug ["Lost connection to folder" folder-name "with connection-id" connection-id ". Trying to reconnect and move the message again."])
-                         (reconnect (connection-data-from-id connection-id))
-                         (move-messages-by-id-between-category-folders connection-id message-id folder-name category-name))))
-                 (catch Exception e (t/log! {:level :error :error e} (.getMessage e)))
-                 (finally (start-idling-for-id connection-id)))
-            (t/log! :error ["Cannot move email because no emails were found with message id" message-id "in folder" (.getName folder)]))
-          connection-id)))))
 
 (defn connection-id-for-email
   "Tries to find out the id of the connection the email belongs to. Returns nil if no active connection is found."
@@ -445,24 +471,9 @@
 
 (defrecord ImapClient []
   int/EmailClient
-  (start-monitor [_ config] (connect config))
+  (start-monitor [_ config context] (connect config context))
   (connections [_] @connections)
   (create-category-directories! [_ connection-data category-names] (create-category-folders! connection-data category-names))
   (connection-id-for-email [_ connections email] (connection-id-for-email connections email))
-  (move-email-between-categories [_ connection-id message-id old-category new-category] (move-messages-by-id-between-category-folders connection-id message-id old-category new-category)))
-
-(defn client-event-loop
-  "Listens to :enriched-email
-  
-  Options:
-  :move - boolean
-
-  If :move is true, move the e-mail to the corresponding category folder."
-  [publisher]
-  (let [local-chan (async/chan)]
-    (async/sub publisher :enriched-email local-chan)
-    (async/go-loop [event (async/<! local-chan)]
-      (when (some? event)
-        (t/log! :debug ["Client event loop processing the event:" event])
-        (handle-incoming-events event)
-        (recur (async/<! local-chan))))))
+  (move-email-between-categories [_ connection-id message-id old-category new-category context] (move-messages-by-id-between-category-folders connection-id message-id old-category new-category context))
+  (move-email-to-category [_ connection-id message original-folder category] (move-message connection-id message original-folder category)))

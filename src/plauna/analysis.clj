@@ -8,7 +8,8 @@
             [clojure.core.async :as async]
             [taoensso.telemere :as t]
             [cld.core :as lang]
-            [plauna.files :as files])
+            [plauna.files :as files]
+            [plauna.interfaces :as int])
   (:import
    (opennlp.tools.util.normalizer AggregateCharSequenceNormalizer NumberCharSequenceNormalizer ShrinkCharSequenceNormalizer CharSequenceNormalizer)
    (opennlp.tools.util MarkableFileInputStreamFactory PlainTextByLineStream TrainingParameters)
@@ -142,6 +143,14 @@
         category-id (if (nil? (:name category-result)) nil (:id (db/category-by-name (:name category-result))))]
     (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category (:name category-result) :category-confidence (:confidence category-result) :category-id category-id})))
 
+(defn detect-language-and-categorize-email [email]
+  (let [body-part-to-train-on (core-email/body-part-for-mime-type "text/html" email)
+        training-content (normalize-body-part body-part-to-train-on)
+        language-result (detect-language training-content)
+        category-result (category-for-text training-content (:code language-result))
+        category-id (if (nil? (:name category-result)) nil (:id (db/category-by-name (:name category-result))))]
+    (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category (:name category-result) :category-confidence (:confidence category-result) :category-id category-id})))
+
 (defn detect-language-event [event]
   (let [email (:payload event)
         body-part-to-train-on (core-email/body-part-for-mime-type "text/html" email)
@@ -174,3 +183,7 @@
                     local-chan
                     true
                     (fn [^Throwable th] (t/log! {:level :error :error th} (.getMessage th))))))
+
+(defrecord BasicAnalyzer []
+  int/Analyzer
+  (enrich-email [_ email] (detect-language-and-categorize-email email)))
