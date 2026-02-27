@@ -402,7 +402,7 @@
                                           folder (:folder params)
                                           move (some? (:move params))
                                           conn-data (client/connection-data-from-id id)]
-                                      (client/parse-all-in-folder conn-data folder move)
+                                      (client/parse-all-in-folder conn-data folder move context)
                                       (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)})))
                                       (redirect-request request)))))
 

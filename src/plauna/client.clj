@@ -186,7 +186,9 @@
   (new Body-Part (.getMessageID message) (charset (.getContentType message)) (mime-type (.getContentType message)) (first (.getHeader message "Content-transfer-encoding")) content (.getFileName message) (.getDisposition message)))
 
 (defmethod create-body-part BodyPart [^BodyPart bodypart ^IMAPMessage message]
-  (new Body-Part (.getMessageID message) (charset (.getContentType bodypart)) (mime-type (.getContentType bodypart)) (first (.getHeader bodypart "Content-transfer-encoding")) (.getContent bodypart) (.getFileName bodypart) (.getDisposition bodypart)))
+  (if (instance? Multipart (.getContent bodypart))
+    (create-body-part (.getContent bodypart) message)
+    (new Body-Part (.getMessageID message) (charset (.getContentType bodypart)) (mime-type (.getContentType bodypart)) (first (.getHeader bodypart "Content-transfer-encoding")) (.getContent bodypart) (.getFileName bodypart) (.getDisposition bodypart))))
 
 (defmethod create-body-part Multipart [^Multipart multipart ^IMAPMessage message]
   (for [i (range 0 (.getCount multipart))] (doall (create-body-part (.getBodyPart multipart i) message))))
@@ -432,15 +434,16 @@
 
 (defn parse-all-in-folder
   "Read all emails from a folder, convert them to outputstream and send them via :received-email channels"
-  [connection-data folder-name move?]
+  [connection-data folder-name move? context]
   (t/log! :info ["Read all e-mails from:" folder-name "with move option:" move?])
-  (let [folder (folder-from-connection  connection-data folder-name)
-        connection-id (id-from-connection connection-data)
-        transport-function (fn [byte-array options-seq] (put-to-main-chan (events/create-event :received-email byte-array options-seq)))]
-    (async/go (loop-over-messages-in-folder folder (fn [message] (doto-message->byte-array
-                                                                  message
-                                                                  transport-function
-                                                                  {:enrich true :move move? :connection-id connection-id :folder folder}))))))
+  (let [folder ^Folder (folder-from-connection  connection-data folder-name)
+        connection-id (id-from-connection connection-data)]
+    (doseq [message-num (range 1 (inc (.getMessageCount folder)))
+            :let [^Message message (.getMessage folder message-num)]]
+      (t/log! :debug ["Reading message number" message-num "from" (.getName folder)])
+      (app/handle-incoming-imap-email (message->email message)
+                                      {:connection-id connection-id :move move? :origin-folder folder :message message}
+                                      context))))
 
 (defmulti connect (fn [config _] (:auth-type config)))
 
