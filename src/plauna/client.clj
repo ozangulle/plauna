@@ -14,7 +14,7 @@
    (plauna.core.email Header Body-Part Participant Email)
    (clojure.lang PersistentVector)
    (jakarta.mail Store Session Folder BodyPart Multipart Message Message$RecipientType Flags$Flag AuthenticationFailedException)
-   (jakarta.mail.internet InternetAddress)
+   (jakarta.mail.internet InternetAddress MimeMultipart)
    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
    (jakarta.mail.event MessageCountAdapter MessageCountEvent MessageCountListener)
    (jakarta.mail.search MessageIDTerm)
@@ -173,9 +173,17 @@
 
 ;; Construct email from message
 
+(defn text? [content-type] (s/starts-with? (s/lower-case content-type) "text"))
+
 (defn mime-type [content-type] (s/lower-case (first (s/split content-type #";"))))
 
-(defn charset [content-type] (s/lower-case (or (second (s/split (second (s/split content-type #";")) #"=")) "ascii")))
+(defonce fallback-charset "us-ascii")
+
+(defn charset [content-type] (if (text? content-type)
+                               (s/lower-case (or (second (s/split (second (s/split content-type #";")) #"=")) fallback-charset))
+                               fallback-charset))
+
+(defn disposition [disposition] (when (some? disposition) (s/lower-case disposition)))
 
 (defn create-header [^IMAPMessage message]
   (new Header (.getMessageID message) (.getInReplyTo message) (.getSubject message) (mime-type (.getContentType message)) (quot (.getTime (.getSentDate message)) 1000)))
@@ -188,9 +196,12 @@
 (defmethod create-body-part BodyPart [^BodyPart bodypart ^IMAPMessage message]
   (if (instance? Multipart (.getContent bodypart))
     (create-body-part (.getContent bodypart) message)
-    (new Body-Part (.getMessageID message) (charset (.getContentType bodypart)) (mime-type (.getContentType bodypart)) (first (.getHeader bodypart "Content-transfer-encoding")) (.getContent bodypart) (.getFileName bodypart) (.getDisposition bodypart))))
+    (new Body-Part (.getMessageID message) (charset (.getContentType bodypart)) (mime-type (.getContentType bodypart)) (first (.getHeader bodypart "Content-transfer-encoding")) (.getContent bodypart) (.getFileName bodypart) (disposition (.getDisposition bodypart)))))
 
 (defmethod create-body-part Multipart [^Multipart multipart ^IMAPMessage message]
+  (for [i (range 0 (.getCount multipart))] (doall (create-body-part (.getBodyPart multipart i) message))))
+
+(defmethod create-body-part MimeMultipart [^Multipart multipart ^IMAPMessage message]
   (for [i (range 0 (.getCount multipart))] (doall (create-body-part (.getBodyPart multipart i) message))))
 
 ;; TODO remove duplication with parser.clj
