@@ -1,6 +1,7 @@
 (ns plauna.application
   (:require [plauna.interfaces :as int]
             [taoensso.telemere :as t]
+            [clojure.core.async :as async]
             [plauna.util.page :as page]))
 
 (defn- filter->sql-clause [filter]
@@ -101,10 +102,28 @@
 
       (catch Exception e (t/log! :error e) (error-result e "Moving email failed. Please check the logs.")))))
 
+(defn- incoming-email-workflow [email-message connection-id folder move? {:keys [client analyzer db]}]
+  (let [enriched-email (int/enrich-email analyzer (:email email-message))
+        category (:category (:metadata enriched-email))]
+    (t/log! :info ["Successfully parsed email with message-id:" (-> email-message :email :header :message-id)])
+    (int/save-email db enriched-email)
+    (when (and (true? move?) (some? category)) (int/move-email-to-category client connection-id (:message email-message) folder category))))
+
 (defn handle-incoming-imap-email
   "Handle incoming emails synchronously on a single thread."
-  [parsed-email {:keys [connection-id origin-folder move message]} {:keys [client db analyzer]}]
-  (let [enriched-email (int/enrich-email analyzer parsed-email)
-        category (:category (:metadata enriched-email))]
-    (int/save-email db enriched-email)
-    (when (and (true? move) (some? category)) (int/move-email-to-category client connection-id message origin-folder category))))
+  [parsed-email {:keys [connection-id origin-folder move message]} context]
+  (incoming-email-workflow {:email parsed-email :message message} connection-id origin-folder move context))
+
+(defn read-emails-from-folder
+  "Read all emails from a folder and process them. Returns the number of messages in the folder. Emails are processed on another thread."
+  [connection-data folder-name move? {:keys [client] :as context}]
+  (let [messages-result (int/number-of-messages-in-folder client connection-data folder-name)
+        folder (:folder messages-result)]
+    (t/log! :info ["There are" (:message-count messages-result) "emails in" folder-name])
+    (t/log! :info ["The messages will be processed asynchronously"])
+    (async/go
+      (doseq [n (range 1 (inc (:message-count messages-result)))
+              :let [email-message (int/nth-email-from-folder client n folder)
+                    move-result (incoming-email-workflow email-message (:connection-id messages-result) folder move? context)]]
+        (when (true? move?) (t/log! :info ["Moving" (-> email-message :email :header :message-id) "was successful:" move-result]))))
+    (:message-count messages-result)))

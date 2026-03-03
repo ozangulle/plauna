@@ -1,24 +1,20 @@
 (ns plauna.client
   (:require
-   [clojure.core.async :as async]
-   [plauna.core.events :as events]
    [plauna.preferences :as p]
    [plauna.database :as db]
    [plauna.client.oauth :as oauth]
    [clojure.string :as s]
    [taoensso.telemere :as t]
    [plauna.interfaces :as int]
-   [plauna.messaging :as messaging]
    [plauna.application :as app])
   (:import
    (plauna.core.email Header Body-Part Participant Email)
    (clojure.lang PersistentVector)
    (jakarta.mail Store Session Folder BodyPart Multipart Message Message$RecipientType Flags$Flag AuthenticationFailedException)
-   (jakarta.mail.internet InternetAddress MimeMultipart)
+   (jakarta.mail.internet InternetAddress)
    (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
    (jakarta.mail.event MessageCountAdapter MessageCountEvent MessageCountListener)
    (jakarta.mail.search MessageIDTerm)
-   (java.io ByteArrayOutputStream)
    (java.lang AutoCloseable)
    (java.util Properties UUID)
    (java.util.concurrent Executors)
@@ -38,8 +34,6 @@
 (declare connect)
 
 (declare reconnect)
-
-(declare parse-all-in-folder)
 
 (declare start-monitoring)
 
@@ -199,9 +193,6 @@
     (new Body-Part (.getMessageID message) (charset (.getContentType bodypart)) (mime-type (.getContentType bodypart)) (first (.getHeader bodypart "Content-transfer-encoding")) (.getContent bodypart) (.getFileName bodypart) (disposition (.getDisposition bodypart)))))
 
 (defmethod create-body-part Multipart [^Multipart multipart ^IMAPMessage message]
-  (for [i (range 0 (.getCount multipart))] (doall (create-body-part (.getBodyPart multipart i) message))))
-
-(defmethod create-body-part MimeMultipart [^Multipart multipart ^IMAPMessage message]
   (for [i (range 0 (.getCount multipart))] (doall (create-body-part (.getBodyPart multipart i) message))))
 
 ;; TODO remove duplication with parser.clj
@@ -430,32 +421,6 @@
 
 (defn id-from-connection [connection-data] (get-in connection-data [:config :id]))
 
-(defn doto-message->byte-array [^Message message do-func & args]
-  (with-open [os (ByteArrayOutputStream.)]
-    (.writeTo message os)
-    (apply do-func (.toByteArray os) args)))
-
-(defn loop-over-messages-in-folder [^Folder folder body]
-  (doseq [message-num (range 1 (inc (.getMessageCount folder)))
-          :let [^Message message (.getMessage folder message-num)]]
-    (t/log! :debug ["Reading message number" message-num "from" (.getName ^Folder folder)])
-    (body message)))
-
-(defn put-to-main-chan [event] (async/>!! @messaging/main-chan event))
-
-(defn parse-all-in-folder
-  "Read all emails from a folder, convert them to outputstream and send them via :received-email channels"
-  [connection-data folder-name move? context]
-  (t/log! :info ["Read all e-mails from:" folder-name "with move option:" move?])
-  (let [folder ^Folder (folder-from-connection  connection-data folder-name)
-        connection-id (id-from-connection connection-data)]
-    (doseq [message-num (range 1 (inc (.getMessageCount folder)))
-            :let [^Message message (.getMessage folder message-num)]]
-      (t/log! :debug ["Reading message number" message-num "from" (.getName folder)])
-      (app/handle-incoming-imap-email (message->email message)
-                                      {:connection-id connection-id :move move? :origin-folder folder :message message}
-                                      context))))
-
 (defmulti connect (fn [config _] (:auth-type config)))
 
 (defmethod connect "oauth2" [connection-config context]
@@ -490,4 +455,14 @@
   (create-category-directories! [_ connection-data category-names] (create-category-folders! connection-data category-names))
   (connection-id-for-email [_ connections email] (connection-id-for-email connections email))
   (move-email-between-categories [_ connection-id message-id old-category new-category context] (move-messages-by-id-between-category-folders connection-id message-id old-category new-category context))
-  (move-email-to-category [_ connection-id message original-folder category] (move-message connection-id message original-folder category)))
+  (move-email-to-category [_ connection-id message original-folder category] (move-message connection-id message original-folder category))
+  (number-of-messages-in-folder [_ connection-data folder-name]
+    (let [folder ^Folder (folder-from-connection  connection-data folder-name)]
+      {:message-count (.getMessageCount folder)
+       :connection-id (id-from-connection connection-data)
+       :folder folder}))
+  (nth-email-from-folder [_ n folder]
+    (let [message (.getMessage ^IMAPFolder folder n)]
+      (t/log! :debug ["Reading message number" n "from" (.getName ^IMAPFolder folder)])
+      {:email (message->email message)
+       :messages message})))

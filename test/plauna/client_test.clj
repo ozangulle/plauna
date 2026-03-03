@@ -113,17 +113,6 @@
         connection-data (->ConnectionData {:user "test2@test.com" :id "some-id"} nil nil nil nil nil)]
     (is (nil? (client/connection-id-for-email {"correct-id" connection-data} email)))))
 
-(deftest parsing-folder-creates-correct-event
-  (let [test-chan (async/chan)]
-    (with-redefs [client/loop-over-messages-in-folder (fn [_ body] (body "message"))
-                  client/doto-message->byte-array (fn [_ do-func & args] (apply do-func "test" args))
-                  client/put-to-main-chan (fn [event] (async/>!! test-chan event))
-                  client/folder-from-connection (fn [_ _] :test-folder)]
-      (let [expected-event (events/create-event :received-email "test" {:enrich true :move true :connection-id "1234" :folder :test-folder})
-            test-connection (->ConnectionData {:id "1234"} nil nil nil nil nil)]
-        (client/parse-all-in-folder test-connection "test-folder" true)
-        (is (= expected-event (async/<!! test-chan)))))))
-
 (deftest folder-monitor-tests
   (let [null (client/monitor-folder-name nil)
         empty (client/monitor-folder-name "")
@@ -169,5 +158,5 @@
 (deftest move-emails-test-no-connection
   (with-redefs [client/connected? (fn [_] false)
                 client/connection-data-from-id (fn [_] {})]
-    (is (false? (client/move-messages-by-id-between-category-folders "fake" "does-no-exist" "test" "test2"))))
+    (is (false? (client/move-messages-by-id-between-category-folders "fake" "does-no-exist" "test" "test2" {}))))
   "If the store is not connected, return false immediately.")

@@ -17,7 +17,9 @@
   (create-category-directories! [this connection-data category-names])
   (connection-id-for-email [this connections email])
   (move-email-between-categories [this connection-id message-id old-category new-category context])
-  (move-email-to-category [this connection-id original-message original-folder category]))
+  (move-email-to-category [this connection-id original-message original-folder category])
+  (number-of-messages-in-folder [this connection-data folder-name])
+  (nth-email-from-folder [this n folder]))
 
 (defprotocol Analyzer
   "Language detection and categorization"

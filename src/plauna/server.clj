@@ -401,9 +401,9 @@
               (= "parse" operation) (let [params (:params request)
                                           folder (:folder params)
                                           move (some? (:move params))
-                                          conn-data (client/connection-data-from-id id)]
-                                      (client/parse-all-in-folder conn-data folder move context)
-                                      (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. Move folders after parsing: " move)})))
+                                          conn-data (client/connection-data-from-id id)
+                                          message-count (app/read-emails-from-folder conn-data folder move context)]
+                                      (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)})))
                                       (redirect-request request)))))
 
     (comp/POST "/metadata/languages" request
