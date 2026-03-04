@@ -238,13 +238,17 @@
 (defn message-count-listener [connection-id folder folder-name context]
   (proxy [MessageCountAdapter] []
     (messagesAdded [^MessageCountEvent event]
-      (t/log! :info "Received new message event.")
+      (t/log! :debug "Received new message event.")
       (doseq [message ^IMAPMessage (.getMessages event)]
         (t/log! :debug ["Processing message:" message])
         (.setPeek ^IMAPMessage message true)
-        (app/handle-incoming-imap-email (message->email message)
-                                        {:connection-id connection-id :move true :origin-folder folder :message message}
-                                        context)
+        (let [parsed-email (message->email message)
+              process (app/handle-incoming-imap-email parsed-email
+                                                      {:connection-id connection-id :move true :origin-folder folder :message message}
+                                                      context)]
+          (if (= :error (:result process))
+            (t/log! :error ["An error occured while handling incoming message" (:exception process)])
+            (t/log! :info ["The email with subject" (-> parsed-email :header :subject) "was handled successfully"])))
         (let [conn-data ^ConnectionData (connection-data-from-id connection-id)]
           (t/log! :debug ["Idling on the folder" folder-name "while waiting for new messages."])
           (.watch ^IdleManager (.idle-manager conn-data) (.folder conn-data)))))))
@@ -266,17 +270,22 @@
     (t/log! :debug ["Expunged source folder"])
     (catch Exception e (t/log! {:level :error :error e} ["There was an error copying and deleting the message" message]))))
 
-(defn move-message [connection-id ^Message message ^Folder source-folder ^String target-name]
+(defn move-message
+  "Find the proper location for the email and move it there. Returns the name of the folder to which the email was moved."
+  [connection-id ^Message message ^Folder source-folder ^String target-name]
   (let [connection-data (connection-data-from-id connection-id)
         store (:store connection-data)
         capabilities ^PersistentVector (:capabilities connection-data)
-        target-folder ^IMAPFolder (.getFolder ^Store store ^String (structured-folder-name store target-name))]
+        structured-folder (structured-folder-name store target-name)
+        target-folder ^IMAPFolder (.getFolder ^Store store ^String structured-folder)]
     (if (.contains capabilities :move)
       (do (t/log! :debug ["Moving message from" source-folder "to" target-folder])
           (.setPeek ^IMAPMessage message true)
-          (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder))
+          (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder)
+          structured-folder)
       (do (t/log! :debug "Server does not support the IMAP MOVE command. Using copy and delete as fallback.")
-          (copy-message message source-folder target-folder)))))
+          (copy-message message source-folder target-folder)
+          structured-folder))))
 
 (defn monitor->map [monitor]
   (if (nil? monitor)

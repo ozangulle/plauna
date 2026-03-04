@@ -105,25 +105,33 @@
 (defn- incoming-email-workflow [email-message connection-id folder move? {:keys [client analyzer db]}]
   (let [enriched-email (int/enrich-email analyzer (:email email-message))
         category (:category (:metadata enriched-email))]
-    (t/log! :info ["Successfully parsed email with message-id:" (-> email-message :email :header :message-id)])
+    (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was categorized as" category])
     (int/save-email db enriched-email)
-    (when (and (true? move?) (some? category)) (int/move-email-to-category client connection-id (:message email-message) folder category))))
+    (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully saved to the database"])
+    (if (and (true? move?) (some? category))
+      (do (int/move-email-to-category client connection-id (:message email-message) folder category)
+          (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully moved to the corresponding folder"]))
+      (do (t/log! :debug ["move option:" move? "category:" category "the email" (-> email-message :email :header :subject) "will not move moved"])
+          :na))))
 
 (defn handle-incoming-imap-email
-  "Handle incoming emails synchronously on a single thread."
+  "Handle incoming emails synchronously on a single thread. Returns a result."
   [parsed-email {:keys [connection-id origin-folder move message]} context]
-  (incoming-email-workflow {:email parsed-email :message message} connection-id origin-folder move context))
+  (try (let [process-result (incoming-email-workflow {:email parsed-email :message message} connection-id origin-folder move context)]
+         (success-result :ok {:move process-result}))
+       (catch Exception e (error-result e "Error encountered when processing incoming email"))))
 
 (defn read-emails-from-folder
   "Read all emails from a folder and process them. Returns the number of messages in the folder. Emails are processed on another thread."
   [connection-data folder-name move? {:keys [client] :as context}]
   (let [messages-result (int/number-of-messages-in-folder client connection-data folder-name)
         folder (:folder messages-result)]
-    (t/log! :info ["There are" (:message-count messages-result) "emails in" folder-name])
-    (t/log! :info ["The messages will be processed asynchronously"])
-    (async/go
-      (doseq [n (range 1 (inc (:message-count messages-result)))
-              :let [email-message (int/nth-email-from-folder client n folder)
-                    move-result (incoming-email-workflow email-message (:connection-id messages-result) folder move? context)]]
-        (when (true? move?) (t/log! :info ["Moving" (-> email-message :email :header :message-id) "was successful:" move-result]))))
+    (if (> (:message-count messages-result) 0)
+      (do
+        (t/log! :info ["There are" (:message-count messages-result) "emails in" folder-name "The messages will get processed asynchronously"])
+        (async/go
+          (doseq [n (range 0 (:message-count messages-result))
+                  :let [email-message (int/nth-email-from-folder client n folder)]]
+            (incoming-email-workflow email-message (:connection-id messages-result) folder move? context))))
+      (t/log! :info ["There are no emails in the folder. Doing nothing."]))
     (:message-count messages-result)))

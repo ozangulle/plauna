@@ -1,14 +1,12 @@
 (ns plauna.client-test
   (:require [clojure.test :refer :all]
-            [clojure.core.async :as async]
             [plauna.client :as client :refer [->ConnectionData]]
             [plauna.core.email :as core-email :refer [->Email ->Participant]]
-            [taoensso.telemere :as t]
-            [plauna.core.events :as events])
+            [taoensso.telemere :as t])
   (:import (java.util Properties)
            (jakarta.mail Session)))
 
-(t/set-min-level! :error)
+(t/set-ns-filter! {:disallow "plauna.*"})
 
 (deftest ssl-properties-set-correctly
   (let [session ^Session (client/config->session {:security "ssl" :port 993})
