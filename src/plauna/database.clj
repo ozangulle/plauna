@@ -411,4 +411,10 @@
   (fetch-auth-provider [_ id] (get-auth-provider id))
   (fetch-categories [_] (get-categories))
   (fetch-emails [_ entity customization] (fetch-data entity customization))
-  (save-category [_ category-name] (create-category category-name)))
+  (save-category [_ category-name] (create-category category-name))
+  (save-email [_ email]
+    (save-headers [(:header email)])
+    (save-bodies (:body email))
+    (save-contacts (:participants email))
+    (save-communications (:participants email))
+    (when (not (empty? (:metadata email))) (update-metadata-batch [(:metadata email)]))))

@@ -1,6 +1,7 @@
 (ns plauna.application
   (:require [plauna.interfaces :as int]
             [taoensso.telemere :as t]
+            [clojure.core.async :as async]
             [plauna.util.page :as page]))
 
 (defn- filter->sql-clause [filter]
@@ -31,11 +32,9 @@
 
 (defn connect-to-client
   "Returns {:result :ok} or {:result :redirect :provider provider} in case of oauth2"
-  [context id]
+  [{:keys [db client] :as context} id]
   (try
-    (let [db (:db context)
-          client (:client context)
-          connection (int/fetch-connection db id)]
+    (let [connection (int/fetch-connection db id)]
       (if (= "oauth2" (:auth-type connection))
         (let [auth-provider (int/fetch-auth-provider db (:auth-provider connection))
               oauth-data (int/fetch-oauth-token-data db id)]
@@ -45,8 +44,8 @@
             (do
               (t/log! :warn ["Connection" (:user connection) (:host connection) "is set to use oauth2 but has no tokens in the db. You need to login manually from the 'Connections' page first."])
               (success-result :redirect {:provider (int/fetch-auth-provider db (:auth-provider connection))}))
-            :else (do (int/start-monitor client connection) (success-result :ok nil))))
-        (do (int/start-monitor client connection) {:result :ok})))
+            :else (do (int/start-monitor client connection context) (success-result :ok nil))))
+        (do (int/start-monitor client connection context) {:result :ok})))
     (catch Exception e (do (t/log! :error ["There was an error when trying to log in:" e])
                            (error-result e "There was an error when trying to log in.")))))
 
@@ -76,7 +75,7 @@
 
 (defn move-email-to-category
   "Email address of the recipient is usually the 'username' in the connection data. It may be different, if the user is using some kind of email masking service. If the email and the username match, we know where to look for. If not, we have to loop over the connections and try to find the email by id before moving it to its new directory. This all pressupposes that the message-id is really unique."
-  [email category {:keys [client]}]
+  [email category {:keys [client] :as context}]
   (let [connections (vals (int/connections client))
         connection-id-guess (int/connection-id-for-email client connections email)
         message-id (-> email :header :message-id)
@@ -88,7 +87,7 @@
             (some? connection-id-guess)
             (do
               (t/log! :debug ["Email seems to belong to the connection with the id" connection-id-guess])
-              (if (true? (int/move-email-between-categories client connection-id-guess message-id old-category category))
+              (if (true? (int/move-email-between-categories client connection-id-guess message-id old-category category context))
                 (success-result :ok nil)
                 (error-result nil "Moving email failed. Please check the logs.")))
 
@@ -96,9 +95,44 @@
             (let [results (for [conn connections
                                 :let [id (get-in conn [:config :id])]]
                             (do (t/log! :debug ["Move message-id" message-id])
-                                (int/move-email-between-categories client id message-id old-category category)))]
+                                (int/move-email-between-categories client id message-id old-category category context)))]
               (if (some true? results)
                 (success-result :ok nil)
                 (error-result nil "Moving email failed. Please check the logs."))))
 
       (catch Exception e (t/log! :error e) (error-result e "Moving email failed. Please check the logs.")))))
+
+(defn- incoming-email-workflow [email-message connection-id folder move? {:keys [client analyzer db]}]
+  (let [enriched-email (int/enrich-email analyzer (:email email-message))
+        category (:category (:metadata enriched-email))]
+    (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was categorized as" category])
+    (int/save-email db enriched-email)
+    (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully saved to the database"])
+    (if (and (true? move?) (some? category))
+      (do (int/move-email-to-category client connection-id (:message email-message) folder category)
+          (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully moved to the corresponding folder"]))
+      (do (t/log! :debug ["move option:" move? "category:" category "the email" (-> email-message :email :header :subject) "will not move moved"])
+          :na))))
+
+(defn handle-incoming-imap-email
+  "Handle incoming emails synchronously on a single thread. Returns a result."
+  [parsed-email {:keys [connection-id origin-folder move message]} context]
+  (try (let [process-result (incoming-email-workflow {:email parsed-email :message message} connection-id origin-folder move context)]
+         (success-result :ok {:move process-result}))
+       (catch Exception e (error-result e "Error encountered when processing incoming email"))))
+
+(defn read-emails-from-folder
+  "Read all emails from a folder and process them. Returns the number of messages in the folder. Emails are processed on another thread."
+  [connection-data folder-name move? {:keys [client] :as context}]
+  (let [messages-result (int/number-of-messages-in-folder client connection-data folder-name)
+        folder (:folder messages-result)]
+    (if (> (:message-count messages-result) 0)
+      (do
+        (t/log! :info ["There are" (:message-count messages-result) "emails in" folder-name "The messages will get processed asynchronously"])
+        (async/go
+          ;; reading email is index 1
+          (doseq [n (range 1 (inc (:message-count messages-result)))
+                  :let [email-message (int/nth-email-from-folder client n folder)]]
+            (incoming-email-workflow email-message (:connection-id messages-result) folder move? context))))
+      (t/log! :info ["There are no emails in the folder. Doing nothing."]))
+    (:message-count messages-result)))

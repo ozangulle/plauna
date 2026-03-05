@@ -7,12 +7,20 @@
   (fetch-auth-provider [this id])
   (fetch-categories [this] "Get a list of all categories")
   (fetch-emails [this entity customization] "Get a list of emails")
-  (save-category [this category-name]))
+  (save-category [this category-name])
+  (save-email [this email]))
 
 (defprotocol EmailClient
   "Email client"
-  (start-monitor [this config] "Connect to the client")
+  (start-monitor [this config context] "Connect to the client")
   (connections [this] "Get a list of connections")
   (create-category-directories! [this connection-data category-names])
   (connection-id-for-email [this connections email])
-  (move-email-between-categories [this connection-id message-id old-category new-category]))
+  (move-email-between-categories [this connection-id message-id old-category new-category context])
+  (move-email-to-category [this connection-id original-message original-folder category])
+  (number-of-messages-in-folder [this connection-data folder-name])
+  (nth-email-from-folder [this n folder]))
+
+(defprotocol Analyzer
+  "Language detection and categorization"
+  (enrich-email [this email]))
