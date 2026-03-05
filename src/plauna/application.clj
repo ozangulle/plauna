@@ -130,7 +130,8 @@
       (do
         (t/log! :info ["There are" (:message-count messages-result) "emails in" folder-name "The messages will get processed asynchronously"])
         (async/go
-          (doseq [n (range 0 (:message-count messages-result))
+          ;; reading email is index 1
+          (doseq [n (range 1 (inc (:message-count messages-result)))
                   :let [email-message (int/nth-email-from-folder client n folder)]]
             (incoming-email-workflow email-message (:connection-id messages-result) folder move? context))))
       (t/log! :info ["There are no emails in the folder. Doing nothing."]))

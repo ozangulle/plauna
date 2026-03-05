@@ -474,4 +474,4 @@
     (let [message (.getMessage ^IMAPFolder folder n)]
       (t/log! :debug ["Reading message number" n "from" (.getName ^IMAPFolder folder)])
       {:email (message->email message)
-       :messages message})))
+       :message message})))

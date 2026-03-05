@@ -158,3 +158,4 @@
                 client/connection-data-from-id (fn [_] {})]
     (is (false? (client/move-messages-by-id-between-category-folders "fake" "does-no-exist" "test" "test2" {}))))
   "If the store is not connected, return false immediately.")
+
