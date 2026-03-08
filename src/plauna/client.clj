@@ -271,7 +271,8 @@
     (catch Exception e (t/log! {:level :error :error e} ["There was an error copying and deleting the message" message]))))
 
 (defn inbox-or-category-folder-name [^Store store ^String folder-name default]
-  (if (nil? folder-name) default (structured-folder-name store folder-name)))
+  (let [real-default (if (s/blank? default) "INBOX" default)]
+      (if (nil? folder-name) real-default (structured-folder-name store folder-name))))
 
 (defn move-message
   "Find the proper location for the email and move it there. Returns the name of the folder to which the email was moved."
