@@ -270,13 +270,16 @@
     (t/log! :debug ["Expunged source folder"])
     (catch Exception e (t/log! {:level :error :error e} ["There was an error copying and deleting the message" message]))))
 
+(defn inbox-or-category-folder-name [^Store store ^String folder-name default]
+  (if (nil? folder-name) default (structured-folder-name store folder-name)))
+
 (defn move-message
   "Find the proper location for the email and move it there. Returns the name of the folder to which the email was moved."
   [connection-id ^Message message ^Folder source-folder ^String target-name]
   (let [connection-data (connection-data-from-id connection-id)
         store (:store connection-data)
         capabilities ^PersistentVector (:capabilities connection-data)
-        structured-folder (structured-folder-name store target-name)
+        structured-folder (inbox-or-category-folder-name store target-name (-> connection-data :config :folder))
         target-folder ^IMAPFolder (.getFolder ^Store store ^String structured-folder)]
     (if (.contains capabilities :move)
       (do (t/log! :debug ["Moving message from" source-folder "to" target-folder])
@@ -297,9 +300,6 @@
 
 (defn folders-in-store [^Store store]
   (.list (.getDefaultFolder store) "*"))
-
-(defn inbox-or-category-folder-name [^Store store ^String folder-name default]
-  (if (nil? folder-name) default (structured-folder-name store folder-name)))
 
 (defn connected? [^ConnectionData connection-data] (.isConnected ^Store (:store connection-data)))
 
