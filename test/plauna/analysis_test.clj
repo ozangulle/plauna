@@ -9,3 +9,7 @@
 (deftest normalization-1
   (let [res (analysis/normalize (slurp (io/resource "test/normalization/original-text-1.txt")))]
     (is (= (s/trim (slurp (io/resource "test/normalization/normalized-text-1.txt"))) res))))
+
+(deftest normalization-2
+  (let [res (analysis/normalize (slurp (io/resource "test/normalization/greek-lorem-ipsum.txt")))]
+    (is (= (s/trim (slurp (io/resource "test/normalization/normalized-greek-lorem-ipsum.txt"))) res))))

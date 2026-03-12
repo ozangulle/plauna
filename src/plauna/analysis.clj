@@ -34,7 +34,7 @@
                          (normalize [_ text] (#(st/replace % (Pattern/compile "[^\\s\\w]" (bit-or Pattern/MULTILINE Pattern/UNICODE_CHARACTER_CLASS)) " ") text))))
 
 (def ExtraWhiteSpaceNormalizer (reify CharSequenceNormalizer
-                                 (normalize [_ text] (#(st/replace % (Pattern/compile "\\W{2,}" Pattern/MULTILINE) " ") text))))
+                                 (normalize [_ text] (#(st/replace % (Pattern/compile "\\s{2,}" Pattern/MULTILINE) " ") text))))
 
 (def NonPrintableCharNormalizer (reify CharSequenceNormalizer
                                   (normalize [_ text] (#(st/replace % (Pattern/compile "\\p{C}") " ") text))))
