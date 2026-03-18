@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2026-03-18.0] - 2026-03-18
+
+### 🚀 Features
+
+- Add search functionality to the email list
+
+### 🐛 Bug Fixes
+
+- Server error due to changes in pagination structure
+- Creating categories and moving emails fail
+- *(client)* Empty folder name not recognized as default folder name
+- Empty strings are treated as nil in default folder names
+- Non latin texts are not normalized correctly
+
+### 🚜 Refactor
+
+- Logic for moving emails
+- Simplify logic for incoming emails and add tests
+
+### ⚙️ Miscellaneous Tasks
+
+- Update dependencies and docker images
+
 ## [2026-01-18.0] - 2026-01-18
 
 ### 🚀 Features
