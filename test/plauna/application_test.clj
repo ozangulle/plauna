@@ -168,7 +168,7 @@
   (let [analyzer (reify int/Analyzer (enrich-email [_ _] {:metadata {:category "test"}}))
         db (reify int/DB (save-email [_ _] true))
         client (reify int/EmailClient (move-email-to-category [_ _ _ _ _] (throw (ex-info "test exception" {}))))
-        test-result (app/handle-incoming-imap-email {} {:move true} {:analyzer analyzer :db db :client client})]
+        test-result (app/handle-incoming-imap-email {} {:move? true} {:analyzer analyzer :db db :client client})]
     (is (= :error (:result test-result))))
   "Return error if move=true and something goes wrong in the client")
 
@@ -176,7 +176,7 @@
   (let [analyzer (reify int/Analyzer (enrich-email [_ _] {:metadata {:category "test"}}))
         db (reify int/DB (save-email [_ _] true))
         client (reify int/EmailClient (move-email-to-category [_ _ _ _ _] (throw (ex-info "test exception" {}))))
-        test-result (app/handle-incoming-imap-email {} {:move false} {:analyzer analyzer :db db :client client})]
+        test-result (app/handle-incoming-imap-email {} {:move? false} {:analyzer analyzer :db db :client client})]
     (is (= :ok (:result test-result))))
   "Client is not called if move=false")
 
@@ -184,7 +184,7 @@
   (let [analyzer (reify int/Analyzer (enrich-email [_ _] {:metadata {:category nil}}))
         db (reify int/DB (save-email [_ _] true))
         client (reify int/EmailClient (move-email-to-category [_ _ _ _ _] (throw (ex-info "test exception" {}))))
-        test-result (app/handle-incoming-imap-email {} {:move true} {:analyzer analyzer :db db :client client})]
+        test-result (app/handle-incoming-imap-email {} {:move? true} {:analyzer analyzer :db db :client client})]
     (is (= :ok (:result test-result))))
   "Client is not called if move=true but not category")
 
@@ -192,6 +192,6 @@
   (let [analyzer (reify int/Analyzer (enrich-email [_ _] {:metadata {:category "test"}}))
         db (reify int/DB (save-email [_ _] true))
         client (reify int/EmailClient (move-email-to-category [_ _ _ _ _] true))
-        test-result (app/handle-incoming-imap-email {} {:move true} {:analyzer analyzer :db db :client client})]
+        test-result (app/handle-incoming-imap-email {} {:move? true} {:analyzer analyzer :db db :client client})]
     (is (= :ok (:result test-result))))
   "Happy path. All underlying functions are called normally. Return an :ok result.")

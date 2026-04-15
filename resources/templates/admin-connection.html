@@ -91,6 +91,14 @@
         <label for="move">Move e-mails after categorization</label>
         <input class="checkbox" name="move" type="checkbox">
       </div>
+      <label for="assigned-category">Assign following category for all e-mails in folder. Leave blank for automatic category detection.</label>
+        <div class="form-control">
+          <select class="select" name="assigned-category">
+            {% for category in categories %}
+            <option value="{{category.id}}-{{category.name}}">{{category.name}}</option>
+            {% endfor %}
+          </select>
+        </div>
       <div class="form-field">
         <button form="parse" class="btn btn-primary">Parse E-mails</button>
       </div>

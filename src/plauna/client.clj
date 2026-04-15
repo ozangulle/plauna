@@ -244,7 +244,7 @@
         (.setPeek ^IMAPMessage message true)
         (let [parsed-email (message->email message)
               process (app/handle-incoming-imap-email parsed-email
-                                                      {:connection-id connection-id :move true :origin-folder folder :message message}
+                                                      {:connection-id connection-id :origin-folder folder :message message :move? true}
                                                       context)]
           (if (= :error (:result process))
             (t/log! :error ["An error occured while handling incoming message" (:exception process)])
@@ -272,7 +272,7 @@
 
 (defn inbox-or-category-folder-name [^Store store ^String folder-name default]
   (let [real-default (if (s/blank? default) "INBOX" default)]
-      (if (nil? folder-name) real-default (structured-folder-name store folder-name))))
+    (if (nil? folder-name) real-default (structured-folder-name store folder-name))))
 
 (defn move-message
   "Find the proper location for the email and move it there. Returns the name of the folder to which the email was moved."

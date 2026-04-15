@@ -371,12 +371,13 @@
 
     (comp/GET "/admin/connections/:id" [id]
       (let [conn-info (connection-information id)
-            providers (db/get-auth-providers)]
+            providers (db/get-auth-providers)
+            categories (db/get-categories)]
         (if (seq @global-messages)
           (let [messages @global-messages]
             (swap! global-messages (fn [_] []))
-            (success-html-with-body (markup/connection (assoc conn-info :auth-providers providers) (connection-folders conn-info) messages)))
-          (success-html-with-body (markup/connection (assoc conn-info :auth-providers providers) (connection-folders conn-info))))))
+            (success-html-with-body (markup/connection (assoc conn-info :auth-providers providers) (connection-folders conn-info) messages categories)))
+          (success-html-with-body (markup/connection (assoc conn-info :auth-providers providers) (connection-folders conn-info) categories)))))
 
     (comp/PUT "/admin/connections/:id" request
       (let [params (:params request)]
@@ -401,8 +402,9 @@
               (= "parse" operation) (let [params (:params request)
                                           folder (:folder params)
                                           move (some? (:move params))
+                                          assigned-category-pair (clojure.string/split (:assigned-category params) #"-")
                                           conn-data (client/connection-data-from-id id)
-                                          message-count (app/read-emails-from-folder conn-data folder move context)]
+                                          message-count (app/read-emails-from-folder conn-data folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)} context)]
                                       (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)})))
                                       (redirect-request request)))))
 

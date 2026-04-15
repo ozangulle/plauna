@@ -2,6 +2,7 @@
   (:require [plauna.interfaces :as int]
             [taoensso.telemere :as t]
             [clojure.core.async :as async]
+            [plauna.core.email :as core-email]
             [plauna.util.page :as page]))
 
 (defn- filter->sql-clause [filter]
@@ -102,28 +103,37 @@
 
       (catch Exception e (t/log! :error e) (error-result e "Moving email failed. Please check the logs.")))))
 
-(defn- incoming-email-workflow [email-message connection-id folder move? {:keys [client analyzer db]}]
-  (let [enriched-email (int/enrich-email analyzer (:email email-message))
-        category (:category (:metadata enriched-email))]
-    (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was categorized as" category])
-    (int/save-email db enriched-email)
-    (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully saved to the database"])
-    (if (and (true? move?) (some? category))
-      (do (int/move-email-to-category client connection-id (:message email-message) folder category)
-          (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully moved to the corresponding folder"]))
-      (do (t/log! :debug ["move option:" move? "category:" category "the email" (-> email-message :email :header :subject) "will not move moved"])
-          :na))))
+(defn- move-message [move? folder connection-id email-message category context]
+  (if (and (true? move?) (some? category))
+    (do (int/move-email-to-category (:client context) connection-id (:message email-message) folder category)
+        (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully moved to the corresponding folder"]))
+    (do (t/log! :debug ["move option:" move? "category:" category "the email" (-> email-message :email :header :subject) "will not move moved"])
+        :na)))
+
+(defn- incoming-email-workflow [email-message connection-id folder {:keys [move? assigned-category assigned-category-id] :as options} {:keys [client analyzer db] :as context}]
+  (if (some? assigned-category)
+    (let [language-result (int/detect-language analyzer (:email email-message))
+          enriched-email (core-email/construct-enriched-email (:email email-message) {:language (:code language-result) :language-confidence (:confidence language-result)} {:category assigned-category :category-id assigned-category-id :category-confidence 1})]
+      (int/save-email db enriched-email)
+      (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully saved to the database"])
+      (move-message move? folder connection-id email-message assigned-category context))
+    (let [enriched-email (int/enrich-email analyzer (:email email-message))
+          category (:category (:metadata enriched-email))]
+      (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was categorized as" category])
+      (int/save-email db enriched-email)
+      (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully saved to the database"])
+      (move-message move? folder connection-id email-message category context))))
 
 (defn handle-incoming-imap-email
   "Handle incoming emails synchronously on a single thread. Returns a result."
-  [parsed-email {:keys [connection-id origin-folder move message]} context]
-  (try (let [process-result (incoming-email-workflow {:email parsed-email :message message} connection-id origin-folder move context)]
+  [parsed-email {:keys [connection-id origin-folder message] :as options} context]
+  (try (let [process-result (incoming-email-workflow {:email parsed-email :message message} connection-id origin-folder options context)]
          (success-result :ok {:move process-result}))
        (catch Exception e (error-result e "Error encountered when processing incoming email"))))
 
 (defn read-emails-from-folder
   "Read all emails from a folder and process them. Returns the number of messages in the folder. Emails are processed on another thread."
-  [connection-data folder-name move? {:keys [client] :as context}]
+  [connection-data folder-name options {:keys [client] :as context}]
   (let [messages-result (int/number-of-messages-in-folder client connection-data folder-name)
         folder (:folder messages-result)]
     (if (> (:message-count messages-result) 0)
@@ -133,6 +143,6 @@
           ;; reading email is index 1
           (doseq [n (range 1 (inc (:message-count messages-result)))
                   :let [email-message (int/nth-email-from-folder client n folder)]]
-            (incoming-email-workflow email-message (:connection-id messages-result) folder move? context))))
+            (incoming-email-workflow email-message (:connection-id messages-result) folder options context))))
       (t/log! :info ["There are no emails in the folder. Doing nothing."]))
     (:message-count messages-result)))

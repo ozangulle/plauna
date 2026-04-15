@@ -23,4 +23,5 @@
 
 (defprotocol Analyzer
   "Language detection and categorization"
-  (enrich-email [this email]))
+  (enrich-email [this email])
+  (detect-language [this email]))

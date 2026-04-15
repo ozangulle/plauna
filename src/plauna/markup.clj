@@ -179,8 +179,8 @@
   ([connections messages] (render-file "admin-connections.html" {:configs connections :active-nav :admin :messages (mapv type->toast-role messages)})))
 
 (defn connection
-  ([config folders] (render-file "admin-connection.html" (merge config {:folders folders :active-nav :admin})))
-  ([config folders messages] (render-file "admin-connection.html" (merge config {:folders folders :messages (mapv type->toast-role messages) :active-nav :admin}))))
+  ([config folders categories] (render-file "admin-connection.html" (merge config {:folders folders :active-nav :admin :categories (cons nil categories)})))
+  ([config folders messages categories] (render-file "admin-connection.html" (merge config {:folders folders :messages (mapv type->toast-role messages) :active-nav :admin :categories (cons nil categories)}))))
 
 (defn preferences-page [data] (let [log-levels {:log-level-options [{:key :error :name "Error"} {:key :info :name "Info"} {:key :debug :name "Debug"}] :active-nav :admin}]
                                 (render-file "admin-preferences.html" (conj data log-levels))))

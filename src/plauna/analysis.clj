@@ -158,6 +158,11 @@
         language-result (try (detect-language training-content) (catch Exception e (t/log! {:level :error :error e} [(.getMessage e) "\nText causing the exception:" training-content])))]
     (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category (-> email :metadata :category) :category-confidence (-> email :metadata :category-confidence) :category-id (-> email :metadata :category-id)})))
 
+(defn language-result [email]
+  (let [body-part-to-train-on (core-email/body-part-for-mime-type "text/html" email)
+        training-content (normalize-body-part body-part-to-train-on)]
+    (try (detect-language training-content) (catch Exception e (t/log! {:level :error :error e} [(.getMessage e) "\nText causing the exception:" training-content])))))
+
 (defmulti handle-enrichment :type)
 
 (defmethod handle-enrichment :parsed-enrichable-email [event]
@@ -186,4 +191,5 @@
 
 (defrecord BasicAnalyzer []
   int/Analyzer
-  (enrich-email [_ email] (detect-language-and-categorize-email email)))
+  (enrich-email [_ email] (detect-language-and-categorize-email email))
+  (detect-language [_ email] (language-result email)))
