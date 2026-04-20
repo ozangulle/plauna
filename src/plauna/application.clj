@@ -110,7 +110,7 @@
     (do (t/log! :debug ["move option:" move? "category:" category "the email" (-> email-message :email :header :subject) "will not move moved"])
         :na)))
 
-(defn- incoming-email-workflow [email-message connection-id folder {:keys [move? assigned-category assigned-category-id] :as options} {:keys [client analyzer db] :as context}]
+(defn- incoming-email-workflow [email-message connection-id folder {:keys [move? assigned-category assigned-category-id]} {:keys [analyzer db] :as context}]
   (if (some? assigned-category)
     (let [language-result (int/detect-language analyzer (:email email-message))
           enriched-email (core-email/construct-enriched-email (:email email-message) {:language (:code language-result) :language-confidence (:confidence language-result)} {:category assigned-category :category-id assigned-category-id :category-confidence 1})]

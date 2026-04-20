@@ -29,6 +29,10 @@ You can parse your e-mails from mbox files or directly by connecting to your IMA
 - Read emails directly from IMAP folders.
 
 
+* What Plauna is NOT
+
+Plauna is not an e-mail archive tool. It only saves headers and contents from e-mail that it thinks will be useful for categorizing your e-mails. Certain things like the attachments are explicitly not stored in order to save db space. Please do no rely on Plauna to successfully preserve the e-mails you want to archive. 
+
 * How to get Plauna
 
 ** Docker
@@ -54,61 +58,32 @@ Plauna comes without security features like different users. It is made to be us
 
 * How to use
 
-** How to run
-
-You must provide a configuration file to start Plauna. By default, the configuration is expected to be at ~/.config/plauna.edn. You can modify the location of the configuration file by passing the parameter --config-file. This method is useful when running Plauna from the command line, e.g., java -jar plauna.jar --config-file=/opt/plauna/plauna.edn.
-
-If you are using Docker, you can put the parameters in the environment variable PLAUNA_ARGS. A docker-compose example would look like this:
-
-#+begin_src docker-compose
-services:
-  plauna:
-    container_name: plauna
-    image: ozangulle/plauna:dev
-    environment:
-      - 'PLAUNA_ARGS=--config-file=/opt/plauna/plauna.edn'
-    restart: unless-stopped
-#+end_src
-
 ** Configuration
 
-*** IMPORTANT NOTE
+There are two configuration values which cannot be configured from withing Plauna. These are:
 
-The configuration file is deprecated and will be removed in a future release.
+The database folder - this is where the database file (SQLITE) and the training files live. Defaults to /var/lib/plauna
+The server port - Defaults to 8080
 
-If this is your first time using Plauna, do not use a configuration file.
-
-The ":email" part of the configuration was moved over to the database.
-
-If you had an old configuration, the first time you run Plauna after updating it will save the email client configuration to the database. You don't have to do anything manually.
-
-*** Configuration File (Deprecated)
-
-Plauna can be configured using a separate configuration file. Currently the only values that can be configured using the configuration file are :data-folder (defaults to /var/lib/plauna) and :server {:port *} (defaults to 8080).
-
-#+begin_src clojure
-  {:data-folder "/home/myhome/example-directory" ; The location for the db, training files and models. Refers to the path in the container
-   :server {:port 80} ; The port Plauna's web server listens to in the container. Defaults to 8080.
-  }
-#+end_src
+Note: If you run Plauna as a Docker container, the directory /var/lib/plauna is created automatically. If you want to run it on your computer as a jar file, you must create this directory yourself.
 
 *** Environment Variables
 
-You can use the environment variables $DATA_FOLDER and $SERVER_PORT instead of using a configuration file. You can also use the environment variable $CONFIG_FILE to specify the location of your config file.
-
+You can use the environment variables $DATA_FOLDER and $SERVER_PORT
 
 *** CLI Parameters
 
-Everything that can be done using the environment variables can also be done using the cli parameters --config-file, --data-folder, and --server-port.
+You can also configure these values using the cli parameters --data-folder, and --server-port.
+
+E.g. java -jar plauna.jar --server-port 80
 
 *** Order of Priority
 
-The order which configuration is used is determined by the following order:
+In case multiple values are provided, plauna decides on which value to use according to the priority list below:
 
-1. Config file specified as cli parameter (will be deprecated soon)
-2. CLI parameters
-3. Environment variables
-4. Default configuration
+1. CLI parameters
+2. Environment variables
+3. Default configuration
 
 
 ** Authentication

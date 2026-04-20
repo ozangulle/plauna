@@ -1,18 +1,17 @@
 (ns plauna.entry
   (:require
-   [plauna.files :as files]
-   [plauna.application :as app]
-   [plauna.server :as server]
-   [plauna.client :as client]
-   [plauna.messaging :as messaging]
    [plauna.analysis :as analysis]
-   [taoensso.telemere :as t]
-   [plauna.parser :as parser]
-   [plauna.core.events :as events]
-   [plauna.preferences :as preferences]
-   [plauna.database :as db]
+   [plauna.application :as app]
+   [plauna.client :as client]
    [plauna.core.email :as core.email]
-   [plauna.interfaces :as int])
+   [plauna.core.events :as events]
+   [plauna.database :as db]
+   [plauna.files :as files]
+   [plauna.messaging :as messaging]
+   [plauna.parser :as parser]
+   [plauna.preferences :as preferences]
+   [plauna.server :as server]
+   [taoensso.telemere :as t])
   (:import [plauna.client ImapClient]
            [plauna.database SqliteDB]
            [plauna.analysis BasicAnalyzer])
@@ -70,4 +69,3 @@
   (require '[flow-storm.api :as fs-api])
   (fs-api/local-connect)
   (client/disconnect-all))
-
