@@ -304,6 +304,10 @@
 
 (defn connected? [^ConnectionData connection-data] (.isConnected ^Store (:store connection-data)))
 
+(defn- set-message-as-peek [^IMAPMessage message] (.setPeek message true))
+
+(defn- set-messages-as-peek [messages] (doseq [message messages] (set-message-as-peek message)))
+
 (defn move-messages-by-id-between-category-folders
   "Return true if the message could be moved. False if not."
   [^String id message-id ^String source-name ^String target-name context]
@@ -320,11 +324,13 @@
               (if (= target-folder-name (:folder (:config connection-data)))
                 (do
                   (stop-monitoring connection-data)
+                  (set-messages-as-peek found-messages)
                   (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
                   (.moveMessages source-folder (into-array Message found-messages) target-folder)
                   (start-monitoring connection-data context)
                   true)
                 (do
+                  (set-messages-as-peek found-messages)
                   (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
                   (.moveMessages source-folder (into-array Message found-messages) target-folder)
                   true))
@@ -473,6 +479,7 @@
        :folder folder}))
   (nth-email-from-folder [_ n folder]
     (let [message (.getMessage ^IMAPFolder folder n)]
+      (set-message-as-peek message)
       (t/log! :debug ["Reading message number" n "from" (.getName ^IMAPFolder folder)])
       {:email (message->email message)
        :message message})))
