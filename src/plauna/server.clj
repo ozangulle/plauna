@@ -72,7 +72,6 @@
 
 (defn save-metadata-form [params]
   (let [transformed (flatten-map params)]
-    (println params)
     (dorun (map (fn [x] (let [request (params->update-request x)]
                           (db/update-metadata (:message-id x) (:category-id request) (:category-confidence request) (:language request) (:language-confidence request)))) transformed))))
 
@@ -235,50 +234,41 @@
 
    (comp/GET "/api/admin/categories" {}
      (let [categories (db/get-categories)]
-       (success-html-with-body (markup/categories-page categories))))
+       (success-json-with-body (generate-string categories))))
+
+   (comp/POST "/api/admin/categories" {request :body}
+     (app/create-new-category! context (:name request))
+     (success-json-with-body (generate-string (db/get-categories))))
+
+   (comp/DELETE "/api/admin/categories/:id" {route-params :route-params}
+     (db/delete-category-by-id (:id route-params))
+     (success-json-with-body (generate-string (db/get-categories))))
 
    (comp/GET "/api/admin/languages" {}
-     (success-html-with-body
-      (markup/languages-admin-page (language-preferences))))
+     (success-json-with-body (generate-string (language-preferences))))
+
+   (comp/POST "/api/admin/languages" {params :body}
+     (doseq [preference params]
+       (db/update-language-preference preference))
+     (let [language-preferences (language-preferences)]
+       (success-json-with-body (generate-string language-preferences))))
 
    (comp/GET "/api/admin/preferences" {}
      (let [language-datection-threshold (p/language-detection-threshold)
            categorization-threshold (p/categorization-threshold)
            client-health-check-interval (p/client-health-check-interval)
            log-level (p/log-level)]
-       (success-html-with-body (markup/preferences-page
+       (success-json-with-body (generate-string
                                 {:language-detection-threshold language-datection-threshold
                                  :categorization-threshold categorization-threshold
                                  :log-level log-level
                                  :client-health-check-interval client-health-check-interval}))))
 
    (comp/POST "/api/admin/preferences" request
-     (doseq [param (dissoc (:params request) :redirect-url)]
-       (p/update-preference (first param) (second param)))
+     (doseq [param (:body request)]
+       (p/update-preference (first param) (if (string? (second param)) (str (keyword (second param))) (second param))))
      (t/set-min-level! (p/log-level))
-     (redirect-request request))
-
-   (comp/POST "/api/admin/languages" {params :params}
-     (let [langs-to-use (if (vector? (:use params)) (:use params) [(:use params)])]
-       (doseq [preference (mapv (fn [id language]
-                                  {:id id :language language :use (some? (some #(= language %) langs-to-use))})
-                                (vectorize (:id params))
-                                (vectorize (:language params)))]
-         (db/update-language-preference preference)))
-     (let [language-preferences (language-preferences)]
-       (success-html-with-body (markup/languages-admin-page language-preferences))))
-
-   (comp/POST "/api/admin/categories" {params :params}
-     (app/create-new-category! context (:name params))
-     {:status  301
-      :headers {"Location" "/admin/categories"}
-      :body    (markup/administration {:repl (get-status-repl-server)})})
-
-   (comp/DELETE "/api/admin/categories/:id" {route-params :route-params}
-     (db/delete-category-by-id (:id route-params))
-     {:status  301
-      :headers {"Location" "/admin/categories"}
-      :body    (markup/administration {:repl (get-status-repl-server)})})
+     (success-json-with-body (generate-string "OK")))
 
    (comp/POST "/api/admin/database" {}
      (files/check-and-create-database-file)
@@ -326,11 +316,7 @@
      {:status  200})
 
    (comp/GET "/api/admin/connections" _
-     (let [messages @global-messages]
-       (empty-global-messages)
-       (if (seq messages)
-         (response (markup/connections-list (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)) messages))
-         (response (markup/connections-list (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))))))
+     (success-json-with-body (generate-string (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))))
 
    (comp/POST "/api/admin/connections" request
      (let [params (:params request)
@@ -344,51 +330,38 @@
        (db/delete-connection (get params :id))
        {:status 200}))
 
-   (comp/GET "/api/admin/new-connection" []
-     (let [providers (db/get-auth-providers)]
-       {:status 200
-        :header html-headers
-        :body   (markup/new-connection providers)}))
-
    (comp/DELETE "/api/admin/auth-providers/:id" request
-     (let [params (:params request)
-           body (parse-string (slurp (:body request)) true)]
+     (let [params (:params request)]
        (db/delete-auth-provider (get params :id))
-       (if (empty? (:conn-id body))
-         (redirect "/admin/new-connection" 303)
-         (redirect (str "/admin/connections/" (:conn-id body) 303)))))
+       (success-json-with-body {})))
 
    (comp/POST "/api/admin/auth-providers" request
-     (let [params (:params request)]
-       (db/add-auth-provider (dissoc params :redirect-url))
-       (if (= "/api/admin/connections/" (:redirect-url params))
-         (redirect-request (assoc-in request [:params :redirect-url] "/admin/new-connection"))
-         (redirect-request request))))
+     (let [body (:body request)]
+       (db/add-auth-provider body)
+       (success-json-with-body {})))
 
    (comp/PUT "/api/admin/auth-providers/:id" request
-     (let [params (:params request)]
-       (db/update-auth-provider params)))
+     (let [body (:body request)]
+       (db/update-auth-provider body)
+       (success-json-with-body {})))
 
    (comp/GET "/api/admin/connections/:id" [id]
      (let [conn-info (connection-information id)
            providers (db/get-auth-providers)
            categories (db/get-categories)]
-       (if (seq @global-messages)
-         (let [messages @global-messages]
-           (swap! global-messages (fn [_] []))
-           (success-html-with-body (markup/connection (assoc conn-info :auth-providers providers) (connection-folders conn-info) messages categories)))
-         (success-html-with-body (markup/connection (assoc conn-info :auth-providers providers) (connection-folders conn-info) categories)))))
+       (success-json-with-body (generate-string {:config (assoc conn-info :auth-providers providers) :folders (mapv str (connection-folders conn-info)) :categories categories}))))
 
    (comp/PUT "/api/admin/connections/:id" request
-     (let [params (:params request)]
-       (db/update-connection {:id (get params :id) :host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs)) :auth-type (get params :auth-type) :auth-provider (get params :auth-provider)})
-       {:status 200}))
+     (let [config (:config (:body request))
+           id (:id (:route-params request))]
+       (db/update-connection {:id id :host (get config :host) :user (get config :user) :secret (get config :secret) :folder (get config :folder) :debug (get config :debug) :security (get config :security) :port (get config :port) :check-ssl-certs (get config :check-ssl-certs) :auth-type (get config :auth-type) :auth-provider (get config :auth-provider)})
+       (success-json-with-body {})))
 
    (comp/POST "/api/admin/connections/:id/controls" request
      (let [id (:id (:route-params request))
-           operation (:operation (:params request))]
-       (cond (= "reconnect" operation) (do (client/reconnect (client/connection-data-from-id id)) (redirect-request request))
-             (= "disconnect" operation) (do (client/disconnect (client/connection-data-from-id id)) (redirect-request request))
+           operation (:operation (:body request))]
+       (cond (= "reconnect" operation) (do (client/reconnect (client/connection-data-from-id id))                  (success-json-with-body "OK"))
+             (= "disconnect" operation) (do (client/disconnect (client/connection-data-from-id id))                  (success-json-with-body "OK"))
              (= "connect" operation)
              (let [action (app/connect-to-client context id)]
                (cond
@@ -396,26 +369,28 @@
                  (let [csrf (.toString (UUID/randomUUID))]
                    (-> (redirect (oauth/authorize-uri (:provider action) csrf)) (assoc :session {:oauth-csrf csrf :connection-id id :provider (:provider action)})))
                  (= :ok (:result action))
-                 (redirect-request request)
+                 (success-json-with-body {})
                  (= :error (:result action))
-                 (redirect-request request {:type :alert :content "Connection failed. Please see the logs for the details."})))
-             (= "parse" operation) (let [params (:params request)
-                                         folder (:folder params)
-                                         move (some? (:move params))
-                                         assigned-category-pair (st/split (:assigned-category params) #"-")
+                 (success-json-with-body {}))
+               (comment (redirect-request request {:type :alert :content "Connection failed. Please see the logs for the details."}))
+               (success-json-with-body {}))
+             (= "parse" operation) (let [settings (:parse-settings (:body request))
+                                         folder (:folder settings)
+                                         move (some? (:move settings))
+                                         assigned-category-pair (st/split (:category settings) #"-")
                                          conn-data (client/connection-data-from-id id)
                                          message-count (app/read-emails-from-folder conn-data folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)} context)]
-                                     (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)})))
-                                     (redirect-request request)))))
+                                     (comment (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)}))))
+                                     (success-json-with-body {}))))
 
-   (comp/POST "/api/metadata/languages" request
-     (let [limiter (messaging/channel-limiter :enriched-email)
-           process-fn (fn [enriched-emails]
-                        (doseq [enriched-email enriched-emails]
-                          (async/>!! limiter :token)
-                          (async/>!! @messaging/main-chan {:type :language-detection-request :options {} :payload enriched-email})))]
-       (core-email/iterate-over-all-pages db/fetch-data process-fn {:entity :enriched-email :strict false :page {:page 1 :size 500}} {:where [:= :language nil]} true))
-     (redirect-request request))
+     (comp/POST "/api/metadata/languages" request
+       (let [limiter (messaging/channel-limiter :enriched-email)
+             process-fn (fn [enriched-emails]
+                          (doseq [enriched-email enriched-emails]
+                            (async/>!! limiter :token)
+                            (async/>!! @messaging/main-chan {:type :language-detection-request :options {} :payload enriched-email})))]
+         (core-email/iterate-over-all-pages db/fetch-data process-fn {:entity :enriched-email :strict false :page {:page 1 :size 500}} {:where [:= :language nil]} true))
+       (redirect-request request)))
 
    (comp/POST "/repl" request
      (let [operation (get-in request [:params :operation])]
@@ -437,6 +412,7 @@
          "Bad response - csrf token mismach")))
 
    (comp/ANY "/*" _ (slurp (io/resource "public/index.html")))))
+
 
 (defn upload-progress [_ bytes-read content-length item-count]
   (t/log! {:level :info
@@ -460,8 +436,7 @@
                                          {:status 400
                                           :headers {"Content-Type" "application/json"}
                                           :body {:error "invalid JSON"}}})
-                        (wrap-defaults {:static {:resources "public"
-                                                 :files     "resources/public"}})
+                        (wrap-defaults {:static {:resources "public"}})
                         wrap-params))
 
 (defn get-random-port []

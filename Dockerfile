@@ -3,9 +3,10 @@ RUN apt update && apt install -y nodejs npm
 COPY . /usr/src/app/
 WORKDIR /usr/src/app
 RUN npm install
-RUN npm run build
+#RUN npm run build
 # FIXME Tests are currently disabled because some of them fail at random due to concurrency
 # RUN clojure -M:test
+RUN clojure -M:cljs release app
 RUN clojure -T:build uber
 
 FROM eclipse-temurin:25-alpine

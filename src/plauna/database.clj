@@ -204,7 +204,7 @@
   (jdbc/execute! (ds) (insert->insert-ignore (honey/format {:insert-into :category-training-preferences :columns [:language :use-in-training] :values preferences}))))
 
 (defn update-language-preference [preference]
-  (jdbc/execute! (ds) ["UPDATE category_training_preferences SET use_in_training = ?  WHERE id = ?" (:use preference) (:id preference)] builder-function))
+  (jdbc/execute! (ds) ["UPDATE category_training_preferences SET use_in_training = ?  WHERE id = ?" (:use_in_training preference) (:id preference)] builder-function))
 
 ;;;;;;;;;;;;;; Refactored call stuff
 
@@ -243,7 +243,6 @@
 
 (defmethod data->sql :enriched-email
   ([entity-clause sql-clause]
-   (println sql-clause)
    (let [strict (:strict entity-clause)
          jdbc-sql (honey/format (postwalk change-important-keys sql-clause))]
      (flatten [(str (headers-for-strict-options strict) " " (first jdbc-sql)) (rest jdbc-sql)])))
