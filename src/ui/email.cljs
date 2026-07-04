@@ -14,6 +14,8 @@
 
 (def email-data (r/atom {}))
 
+(def move-email (r/atom true))
+
 (defn event-val [event] (-> event .-target .-value))
 
 (defn fetch-email
@@ -29,7 +31,7 @@
 
 (defn language-update-handler [keys] (fn [event] (update-key [[keys (event-val event)] [[:metadata :language-confidence] 1]])))
 
-(defn save-metadata "Returns a channel" [email] (backend/save-metadata-for-email email false))
+(defn save-metadata "Returns a channel" [email] (backend/save-metadata-for-email email @move-email))
 
 (defn category-update-handler [email]
   (fn [event] (update-key [[[:metadata :category-id] (event-val event)]
@@ -117,6 +119,13 @@
                                                                          (fn [mail] (save-metadata mail))
                                                                          (language-update-handler [:metadata :language]))]
              [:> material/ListItem "Language Confidence:" (utils/decimal-place (ce/language-confidence email) 4)]
+             [:> material/ListItem
+              [:> material/FormControlLabel {:label "Move this email after update"
+                                             :control (r/create-element material/Checkbox
+                                                                        #js
+                                                                        {:checked @move-email
+                                                                         :onChange (fn [_ new] (reset! move-email new))
+                                                                         :label "Test"})}]]
              [:> material/ListItem "Category:" (inputs/category-select email (:categories (:optional @email-data))
                                                                        (category-debouncer)
                                                                        (category-update-handler email))]

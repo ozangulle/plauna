@@ -76,7 +76,7 @@
                [:> material/TableCell ""]]]
              [:> material/TableBody
               (for [connection @connections-data]
-                [:> material/TableRow {:key (:id connection) :on-click (fn [_] (navigate (str "/connections/" (:id connection))))}
+                [:> material/TableRow {:key (:id connection) :on-click (fn [_] (navigate (str "/connections/" (:id connection)))) :sx {:cursor "pointer"}}
                  [:> material/TableCell (:user connection)]
                  [:> material/TableCell (:host connection)]
                  [:> material/TableCell (str (:connected connection))]
