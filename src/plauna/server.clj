@@ -284,12 +284,12 @@
      (if (:move? (:body request))
        (let [message-id (:message-id (:body request))
              email-before-update (enriched-email-by-message-id message-id)
-             new-category-id (Integer/parseInt (:category-id (:metadata (:body request))))
+             new-category-id (:category-id (:metadata (:body request)))
              new-category-name (get (first (filter #(= (:id %) new-category-id) (db/get-categories))) :name "")
              process (app/move-email-to-category email-before-update new-category-name context)]
          (if (= :error (:result process))
            (add-to-messages (:message process))
-           (save-metadata-form (:body request))))
+           (save-metadata-request (:body request))))
        (save-metadata-request (:body request)))
      (success-json-with-body (:body request)))
 
