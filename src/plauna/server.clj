@@ -210,13 +210,6 @@
 
 (defn empty-global-messages [] (reset! global-messages []))
 
-(defmacro result-with-messages [markup-call messages-var]
-  `(if (seq @~messages-var)
-     (let [messages# @~messages-var]
-       (reset! ~messages-var [])
-       (~@markup-call messages#))
-     ~markup-call))
-
 (defn make-routes [context]
   (comp/routes
 
@@ -289,9 +282,9 @@
              process (app/move-email-to-category email-before-update new-category-name context)]
          (if (= :error (:result process))
            (add-to-messages (:message process))
-           (save-metadata-request (:body request))))
+           (save-metadata-request {})))
        (save-metadata-request (:body request)))
-     (success-json-with-body (:body request)))
+     (success-json-with-body {}))
 
    (comp/POST "/api/training" request
      (let [result (write-emails-to-training-files-and-train)]

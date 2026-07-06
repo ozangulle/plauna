@@ -17,27 +17,6 @@
         (reset! timeout-id (js/setTimeout (fn [] (apply f args)) delay-ms)))
       {:cancel (fn [] (when-let [id @timeout-id] (js/clearTimeout id) (reset! timeout-id nil)))})))
 
-(defn editable-language [email keys debouncer-action on-change-handler]
-  (let [debouncer (make-debouncer (fn [mail] (when (some? mail) (debouncer-action mail))) debounce-timeout)
-        func (fn [event] ((comp debouncer on-change-handler) event))]
-    [:> material/Input
-     {:value (get-in email keys)
-      :type "text"
-      :on-click #(.stopPropagation %)
-      :on-change func
-      :sx {"z-index" 2}}]))
-
-(comment (defn debounced-input []
-   (fn [value typ debouncer-action on-change-handler]
-     (let [debouncer (make-debouncer (fn [value] (when (some? value) (debouncer-action value))) debounce-timeout)
-           func ]
-       [:> material/Input
-        {:value value
-         :type typ
-         :on-click #(.stopPropagation %)
-         :on-change func
-         :sx {"z-index" 2}}]))))
-
 (defn debounced-input []
   (let [debouncer-ref (atom nil)]
     (r/create-class

@@ -36,8 +36,6 @@
 
 (defn event-val [event] (-> event .-target .-value))
 
-(defn language-update-handler [email keys] (fn [event] (update-key (ce/message-id email) [[keys (event-val event)] [[:metadata :language-confidence] 1]])))
-
 (defn category-update-handler [email]
   (fn [event] (update-key (ce/message-id email) [[[:metadata :category-id] (event-val event)]
                                                  [[:metadata :category] (->> (:categories (:optional @emails)) (filter #(= (event-val event) (:id %))) first :name)]
@@ -45,7 +43,7 @@
 
 (defn category-debouncer [] (fn [email] (take! (save-metadata email) (fn [_] (refresh-emails (:parameters @emails))))))
 
-(defn extract-email-fields [email navigate]
+(defn extract-email-fields [email index navigate]
   [:> material/TableRow
    {:key (ce/message-id email)
     :on-click (fn [_] (navigate (str "/emails/" (js/btoa (ce/message-id email)))))
@@ -71,9 +69,11 @@
           :textOverflow "ellipsis"
           :whiteSpace "nowrap"}}
     [:> material/Typography {:noWrap true} (-> email utils/filter-to utils/concat-contacts)]]
-   [:> material/TableCell (inputs/editable-language email [:metadata :language]
-                                                    (fn [mail] (save-metadata mail))
-                                                    (language-update-handler email [:metadata :language]))]
+   [:> material/TableCell [:f> inputs/debounced-input
+                           (get-in email [:metadata :language])
+                           ""
+                           (fn [mail] (save-metadata mail))
+                           (fn [new-value] (swap! emails assoc-in [:data index :metadata :language] new-value))]]
    [:> material/TableCell (utils/decimal-place (ce/language-confidence email) 4)]
    [:> material/TableCell (inputs/category-select email (:categories (:optional @emails))
                                                   (category-debouncer)
@@ -138,5 +138,8 @@
                [:> material/TableCell "Confidence"]
                [:> material/TableCell "Category"]
                [:> material/TableCell "Confidence"]]]
-             (into [:> material/TableBody] (mapv #(extract-email-fields % navigate) (:data @emails)))]]]))
+             [:> material/TableBody
+              (for [index (range (count (:data @emails)))
+                    :let [email (get (:data @emails) index)]]
+                (extract-email-fields email index navigate))]]]]))
       (finally (reset! loading? true)))))

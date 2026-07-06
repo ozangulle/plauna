@@ -29,16 +29,14 @@
              (assoc old-data :data result))))
   (:data @email-data))
 
-(defn language-update-handler [keys] (fn [event] (update-key [[keys (event-val event)] [[:metadata :language-confidence] 1]])))
-
-(defn save-metadata "Returns a channel" [email] (backend/save-metadata-for-email email @move-email))
+(defn save-metadata "Returns a channel" [email move?] (backend/save-metadata-for-email email move?))
 
 (defn category-update-handler [email]
   (fn [event] (update-key [[[:metadata :category-id] (event-val event)]
                             [[:metadata :category] (->> (:categories (:optional @email-data)) (filter #(= (event-val event) (:id %))) first :name)]
                                                   [[:metadata :category-confidence] 1]])))
 
-(defn category-debouncer [] (fn [email] (take! (save-metadata email) (fn [_] (fetch-email (ce/message-id email))))))
+(defn category-debouncer [] (fn [email] (take! (save-metadata email @move-email) (fn [_] (fetch-email (ce/message-id email))))))
 
 (defn body-part->html [body-part]
   (let [value (r/atom "0")
@@ -115,9 +113,15 @@
            [:h3 "Metadata"]
            [:> material/Paper
             [:> material/List
-             [:> material/ListItem "Language:" (inputs/editable-language email [:metadata :language]
-                                                                         (fn [mail] (save-metadata mail))
-                                                                         (language-update-handler [:metadata :language]))]
+             [:> material/ListItem "Language:"
+              [:f> inputs/debounced-input
+               (get-in email [:metadata :language])
+               ""
+               (fn [mail] (save-metadata (:data mail) false))
+               (fn [new-value]
+                 (swap! email-data assoc-in [:data :metadata :language] new-value)
+                 (swap! email-data assoc-in [:data :metadata :language-confidence] 1))]
+              ]
              [:> material/ListItem "Language Confidence:" (utils/decimal-place (ce/language-confidence email) 4)]
              [:> material/ListItem
               [:> material/FormControlLabel {:label "Move this email after update"
