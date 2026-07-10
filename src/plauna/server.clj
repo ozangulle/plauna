@@ -281,7 +281,7 @@
              new-category-name (get (first (filter #(= (:id %) new-category-id) (db/get-categories))) :name "")
              process (app/move-email-to-category email-before-update new-category-name context)]
          (if (= :error (:result process))
-           (add-to-messages (:message process))
+           (t/log! :error ["There was an error handling the move request" process])
            (save-metadata-request {})))
        (save-metadata-request (:body request)))
      (success-json-with-body {}))

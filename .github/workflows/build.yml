@@ -48,4 +48,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
           cache-from: type=registry,ref=ozangulle/plauna:buildcache
-          cache-to: type=registry,ref=ozangulle/plauna:buildcache,mode=max
+          cache-to: type=registry,ref=ozangulle/plauna:buildcache,mode=max,ignore-error=true
