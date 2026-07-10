@@ -35,10 +35,16 @@
 
 (defn fetch-connection [id callback] (take! (http/get (str "/api/admin/connections/" id)) callback))
 
+(defn delete-connection [id callback] (take! (http/delete (str "/api/admin/connections/" id)) callback))
+
 (defn update-connection [id config callback] (take! (http/put (str "/api/admin/connections/" id) {:content-type "application/json" :body (serialize {:config config})}) callback))
+
+(defn add-connection [config callback] (take! (http/post "/api/admin/connections" {:content-type "application/json" :body (serialize config)}) callback))
 
 (defn add-auth-provider [provider callback] (take! (http/post "/api/admin/auth-providers" {:content-type "application/json" :body (serialize provider)}) callback))
 
 (defn delete-auth-provider [id callback] (take! (http/delete (str "/api/admin/auth-providers/" id)) callback))
 
 (defn update-auth-provider [id provider callback] (take! (http/put (str "/api/admin/auth-providers/" id) {:content-type "application/json" :body (serialize provider)}) callback))
+
+(defn fetch-auth-providers [callback] (take! (http/get "/api/admin/auth-providers" {:content-type "application/json"}) callback))

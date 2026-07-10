@@ -24,7 +24,9 @@
     [:<>
      [:> material/Button {:variant "outlined"
                           :color "error"
-                          :onClick #(reset! open true)}
+                          :onClick (fn [event]
+                                     (.stopPropagation event)
+                                     (reset! open true))}
       "Delete"]
      [:> material/Dialog {:open @open
                           :onClose #(reset! open false)}
@@ -36,12 +38,14 @@
       [:> material/DialogActions
        [:> material/Button {:variant "contained"
                             :color "error"
-                            :onClick (fn [] (backend/delete-email id nil)
-                                       (fetch-connections-and-refresh)
+                            :onClick (fn [event] (backend/delete-connection id (fn [_] (fetch-connections-and-refresh)))
+                                       (.stopPropagation event)
                                        (reset! open false))}
         "Delete"]
        [:> material/Button {:variant "outlined"
-                            :onClick #(reset! open false)}
+                            :onClick (fn [event]
+                                       (.stopPropagation event)
+                                       (reset! open false))}
         "Cancel"]]]]))
 
 (defn reconnect-button [id connected]
@@ -52,7 +56,7 @@
 (defn disconnect-button [id connected]
   (if connected
     [:> material/Button {:color "error" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :disconnect nil (fn [_] (fetch-connections-and-refresh))))} "Disconnect"]
-    [:> material/Button {:color "error" :disabled true} "Disconnect"]))
+    [:> material/Button {:color "error" :disabled true :on-click (fn [event] (.stopPropagation event))} "Disconnect"]))
 
 (defn connections-page []
   (fn []
@@ -84,7 +88,8 @@
                  [:> material/TableCell
                   [reconnect-button (:id connection) (:connected connection)]
                   [disconnect-button (:id connection) (:connected connection)]
-                  [delete-button]]])]]]])))))
+                  [delete-button (:id connection)]]])]]]
+           [:> material/Button {:on-click (fn [event] (.stopPropagation event) (navigate "/connections/new"))} "Add new"]])))))
 
 (defn- delete-auth-provider-button [name id conn-id]
   (r/with-let [open (r/atom false)]
@@ -122,15 +127,21 @@
 
 (defn update-provider [provider conn-id] (backend/update-auth-provider (:id provider) provider (fn [] (backend/fetch-connection conn-id (fn [response] (reset! connection-data (:body response)))))))
 
-(defn connection-page []
-
+(defn connection-page [mode]
   (fn []
-    (let [params (rr/useParams)]
+    (let [params (rr/useParams)
+          navigate (rr/useNavigate)]
       (r/with-let [loading? (r/atom true)]
-        (when @loading? (backend/fetch-connection (get (js->clj params) "id")
-                                                  (fn [response]
-                                                    (reset! connection-data (:body response))
-                                                    (reset! loading? false))))
+        (cond
+          (and @loading? (= :edit mode))
+          (backend/fetch-connection (get (js->clj params) "id")
+                                    (fn [response]
+                                      (reset! connection-data (:body response))
+                                      (reset! loading? false)))
+          (and @loading? (= :new mode)) (backend/fetch-auth-providers
+                                         (fn [response]
+                                           (swap! connection-data assoc-in [:config :auth-providers] (:body response))
+                                           (reset! loading? false))))
         (if @loading?
           [:> material/LinearProgress {:aria-label "Loading"}]
           (let [config (:config @connection-data)]
@@ -153,7 +164,7 @@
                 [:> material/FormControl {:fullWidth true}
                  [:> material/TextField {:value (:user config) :label "User" :on-change (update-connection-data-config :user)}]]
                 [:> material/FormControl {:fullWidth true}
-                 [:> material/TextField {:value (:user config) :label "Secret" :type "password" :on-change (update-connection-data-config :secret)}]]
+                 [:> material/TextField {:value (:secret config) :label "Secret" :type "password" :on-change (update-connection-data-config :secret)}]]
                 [:> material/FormControl {:fullWidth true}
                  [:> material/TextField {:value (:folder config) :label "Folder" :on-change (update-connection-data-config :folder)}]]
                 [:> material/FormControl {:fullWidth true}
@@ -172,12 +183,19 @@
                  [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:check-ssl-certs config) :onChange (update-connection-data-config :check-ssl-certs)}) :label "Check SSL Certificates"}]]
                 [:> material/FormControl {:fullWidth true}
                  [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:debug config) :onChange (update-connection-data-config :debug)}) :label "IMAP Debug"}]]
-                [:> material/Button {:on-click (fn [] (backend/update-connection
-                                                       (get (js->clj params) "id")
-                                                       (:config @connection-data)
-                                                       (fn [_] (backend/fetch-connection (get (js->clj params) "id")
-                                                                                         (fn [response]
-                                                                                           (reset! connection-data (:body response)))))))} "Update Configuration"]]]
+                (if (= :new mode)
+                  [:> material/Button {:on-click (fn [] (backend/add-connection
+                                                    (:config @connection-data)
+                                                    (fn [_] (backend/fetch-connection (get (js->clj params) "id")
+                                                                                      (fn [response]
+                                                                                        (reset! connection-data (:body response))
+                                                                                        (navigate "/connections"))))))} "Add New Connection"]
+                  [:> material/Button {:on-click (fn [] (backend/update-connection
+                                                         (get (js->clj params) "id")
+                                                         (:config @connection-data)
+                                                         (fn [_] (backend/fetch-connection (get (js->clj params) "id")
+                                                                                           (fn [response]
+                                                                                             (reset! connection-data (:body response)))))))} "Update Connection"])]]
               [:> material/Grid {:size 6}
                (when (> (count (:folders @connection-data)) 0)
                  [:> material/Paper

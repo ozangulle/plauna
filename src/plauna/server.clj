@@ -312,26 +312,29 @@
      (success-json-with-body (generate-string (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))))
 
    (comp/POST "/api/admin/connections" request
-     (let [params (:params request)
-           config {:host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder) :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs))}
+     (let [params (:body request)
+           config {:host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder "") :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs))}
            id (client/id-from-config config)]
        (db/add-connection (merge config {:id id}))
-       (redirect-request request)))
+       (success-json-with-body {})))
 
    (comp/DELETE "/api/admin/connections/:id" request
      (let [params (:params request)]
        (db/delete-connection (get params :id))
-       {:status 200}))
+       (success-json-with-body {})))
 
    (comp/DELETE "/api/admin/auth-providers/:id" request
      (let [params (:params request)]
        (db/delete-auth-provider (get params :id))
        (success-json-with-body {})))
 
+   (comp/GET "/api/admin/auth-providers" _
+     (success-json-with-body (generate-string (db/get-auth-providers))))
+
    (comp/POST "/api/admin/auth-providers" request
-     (let [body (:body request)]
-       (db/add-auth-provider body)
-       (success-json-with-body {})))
+              (let [body (:body request)]
+                (db/add-auth-provider body)
+                (success-json-with-body {})))
 
    (comp/PUT "/api/admin/auth-providers/:id" request
      (let [body (:body request)]

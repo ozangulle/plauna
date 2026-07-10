@@ -57,7 +57,9 @@
                {:path "connections"
                 :element (r/as-element [:f> conn/connections-page])}
                {:path "connections/:id"
-                :element (r/as-element [:f> conn/connection-page])}]}])
+                :element (r/as-element [:f> conn/connection-page :edit])}
+               {:path "connections/new"
+                :element (r/as-element [:f> conn/connection-page :new])}]}])
 
 (def router 
   (rr/createBrowserRouter (clj->js (routes))))
