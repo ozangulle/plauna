@@ -42,23 +42,32 @@
   (let [value (r/atom "0")
         tab-change (fn [_ new-val] (reset! value new-val))]
     (fn []
-      [:> material/List
-       [:> material/ListItem "Mime Type:" (:mime-type body-part)]
-       [:> material/ListItem "Charset:" (:charset body-part)]
-       [:> material/ListItem "Transfer Encoding:" (:transfer-encoding body-part)]
-       (when (some? (:filename body-part))
-         [:> material/ListItem "File Name:" (:transfer-encoding body-part)])
-       (when (some? (:content-disposition body-part))
-         [:> material/ListItem "Content Disposition:" (:content-disposition body-part)])
-       (if (or (= "text/plain" (:mime-type body-part)) (= "text/html" (:mime-type body-part)))
-         [:> lab/TabContext {:value @value}
-          [:> material/Box {:sx {:borderBottom 1 :borderColor "divider"}}
-           [:> lab/TabList {:on-change tab-change}
-            [:> material/Tab {:label "Unsanitized" :value "0"}]
-            [:> material/Tab {:label "Sanitized" :value "1"}]]]
-          [:> material/Container {:fixed true} [:> lab/TabPanel {:value "0"} (:content body-part)]]
-          [:> material/Container {:fixed true} [:> lab/TabPanel {:value "1"} (:sanitized-content body-part)]]]
-         [:div "Non-text content"])])))
+      [:> material/Paper {:sx {:margin-bottom 3}}
+       [:> material/Grid {:container true :spacing 3}
+        [:> material/Grid {:xs 12 :sm 4}
+         [:> material/List
+          [:> material/ListItem [:> material/ListItemText
+                                 {:secondary "Mime Type" :primary (:mime-type body-part)}]]
+          [:> material/ListItem [:> material/ListItemText
+                                 {:secondary "Charset" :primary (:charset body-part)}]]
+          [:> material/ListItem [:> material/ListItemText
+                                 {:secondary "Transfer Encoding" :primary (:transfer-encoding body-part)}]]
+          (when (some? (:filename body-part))
+            [:> material/ListItem [:> material/ListItemText
+                                   {:secondary "File Name" :primary (:transfer-encoding body-part)}]])
+          (when (some? (:content-disposition body-part))
+            [:> material/ListItem [:> material/ListItemText
+                                   {:secondary "Content Disposition" :primary (:content-disposition body-part)}]])]]
+        [:> material/Grid {:xs 12 :sm 8}
+         (if (or (= "text/plain" (:mime-type body-part)) (= "text/html" (:mime-type body-part)))
+           [:> lab/TabContext {:value @value}
+            [:> material/Box {:sx {:borderBottom 1 :borderColor "divider"}}
+             [:> lab/TabList {:on-change tab-change}
+              [:> material/Tab {:label "Unsanitized" :value "0"}]
+              [:> material/Tab {:label "Sanitized" :value "1"}]]]
+            [:> material/Container {:fixed true} [:> lab/TabPanel {:value "0"} [:div {:style {:height "50em" :overflow "scroll"}} (:content body-part)]]]
+            [:> material/Container {:fixed true} [:> lab/TabPanel {:value "1"} (:sanitized-content body-part)]]]
+           [:div "Non-text content"])]]])))
 
 (defn- contents [body-parts]
   (mapv (fn [x] [:f> (body-part->html x)]) body-parts))
@@ -96,43 +105,65 @@
       (when @loading?
         (fetch-email id loading?))
       (if @loading?
-        [:p "LOADING"]
+        [:> material/LinearProgress {:aria-label "Loading…"}]
         (let [email (:data @email-data)]
           [:div
            [:> material/IconButton {:on-click #(navigate -1)} [:> ArrowBackIcon]]
            [:h2 (ce/subject email)]
-           [:> material/Paper
-            [:> material/List
-             [:> material/ListItem "Message ID:" (ce/message-id email)]
-             [:> material/ListItem "Date:" (utils/parse-date (ce/date email))]
-             [:> material/ListItem "Senders:" (-> email utils/filter-from utils/concat-contacts)]
-             [:> material/ListItem "Recipients:" (-> email utils/filter-to utils/concat-contacts)]
-             [:> material/ListItem "CC:" (-> email utils/filter-cc utils/concat-contacts)]
-             [:> material/ListItem "BCC:" (-> email utils/filter-bcc utils/concat-contacts)]]]
-           [:f> delete-button navigate id]
-           [:h3 "Metadata"]
-           [:> material/Paper
-            [:> material/List
-             [:> material/ListItem "Language:"
-              [:f> inputs/debounced-input
-               (get-in email [:metadata :language])
-               ""
-               (fn [mail] (save-metadata (:data mail) false))
-               (fn [new-value]
-                 (swap! email-data assoc-in [:data :metadata :language] new-value)
-                 (swap! email-data assoc-in [:data :metadata :language-confidence] 1))]
-              ]
-             [:> material/ListItem "Language Confidence:" (utils/decimal-place (ce/language-confidence email) 4)]
-             [:> material/ListItem
-              [:> material/FormControlLabel {:label "Move this email after update"
-                                             :control (r/create-element material/Checkbox
-                                                                        #js
-                                                                        {:checked @move-email
-                                                                         :onChange (fn [_ new] (reset! move-email new))
-                                                                         :label "Test"})}]]
-             [:> material/ListItem "Category:" (inputs/category-select email (:categories (:optional @email-data))
-                                                                       (category-debouncer)
-                                                                       (category-update-handler email))]
-             [:> material/ListItem "Category Confidence:" (utils/decimal-place (ce/category-confidence email) 4)]]]
+           [:> material/Grid {:container true
+                              :direction :row
+                              :spacing 3
+                              :sx {:justifyContent :space-between
+                                   :alignItems :flex-start}
+                              :columns {:sm 6 :md 12}}
+            [:> material/Grid {:size 6}
+             [:> material/Paper
+              [:> material/List
+               [:> material/ListItem [:> material/ListItemText
+                                      {:secondary "Message ID" :primary (ce/message-id email)}]]
+               [:> material/ListItem [:> material/ListItemText
+                                      {:secondary "Date" :primary (utils/parse-date (ce/date email))}]]
+               [:> material/ListItem [:> material/ListItemText
+                                      {:secondary "Senders" :primary (-> email utils/filter-from utils/concat-contacts)}]]
+               [:> material/ListItem [:> material/ListItemText
+                                      {:secondary "Recipients" :primary (-> email utils/filter-to utils/concat-contacts)}]]
+               [:> material/ListItem [:> material/ListItemText
+                                      {:secondary "CC" :primary (-> email utils/filter-cc utils/concat-contacts)}]]
+               [:> material/ListItem [:> material/ListItemText
+                                      {:secondary "BCC" :primary (-> email utils/filter-bcc utils/concat-contacts)}]]
+               [:> material/ListItem [:f> delete-button navigate id]]]]]
+            [:> material/Grid {:size 6}
+             (comment [:h3 "Metadata"])
+             [:> material/Paper
+              [:> material/List
+               [:> material/ListItem
+                [:f> inputs/debounced-input
+                 (get-in email [:metadata :language])
+                 "Language"
+                 (fn [mail] (save-metadata (:data mail) false))
+                 (fn [new-value]
+                   (swap! email-data assoc-in [:data :metadata :language] new-value)
+                   (swap! email-data assoc-in [:data :metadata :language-confidence] 1))]]
+               [:> material/ListItem
+                [:> material/ListItemText
+                 {:secondary "Language Confidence" :primary
+                  (utils/decimal-place (ce/language-confidence email) 4)}]]
+               [:> material/ListItem
+                (inputs/category-select email
+                                        "Category"
+                                        (:categories (:optional @email-data))
+                                        (category-debouncer)
+                                        (category-update-handler email))]
+               [:> material/ListItem
+                [:> material/ListItemText
+                 {:secondary "Category Confidence" :primary
+                  (utils/decimal-place (ce/category-confidence email) 4)}]]
+               [:> material/ListItem
+                [:> material/FormControlLabel {:label "Move this email after update"
+                                               :control (r/create-element material/Checkbox
+                                                                          #js
+                                                                           {:checked @move-email
+                                                                            :onChange (fn [_ new] (reset! move-email new))
+                                                                            :label "Test"})}]]]]]]
            [:h3 "Content(s)"]
-           (into [:> material/Paper] (contents (:body email)))])))))
+           (into [:<>] (contents (:body email)))])))))

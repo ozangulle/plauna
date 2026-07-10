@@ -49,8 +49,10 @@
     (update-in email [:metadata :category] (fn [_] nil))
     email))
 
-(defn category-select [email categories debouncer-action on-change-handler]
+(defn category-select [email label categories debouncer-action on-change-handler]
   (let [debouncer (make-debouncer (fn [email] (when (some? email) (debouncer-action email))) debounce-timeout)
         func (fn [event] ((comp debouncer handle-na-category-id on-change-handler) event))
         selected (->> categories (filter #(= (ce/category email) (:name %))) first)]
-    (into [:> material/Select {:value (get selected :id -1) :on-click #(.stopPropagation %) :on-change func}] (mapv (fn [category] [:> material/MenuItem {:value (:id category)} (:name category)]) categories))))
+    [:> material/FormControl
+     [:> material/InputLabel {:id "category-select-label"} label]
+     (into [:> material/Select {:value (get selected :id -1) :label-id "category-select-label" :on-click #(.stopPropagation %) :on-change func}] (mapv (fn [category] [:> material/MenuItem {:value (:id category)} (:name category)]) categories))]))

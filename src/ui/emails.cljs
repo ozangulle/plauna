@@ -75,7 +75,9 @@
                            (fn [mail] (save-metadata mail))
                            (fn [new-value] (swap! emails assoc-in [:data index :metadata :language] new-value))]]
    [:> material/TableCell (utils/decimal-place (ce/language-confidence email) 4)]
-   [:> material/TableCell (inputs/category-select email (:categories (:optional @emails))
+   [:> material/TableCell (inputs/category-select email
+                                                  ""
+                                                  (:categories (:optional @emails))
                                                   (category-debouncer)
                                                   (category-update-handler email))]
    [:> material/TableCell (utils/decimal-place (ce/category-confidence email) 4)]])
