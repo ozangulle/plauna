@@ -100,14 +100,17 @@
          [:h4 "Categories"]
          [:> material/List
           (for [category @categories-data]
-            [:> material/ListItem (:name category) [delete-category-button (:name category) (:id category) ]])]
-         [:> material/TextField {:value @new-category
-                                 :on-change (fn [event] (reset! new-category (utils/event-val event)))} ]
-         [:> material/Fab {:color "primary"
-                           :aria-label "add"
-                           :on-click (fn [] (backend/add-category
-                                             @new-category
-                                             (fn [] (backend/fetch-categories (fn [response] (reset! categories-data (:body response)))))))} [:> AddIcon]]]))))
+            [:> material/ListItem [:> material/ListItemText (:name category)] [:> material/ListItemIcon [delete-category-button (:name category) (:id category)]]])
+          [:> material/ListItem
+           [:> material/ListItemText
+            [:> material/TextField {:value @new-category
+                                    :on-change (fn [event] (reset! new-category (utils/event-val event)))}]]
+           [:> material/ListItemIcon
+            [:> material/Fab {:color "primary"
+                              :aria-label "add"
+                              :on-click (fn [] (backend/add-category
+                                                @new-category
+                                                (fn [] (backend/fetch-categories (fn [response] (reset! categories-data (:body response)))))))} [:> AddIcon]]]]]]))))
 
 (defn toggle-language [language] (update language :use_in_training (fn [cur] (- 1 cur))))
 

@@ -192,14 +192,6 @@
                                                  (conj acc {k (:default v)})))
                                {} template)))
 
-(defn add-sanitized-text-to-enriched-email [email]
-  {:header (:header email)
-   :metadata (:metadata email)
-   :participants (:participants email)
-   :body (map (fn [body-part] (if (core-email/body-text-content? body-part)
-                                (conj body-part {:sanitized-content (analysis/normalize-body-part body-part)})
-                                body-part)) (:body email))})
-
 (defn get-status-repl-server [] {:status (some? @repl-server) :port 7888})
 
 (defn connection-information [id] (let [conn (db/get-connection id)] (merge conn (client/monitor->map (get @client/connections (:id conn))))))
@@ -286,15 +278,10 @@
        (save-metadata-request (:body request)))
      (success-json-with-body {}))
 
-   (comp/POST "/api/training" request
+   (comp/POST "/api/training" _
      (let [result (write-emails-to-training-files-and-train)]
-       (when (some? result) (swap! global-messages (fn [mess] (conj mess result))))
-       (redirect-to-referer request)))
-
-   (comp/POST "/api/training/new" request
-     (let [n (get (:route-params request) :new 20)]
-       (categorize-uncategorized-n-emails n)
-       (redirect-request request)))
+       (comment (when (some? result) (swap! global-messages (fn [mess] (conj mess result)))))
+       (success-json-with-body (generate-string result))))
 
    (comp/GET "/api/emails" request
      (let [parse-fn (template->request-parameters emails-template)
@@ -377,16 +364,16 @@
                                          conn-data (client/connection-data-from-id id)
                                          message-count (app/read-emails-from-folder conn-data folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)} context)]
                                      (comment (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)}))))
-                                     (success-json-with-body {}))))
+                                     (success-json-with-body {})))))
 
-     (comp/POST "/api/metadata/languages" request
+   (comp/POST "/api/metadata/languages" request
        (let [limiter (messaging/channel-limiter :enriched-email)
              process-fn (fn [enriched-emails]
                           (doseq [enriched-email enriched-emails]
                             (async/>!! limiter :token)
                             (async/>!! @messaging/main-chan {:type :language-detection-request :options {} :payload enriched-email})))]
          (core-email/iterate-over-all-pages db/fetch-data process-fn {:entity :enriched-email :strict false :page {:page 1 :size 500}} {:where [:= :language nil]} true))
-       (redirect-request request)))
+       (redirect-request request))
 
    (comp/POST "/repl" request
      (let [operation (get-in request [:params :operation])]

@@ -51,12 +51,12 @@
 (defn reconnect-button [id connected]
   (if connected
     [:> material/Button {:color "secondary" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :reconnect nil (fn [_] (fetch-connections-and-refresh))))} "Reconnect"]
-    [:> material/Button {:color "secondary" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :connect nil (fn [_] (fetch-connections-and-refresh))))} "Connect"]))
+    [:> material/Button {:variant :contained :color "secondary" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :connect nil (fn [_] (fetch-connections-and-refresh))))} "Connect"]))
 
 (defn disconnect-button [id connected]
   (if connected
-    [:> material/Button {:color "error" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :disconnect nil (fn [_] (fetch-connections-and-refresh))))} "Disconnect"]
-    [:> material/Button {:color "error" :disabled true :on-click (fn [event] (.stopPropagation event))} "Disconnect"]))
+    [:> material/Button {:variant :outlined :color "error" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :disconnect nil (fn [_] (fetch-connections-and-refresh))))} "Disconnect"]
+    [:> material/Button {:variant :outlined :color "error" :disabled true :on-click (fn [event] (.stopPropagation event))} "Disconnect"]))
 
 (defn connections-page []
   (fn []
@@ -89,7 +89,7 @@
                   [reconnect-button (:id connection) (:connected connection)]
                   [disconnect-button (:id connection) (:connected connection)]
                   [delete-button (:id connection)]]])]]]
-           [:> material/Button {:on-click (fn [event] (.stopPropagation event) (navigate "/connections/new"))} "Add new"]])))))
+           [:> material/Button {:variant :contained :on-click (fn [event] (.stopPropagation event) (navigate "/connections/new"))} "Add new"]])))))
 
 (defn- delete-auth-provider-button [name id conn-id]
   (r/with-let [open (r/atom false)]
@@ -184,12 +184,13 @@
                 [:> material/FormControl {:fullWidth true}
                  [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:debug config) :onChange (update-connection-data-config :debug)}) :label "IMAP Debug"}]]
                 (if (= :new mode)
-                  [:> material/Button {:on-click (fn [] (backend/add-connection
-                                                    (:config @connection-data)
-                                                    (fn [_] (backend/fetch-connection (get (js->clj params) "id")
-                                                                                      (fn [response]
-                                                                                        (reset! connection-data (:body response))
-                                                                                        (navigate "/connections"))))))} "Add New Connection"]
+                  [:> material/Button {:variant :contained
+                                       :on-click (fn [] (backend/add-connection
+                                                         (:config @connection-data)
+                                                         (fn [_] (backend/fetch-connection (get (js->clj params) "id")
+                                                                                           (fn [response]
+                                                                                             (reset! connection-data (:body response))
+                                                                                             (navigate "/connections"))))))} "Add New Connection"]
                   [:> material/Button {:on-click (fn [] (backend/update-connection
                                                          (get (js->clj params) "id")
                                                          (:config @connection-data)

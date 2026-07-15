@@ -99,9 +99,7 @@
 
 (defn connection-config->store [connection-config]
   (let [session ^Session (config->session connection-config)]
-    (if (= security "ssl")
-      (.getStore session "imaps")
-      (.getStore session "imap"))))
+    (.getStore session "imap")))
 
 (defn login
   ([connection-config ^Store store]

@@ -24,7 +24,7 @@
                                :boxSizing "border-box"
                                :backgroundColor "#fafafa"}}}
    [:> material/Box {:sx {:p 2}}
-    [:> material/Typography {:variant "h5" :sx {:mb 3 :fontWeight 700}} "Plauna"]]
+    [:img {:src "/plauna-banner.png" :width 150}]]
    [:> material/List {:sx {:flex 1}}
     [:> material/ListItem {:disablePadding true}
      [:> material/ListItemButton

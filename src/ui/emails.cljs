@@ -113,6 +113,9 @@
            [:p "Nothing to see here"]]
           [:div
            [:h2 "Emails"]
+           [:> material/Box {:sx {:display :flex :justifyContent "left"}}
+            [:> material/Button {:variant :contained
+                                 :on-click (fn [_] (backend/train-data (fn [_] (println "training done"))))} "Train using existing data"]]
            [:> material/Box
             {:sx {:display "flex" :justifyContent "center"}}
             [:> material/Tooltip

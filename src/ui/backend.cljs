@@ -48,3 +48,5 @@
 (defn update-auth-provider [id provider callback] (take! (http/put (str "/api/admin/auth-providers/" id) {:content-type "application/json" :body (serialize provider)}) callback))
 
 (defn fetch-auth-providers [callback] (take! (http/get "/api/admin/auth-providers" {:content-type "application/json"}) callback))
+
+(defn train-data [callback] (take! (http/post "/api/training") callback))
