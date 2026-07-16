@@ -322,8 +322,8 @@
    (comp/POST "/api/admin/connections/:id/controls" request
      (let [id (:id (:route-params request))
            operation (:operation (:body request))]
-       (cond (= "reconnect" operation) (do (client/reconnect (client/connection-data-from-id id))                  (success-json-with-body "OK"))
-             (= "disconnect" operation) (do (client/disconnect (client/connection-data-from-id id))                  (success-json-with-body "OK"))
+       (cond (= "reconnect" operation) (do (client/reconnect (client/connection-data-from-id id))                  (success-json-with-body {}))
+             (= "disconnect" operation) (do (client/disconnect (client/connection-data-from-id id))                  (success-json-with-body {}))
              (= "connect" operation)
              (let [action (app/connect-to-client context id)]
                (cond

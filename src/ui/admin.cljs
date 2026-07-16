@@ -141,7 +141,7 @@
   (fn []
     [:<>
      [:h3 "Administration"]
-     [:> material/Grid {:container true :spacing 2}
+     [:> material/Grid {:container true :spacing 2 :columns {:sm 4 :md 4 :lg 12}}
       [:> material/Grid {:size 4}
        [:f> categories]]
       [:> material/Grid {:size 4}

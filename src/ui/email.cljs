@@ -115,7 +115,7 @@
                               :spacing 3
                               :sx {:justifyContent :space-between
                                    :alignItems :flex-start}
-                              :columns {:sm 6 :md 12}}
+                              :columns {:sm 6 :md 6 :lg 12}}
             [:> material/Grid {:size 6}
              [:> material/Paper
               [:> material/List
