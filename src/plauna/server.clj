@@ -6,7 +6,6 @@
             [clojure.string :as st]
             [compojure.core :as comp]
             [compojure.route :as route]
-            [nrepl.server :as nrepl]
             [plauna.analysis :as analysis]
             [plauna.application :as app]
             [plauna.client :as client]
@@ -14,19 +13,16 @@
             [plauna.core.email :as core-email]
             [plauna.database :as db]
             [plauna.files :as files]
-            [plauna.markup :as markup]
             [plauna.messaging :as messaging]
             [plauna.preferences :as p]
             [ring.adapter.jetty :as jetty]
             [ring.middleware.defaults :refer [wrap-defaults]]
-            [ring.middleware.json :refer [wrap-json-body wrap-json-params]]
+            [ring.middleware.json :refer [wrap-json-body]]
             [ring.middleware.keyword-params :refer [wrap-keyword-params]]
             [ring.middleware.multipart-params :refer [wrap-multipart-params]]
             [ring.middleware.params :refer [wrap-params]]
-            [ring.middleware.session :refer [wrap-session]]
-            [ring.middleware.session.cookie :refer [cookie-store]]
             [ring.util.codec :refer [base64-decode]]
-            [ring.util.response :refer [response redirect content-type file-response]]
+            [ring.util.response :refer [redirect]]
             [taoensso.telemere :as t])
   (:import [java.net ServerSocket]
            [java.util UUID]
@@ -205,13 +201,6 @@
 (defn make-routes [context]
   (comp/routes
 
-   (comp/GET "/api/admin" {}
-     (if (seq @global-messages)
-       (let [messages @global-messages]
-         (swap! global-messages (fn [_] []))
-         (success-html-with-body (markup/administration messages)))
-       (success-html-with-body (markup/administration {:repl (get-status-repl-server)}))))
-
    (comp/POST "/api/emails/parse" request
      (let [temp-file (get-in request [:params :filename :tempfile])]
        (files/read-emails-from-mbox (io/input-stream temp-file) @messaging/main-chan)
@@ -255,16 +244,6 @@
      (t/set-min-level! (p/log-level))
      (success-json-with-body (generate-string "OK")))
 
-   (comp/POST "/api/admin/database" {}
-     (files/check-and-create-database-file)
-     (db/create-db)
-     {:status  301
-      :headers {"Location" "/admin"}
-      :body    (markup/administration {:repl (get-status-repl-server)})})
-
-   (comp/GET "/api/statistics" {}
-     (success-html-with-body (markup/statistics-overall (db/yearly-email-stats) (mime-type-statistics :yearly) (language-statistics-by-period :yearly) (category-statistics-by-period {:interval :yearly}))))
-
    (comp/POST "/api/metadata" request
      (if (:move? (:body request))
        (let [message-id (:message-id (:body request))
@@ -274,7 +253,7 @@
              process (app/move-email-to-category email-before-update new-category-name context)]
          (if (= :error (:result process))
            (t/log! :error ["There was an error handling the move request" process])
-           (save-metadata-request {})))
+           (save-metadata-request (:body request))))
        (save-metadata-request (:body request)))
      (success-json-with-body {}))
 
@@ -365,22 +344,6 @@
                                          message-count (app/read-emails-from-folder conn-data folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)} context)]
                                      (comment (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)}))))
                                      (success-json-with-body {})))))
-
-   (comp/POST "/api/metadata/languages" request
-       (let [limiter (messaging/channel-limiter :enriched-email)
-             process-fn (fn [enriched-emails]
-                          (doseq [enriched-email enriched-emails]
-                            (async/>!! limiter :token)
-                            (async/>!! @messaging/main-chan {:type :language-detection-request :options {} :payload enriched-email})))]
-         (core-email/iterate-over-all-pages db/fetch-data process-fn {:entity :enriched-email :strict false :page {:page 1 :size 500}} {:where [:= :language nil]} true))
-       (redirect-request request))
-
-   (comp/POST "/repl" request
-     (let [operation (get-in request [:params :operation])]
-       (cond (= operation "start") (swap! repl-server (fn [_] (t/log! :info "Starting repl server") (nrepl/start-server :bind "0.0.0.0" :port 7888)))
-             (= operation "stop") (swap! repl-server (fn [_] (t/log! :info "Stopping repl server") (nrepl/stop-server @repl-server) nil))
-             :else (t/log! :error ["Unsupported operation" operation "at /repl"]))
-       (redirect-request request)))
 
    (comp/GET "/oauth2/callback" request
      (let [params (:params request)

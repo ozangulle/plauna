@@ -39,7 +39,6 @@
         compojure/compojure {:mvn/version "1.7.2"}
         io.github.emidln/cld {:mvn/version "0.2.0"}
         jakarta.mail/jakarta.mail-api {:mvn/version "2.1.5"}
-        nrepl/nrepl {:mvn/version "1.5.1"}
         org.apache.james/apache-mime4j {:mvn/version "0.8.13" :extension "pom"}
         org.apache.opennlp/opennlp-tools {:mvn/version "2.5.6.1"}
         org.clj-commons/claypoole {:mvn/version "1.2.2"}
@@ -51,14 +50,11 @@
         org.eclipse.angus/angus-mail {:mvn/version "2.1.0-M1"}
         org.flywaydb/flyway-core {:mvn/version "11.18.0"}
         org.jsoup/jsoup {:mvn/version "1.21.2"}
-        org.scicloj/tableplot {:git/url "https://github.com/scicloj/tableplot" :git/sha "0f46227fa35cb756ac44ab1f1e732464a096bc6b"}
         org.xerial/sqlite-jdbc {:mvn/version "3.51.1.0"}
         reagent/reagent {:mvn/version "2.0.1"}
         ring/ring-core {:mvn/version "1.15.3"}
         ring/ring-jetty-adapter {:mvn/version "1.15.3"}
         ring/ring-json {:mvn/version "0.5.1"}
-        ring/ring-defaults {:mvn/version "0.7.0"}
-        scicloj/tablecloth {:mvn/version "7.067"}
-        selmer/selmer {:mvn/version "1.12.69"}}
+        ring/ring-defaults {:mvn/version "0.7.0"}}
 }
     
