@@ -7,8 +7,8 @@
 
 (def snackbar-state (r/atom {:open false
                              :message ""
-                             :severity "info"
-                             :duration 3000}))
+                             :severity :info
+                             :duration nil}))
 
 (def default-open-duration 5000)
 
@@ -20,26 +20,27 @@
         (reset! snackbar-state (assoc new-state :open true))
 
         (let [duration (:duration new-state default-open-duration)]
-          (<! (timeout duration))
-          (swap! snackbar-state assoc :open false))
+          (when (some? duration)
+            (<! (timeout duration))
+            (swap! snackbar-state assoc :open false)))
 
         (recur)))))
 
 (defn show-snackbar
-  ([message] (show-snackbar message "info"))
-  ([message severity] (show-snackbar message severity 3000))
+  ([message] (show-snackbar message :info))
+  ([message severity] (show-snackbar message severity default-open-duration))
   ([message severity duration]
    (put! snackbar-chan {:message message
                         :severity severity
                         :duration duration})))
 
 (defn snackbar-component []
-  (let [{:keys [open message severity]} @snackbar-state]
+  (let [{:keys [open message severity duration]} @snackbar-state]
     [:> material/Snackbar
      {:open open
-      :autoHideDuration (:duration @snackbar-state)
       :onClose (fn [] (swap! snackbar-state assoc :open false))
-      :anchorOrigin {:vertical :top :horizontal :center}}
+      :anchorOrigin {:vertical :top :horizontal :center}
+      :autoHideDuration duration}
      [:> material/Alert
       {:onClose (fn [] (swap! snackbar-state assoc :open false))
        :severity severity

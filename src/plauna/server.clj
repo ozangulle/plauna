@@ -259,8 +259,9 @@
 
    (comp/POST "/api/training" _
      (let [result (write-emails-to-training-files-and-train)]
-       (comment (when (some? result) (swap! global-messages (fn [mess] (conj mess result)))))
-       (success-json-with-body (generate-string result))))
+       (if (some? result)
+         (success-json-with-body (generate-string result))
+         (success-json-with-body {}))))
 
    (comp/GET "/api/emails" request
      (let [parse-fn (template->request-parameters emails-template)
@@ -298,9 +299,9 @@
      (success-json-with-body (generate-string (db/get-auth-providers))))
 
    (comp/POST "/api/admin/auth-providers" request
-              (let [body (:body request)]
-                (db/add-auth-provider body)
-                (success-json-with-body {})))
+     (let [body (:body request)]
+       (db/add-auth-provider body)
+       (success-json-with-body {})))
 
    (comp/PUT "/api/admin/auth-providers/:id" request
      (let [body (:body request)]

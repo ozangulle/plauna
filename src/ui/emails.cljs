@@ -2,6 +2,7 @@
   (:require [ui.backend :as backend]
             [ui.inputs :as inputs]
             [ui.utils :as utils]
+            [ui.components :as components]
             [plauna.core.email :as ce]
             [reagent.core :as r]
             [react-router-dom :as rr]
@@ -115,7 +116,10 @@
            [:h2 "Emails"]
            [:> material/Box {:sx {:display :flex :justifyContent "left"}}
             [:> material/Button {:variant :contained
-                                 :on-click (fn [_] (backend/train-data (fn [_] (println "training done"))))} "Train using existing data"]]
+                                 :on-click (fn [_] (backend/train-data
+                                                    (fn [res] (if (and (= 200 (:status res)) (not= :alert (:type (:body res))))
+                                                                   (components/show-snackbar "Training was successful" :success)
+                                                                   (components/show-snackbar (str "There was an error during training " (:content (:body res))) :error nil)))))} "Train using existing data"]]
            [:> material/Box
             {:sx {:display "flex" :justifyContent "center"}}
             [:> material/Tooltip
