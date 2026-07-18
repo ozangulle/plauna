@@ -11,9 +11,9 @@
             [reagent.core :as r]
             [react-router-dom :as rr]
             ["@mui/material" :as material]
-            ["@mui/icons-material" :as icons]
             ["@mui/material/styles" :refer [createTheme ThemeProvider]]
-            ["@mui/material/CssBaseline" :default CssBaseline]))
+            ["@mui/material/CssBaseline" :default CssBaseline]
+            [ui.components :as components]))
 
 (defn sidebar []
   [:> material/Drawer
@@ -85,12 +85,15 @@
     [:<>
      [:> CssBaseline {:enableColorScheme true}]
      [:> ThemeProvider {:theme theme}
-      [:> rr/RouterProvider {:router router}]]]))
+      [:<>
+       [:> rr/RouterProvider {:router router}]
+       [components/snackbar-component]]]]))
 
 (defonce root (rdom/create-root (.getElementById js/document "app")))
 
 (defn init
   []
+  (components/start-snackbar-loop)
   (rdom/render root [app]))
 
 (defn ^:dev/after-load re-render
