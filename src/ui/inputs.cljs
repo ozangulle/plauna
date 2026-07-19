@@ -2,6 +2,7 @@
   (:require [plauna.core.email :as ce]
             [reagent.core :as r]
             [ui.utils :as utils]
+            [cljs.core.async :refer [take! go <!]]
             ["@mui/material" :as material]))
 
 (defonce debounce-timeout 1000)
@@ -17,8 +18,14 @@
         (reset! timeout-id (js/setTimeout (fn [] (apply f args)) delay-ms)))
       {:cancel (fn [] (when-let [id @timeout-id] (js/clearTimeout id) (reset! timeout-id nil)))})))
 
-(defn debounced-input []
-  (let [debouncer-ref (atom nil)]
+(defn- set-color-for-response [response]
+  (if (= 200 (:status response)) :success :warning))
+
+(defn debounced-input
+  "The function for debouncer-action must return the channel from the request."
+  []
+  (let [debouncer-ref (atom nil)
+        color (r/atom :primary)]
     (r/create-class
      {:component-will-unmount
       (fn []
@@ -30,16 +37,18 @@
         (when (nil? @debouncer-ref)
           (reset! debouncer-ref
                   (make-debouncer
-                   (fn [value] (when (some? value) (debouncer-action value)))
+                   (fn [value] (when (some? value) (go (let [res (<! (debouncer-action value))] (r/next-tick (fn [_] (reset! color (set-color-for-response res))))))))
                    debounce-timeout)))
 
         (let [func (fn [event] ((comp @debouncer-ref on-change-handler) (utils/event-val event)))]
           [:> material/TextField
            {:value value
             :label label
+            :variant :standard
             :type "text"
+            :color @color
             :on-click #(.stopPropagation %)
-            :on-change func
+            :on-change (fn [e] (reset! color :primary) (func e))
             :sx {"z-index" 2}}]))})))
 
 (defn- handle-na-category-id

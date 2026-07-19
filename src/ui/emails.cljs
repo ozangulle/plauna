@@ -16,7 +16,7 @@
    (backend/fetch-emails parameters (fn [response] (reset! emails (:body response)) (reset! loading-atom false))))
   ([parameters] (backend/fetch-emails parameters (fn [response] (reset! emails (:body response))))))
 
-(defn save-metadata "Returns a channel" [email] (backend/save-metadata-for-email email false))
+(defn save-metadata  [email] (backend/save-metadata-for-email email false))
 
 (defn email-by-id [id] (->> @emails
                             :data
@@ -42,7 +42,7 @@
                                                  [[:metadata :category] (->> (:categories (:optional @emails)) (filter #(= (event-val event) (:id %))) first :name)]
                                                  [[:metadata :category-confidence] 1]])))
 
-(defn category-debouncer [] (fn [email] (take! (save-metadata email) (fn [_] (refresh-emails (:parameters @emails))))))
+(defn category-debouncer [] (fn [email] (take! (save-metadata email) (refresh-emails (:parameters @emails)))))
 
 (defn extract-email-fields [email index navigate]
   [:> material/TableRow
@@ -74,7 +74,7 @@
                            (get-in email [:metadata :language])
                            ""
                            (fn [mail] (save-metadata mail))
-                           (fn [new-value] (swap! emails assoc-in [:data index :metadata :language] new-value))]]
+                           (fn [new-value] (get (:data (swap! emails assoc-in [:data index :metadata :language] new-value)) index))]]
    [:> material/TableCell (utils/decimal-place (ce/language-confidence email) 4)]
    [:> material/TableCell (inputs/category-select email
                                                   ""
@@ -148,7 +148,8 @@
                [:> material/TableCell "Category"]
                [:> material/TableCell "Confidence"]]]
              [:> material/TableBody
-              (for [index (range (count (:data @emails)))
-                    :let [email (get (:data @emails) index)]]
-                (extract-email-fields email index navigate))]]]]))
+              (doall
+               (for [index (range (count (:data @emails)))
+                     :let [email (get (:data @emails) index)]]
+                 (extract-email-fields email index navigate)))]]]]))
       (finally (reset! loading? true)))))

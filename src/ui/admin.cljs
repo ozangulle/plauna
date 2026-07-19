@@ -35,14 +35,18 @@
           [:> material/ListItem [:f> inputs/debounced-input
                                  (get @preferences-data :language-detection-threshold)
                                  "Language Detection Threshold"
-                                 (fn [_] (save-preferences @preferences-data))
-                                 (fn [new-value] (swap! preferences-data (fn [old] (update old :language-detection-threshold (fn [_] (.parseFloat js/Number new-value)))))
+                                 (fn [_]
+                                   (swap! preferences-data update :language-detection-threshold js/Number)
+                                   (save-preferences @preferences-data))
+                                 (fn [new-value] (swap! preferences-data (fn [old] (update old :language-detection-threshold (fn [_] new-value))))
                                    (get @preferences-data :language-detection-threshold))]]
           [:> material/ListItem [:f> inputs/debounced-input
                                  (get @preferences-data :categorization-threshold)
                                  "Categorization Threshold"
-                                 (fn [_] (save-preferences @preferences-data))
-                                 (fn [new-value] (swap! preferences-data (fn [old] (update old :categorization-threshold (fn [_] (.parseFloat js/Number new-value)))))
+                                 (fn [_]
+                                   (swap! preferences-data update :categorization-threshold js/Number)
+                                   (save-preferences @preferences-data))
+                                 (fn [new-value] (swap! preferences-data (fn [old] (update old :categorization-threshold (fn [_] new-value))))
                                    (get @preferences-data :categorization-threshold))]]
           [:> material/ListItem
            [:> material/FormControl
@@ -58,8 +62,11 @@
           [:> material/ListItem [:f> inputs/debounced-input
                                  (get @preferences-data :client-health-check-interval)
                                  "IMAP Health Check Interval (sec)"
-                                 (fn [_] (save-preferences @preferences-data))
-                                 (fn [new-value] (swap! preferences-data (fn [old] (update old :client-health-check-interval (fn [_] (.parseFloat js/Number new-value)))))
+                                 (fn [_]
+                                   (swap! preferences-data update :client-health-check-interval js/Number
+                                          )
+                                   (save-preferences @preferences-data))
+                                 (fn [new-value] (swap! preferences-data (fn [old] (update old :client-health-check-interval (fn [_] new-value))))
                                    (get @preferences-data :client-health-check-interval))]]]]))))
 
 (defn- delete-category-button [name id]

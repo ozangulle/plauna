@@ -29,7 +29,7 @@
              (assoc old-data :data result))))
   (:data @email-data))
 
-(defn save-metadata "Returns a channel" [email move?] (backend/save-metadata-for-email email move?))
+(defn save-metadata [email move?] (backend/save-metadata-for-email email move?))
 
 (defn category-update-handler [email]
   (fn [event] (update-key [[[:metadata :category-id] (event-val event)]

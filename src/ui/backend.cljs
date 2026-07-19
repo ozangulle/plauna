@@ -12,7 +12,9 @@
 
 (defn delete-email [id callback] (take! (http/delete (str "/api/emails/" id)) callback))
 
-(defn save-metadata-for-email [email move?] (http/post "/api/metadata" {:content-type "application/json" :body (serialize {:message-id (get-in email [:header :message-id]) :metadata (:metadata email) :move? move?})}))
+(defn save-metadata-for-email
+  "This function must return the channel for various functionality to work"
+  [email move?] (http/post "/api/metadata" {:content-type "application/json" :body (serialize {:message-id (get-in email [:header :message-id]) :metadata (:metadata email) :move? move?})}))
 
 (defn fetch-preferences [callback] (take! (http/get "/api/admin/preferences") callback))
 
