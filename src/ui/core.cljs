@@ -1,43 +1,87 @@
 (ns ui.core
-  (:require ["@fontsource/roboto/300.css"]
-            ["@fontsource/roboto/400.css"]
-            ["@fontsource/roboto/500.css"]
-            ["@fontsource/roboto/700.css"]
-            [ui.emails :as emails]
-            [ui.email :as email]
-            [ui.admin :as admin]
-            [ui.connections :as conn]
-            [reagent.dom.client :as rdom]
-            [reagent.core :as r]
-            [react-router-dom :as rr]
-            ["@mui/material" :as material]
-            ["@mui/material/styles" :refer [createTheme ThemeProvider]]
-            ["@mui/material/CssBaseline" :default CssBaseline]
-            [ui.components :as components]))
+  (:require
+   ["@fontsource/roboto/300.css"]
+   ["@fontsource/roboto/400.css"]
+   ["@fontsource/roboto/500.css"]
+   ["@fontsource/roboto/700.css"]
+   ["@mui/material" :as material]
+   ["@mui/material/CssBaseline" :default CssBaseline]
+   ["@mui/material/styles" :refer [createTheme ThemeProvider]]
+   ["@mui/icons-material/Mail" :default MailIcon]
+   ["@mui/icons-material/Settings" :default SettingsIcon]
+   ["@mui/icons-material/Storage" :default StorageIcon]
+   [react-router-dom :as rr]
+   [reagent.core :as r]
+   [reagent.dom.client :as rdom]
+   [ui.admin :as admin]
+   [ui.components :as components]
+   [ui.connections :as conn]
+   [ui.email :as email]
+   [ui.emails :as emails]))
+
+(def theme-atom (r/atom nil))
 
 (defn sidebar []
   [:> material/Drawer
    {:variant "permanent"
-    :sx {:width 200
+    :sx {:width 240
          :flexShrink 0
-         "& .MuiDrawer-paper" {:width 200
+         "& .MuiDrawer-paper" {:width 240
                                :boxSizing "border-box"
-                               :backgroundColor "#fafafa"}}}
-   [:> material/Box {:sx {:p 2}}
-    [:img {:src "/plauna-banner.png" :width 150}]]
-   [:> material/List {:sx {:flex 1}}
-    [:> material/ListItem {:disablePadding true}
-     [:> material/ListItemButton
-      {:component rr/Link :to "/emails" :sx {:pl 2}}
-      [:> material/ListItemText {:primary "Emails"}]]]
-    [:> material/ListItem {:disablePadding true}
-     [:> material/ListItemButton
-      {:component rr/Link :to "/admin" :sx {:pl 2}}
-      [:> material/ListItemText {:primary "Administration"}]]]
-    [:> material/ListItem {:disablePadding true}
-     [:> material/ListItemButton
-      {:component rr/Link :to "/connections" :sx {:pl 2}}
-      [:> material/ListItemText {:primary "IMAP Connections"}]]]]])
+                               :backgroundColor (.. @theme-atom -palette -background -default)
+                               :borderRight (str "1px solid " (.. @theme-atom -palette -divider))
+                               :display "flex"
+                               :flexDirection "column"}}}
+
+   [:> material/Box
+    {:sx {:p 3
+          :display "flex"
+          :alignItems "center"
+          :justifyContent "center"
+          :borderBottom (str "1px solid " (.. @theme-atom -palette -divider))}}
+    [:img {:src "/plauna-banner.png" :width 150 :style {:objectFit "contain"}}]]
+
+   [:> material/List
+    {:sx {:flex 1
+          :pt 2}}
+    (doall
+     (for [item [{:label "Emails" :path "/emails" :icon MailIcon}
+                 {:label "Administration" :path "/admin" :icon SettingsIcon}
+                 {:label "IMAP Connections" :path "/connections" :icon StorageIcon}]]
+       ^{:key (:path item)}
+       [:> material/ListItem
+        {:disablePadding true
+         :sx {"&:hover" {:backgroundColor (.. @theme-atom -palette -action -hover)}}}
+        [:> material/ListItemButton
+         {:component rr/Link
+          :to (:path item)
+          :sx {:pl 2
+               :py 1.5
+               :color (.. @theme-atom -palette -text -primary)
+               :textDecoration "none"
+               "&:hover" {:backgroundColor (.. @theme-atom -palette -action -hover)
+                          :color (.. @theme-atom -palette -primary -main)}
+               "&.active" {:backgroundColor (.. @theme-atom -palette -primary -lighter)
+                           :color (.. @theme-atom -palette -primary -main)
+                           :fontWeight 600}}}
+         [:> material/ListItemIcon
+          {:sx {:minWidth 40
+                :color "inherit"}}
+          [:> (:icon item)]]
+         [:> material/ListItemText
+          {:primary (:label item)
+           :sx {:ml 1}}]]]))]
+
+   [:> material/Box {:sx {:flex 1}}]
+
+   ;; TODO Add the version there later
+   [:> material/Box
+    {:sx {:p 2
+          :borderTop (str "1px solid " (.. @theme-atom -palette -divider))
+          :textAlign "center"
+          :fontSize "0.75rem"
+          :color (.. @theme-atom -palette -text -secondary)}}
+    ""]])
 
 (defn main-layout []
   [:> material/Box {:sx {:display "flex" :height "100vh"}}
@@ -48,7 +92,9 @@
 (defn routes []
   [{:path "/"
     :element (r/as-element [main-layout])
-    :children [{:path "emails"
+    :children [{:index true
+                :element (r/as-element [:> rr/Navigate {:to "emails" :replace true}])}
+               {:path "emails"
                 :element (r/as-element [:f> emails/emails-page])}
                {:path "emails/:id"
                 :element (r/as-element [:f> email/email-page])}
@@ -61,7 +107,7 @@
                {:path "connections/new"
                 :element (r/as-element [:f> conn/connection-page :new])}]}])
 
-(def router 
+(def router
   (rr/createBrowserRouter (clj->js (routes))))
 
 (defn app []
@@ -82,6 +128,7 @@
                   :mode "light"
                   :success
                   {:main "#006e09"}}}))]
+    (reset! theme-atom theme)
     [:<>
      [:> CssBaseline {:enableColorScheme true}]
      [:> ThemeProvider {:theme theme}

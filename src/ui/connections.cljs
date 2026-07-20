@@ -1,13 +1,15 @@
 (ns ui.connections
-  (:require [reagent.core :as r]
-            [ui.backend :as backend]
-            [react-router-dom :as rr]
-            ["@mui/material" :as material]
-            ["@mui/icons-material/Add" :default AddIcon]
-            ["@mui/icons-material/DeleteForever" :default DeleteForeverIcon]
-            ["@mui/icons-material/WarningRounded" :default WarningRoundedIcon]
-            [ui.utils :as utils]
-            [ui.inputs :as inputs]))
+  (:require
+   ["@mui/icons-material/Add" :default AddIcon]
+   ["@mui/icons-material/DeleteForever" :default DeleteForeverIcon]
+   ["@mui/icons-material/WarningRounded" :default WarningRoundedIcon]
+   ["@mui/material" :as material]
+   [react-router-dom :as rr]
+   [reagent.core :as r]
+   [ui.backend :as backend]
+   [ui.components :as components]
+   [ui.inputs :as inputs]
+   [ui.utils :as utils]))
 
 (defonce connections-data (r/atom []))
 
@@ -36,13 +38,13 @@
       [:> material/Divider]
       [:> material/DialogContent "Are you sure you want to delete this connection?"]
       [:> material/DialogActions
-       [:> material/Button {:variant "contained"
+       [:> material/Button {:variant :contained
                             :color "error"
                             :onClick (fn [event] (backend/delete-connection id (fn [_] (fetch-connections-and-refresh)))
                                        (.stopPropagation event)
                                        (reset! open false))}
         "Delete"]
-       [:> material/Button {:variant "outlined"
+       [:> material/Button {:variant :contained
                             :onClick (fn [event]
                                        (.stopPropagation event)
                                        (reset! open false))}
@@ -106,14 +108,14 @@
       [:> material/Divider]
       [:> material/DialogContent "Are you sure you want to delete this authentication provider?"]
       [:> material/DialogActions
-       [:> material/Button {:variant "contained"
+       [:> material/Button {:variant :contained
                             :color "error"
                             :onClick (fn [] (backend/delete-auth-provider id (fn []
                                                                                (backend/fetch-connection conn-id (fn [response]
                                                                                                             (reset! connection-data (:body response))
                                                                                                             (reset! open false))))))}
         "Delete"]
-       [:> material/Button {:variant "outlined"
+       [:> material/Button {:variant :contained
                             :onClick #(reset! open false)}
         "Cancel"]]]]))
 
@@ -149,77 +151,87 @@
              [:h2 "IMAP Connection for " (:host config) " - " (:user config)]
              [:> material/Grid {:container true :spacing 2}
               [:> material/Grid {:size 6}
-               [:> material/Paper
-                [:h3 "Configuration"]
-                [:> material/FormControl {:fullWidth true}
-                 [:> material/InputLabel {:id "auth-type-select-label"} "Authentication Type"]
-                 [:> material/Select {:labelId "auth-type-select-label"
-                                      :value (:auth-type config)
-                                      :label "Auth Type"
-                                      :on-change (update-connection-data-config :auth-type)}
-                  [:> material/MenuItem {:value "basic"} "Basic"]
-                  [:> material/MenuItem {:value "oauth2"} "OAUTH2"]]]
-                [:> material/FormControl {:fullWidth true}
-                 [:> material/TextField {:value (:host config) :labelId "host-label" :label "Host" :on-change (update-connection-data-config :host)}]]
-                [:> material/FormControl {:fullWidth true}
-                 [:> material/TextField {:value (:user config) :label "User" :on-change (update-connection-data-config :user)}]]
-                [:> material/FormControl {:fullWidth true}
-                 [:> material/TextField {:value (:secret config) :label "Secret" :type "password" :on-change (update-connection-data-config :secret)}]]
-                [:> material/FormControl {:fullWidth true}
-                 [:> material/TextField {:value (:folder config) :label "Folder" :on-change (update-connection-data-config :folder)}]]
-                [:> material/FormControl {:fullWidth true}
-                 [:> material/TextField {:value (:port config) :label "Port" :on-change (update-connection-data-config :port)}]]
-                [:> material/FormControl {:fullWidth true}
-                 [:> material/InputLabel {:id "security-select-label"} "Authentication Type"]]
-                [:> material/FormControl {:fullWidth true}
-                 [:> material/Select {:labelId "security-select-label"
-                                      :value (:security config)
-                                      :label "Security"
-                                      :on-change (update-connection-data-config :security)}
-                  [:> material/MenuItem {:value "ssl"} "SSL"]
-                  [:> material/MenuItem {:value "starttls"} "STARTTLS"]
-                  [:> material/MenuItem {:value "plain"} "PLAIN"]]]
-                [:> material/FormControl {:fullWidth true}
-                 [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:check-ssl-certs config) :onChange (update-connection-data-config :check-ssl-certs)}) :label "Check SSL Certificates"}]]
-                [:> material/FormControl {:fullWidth true}
-                 [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:debug config) :onChange (update-connection-data-config :debug)}) :label "IMAP Debug"}]]
-                (if (= :new mode)
-                  [:> material/Button {:variant :contained
-                                       :on-click (fn [] (backend/add-connection
-                                                         (:config @connection-data)
-                                                         (fn [_] (backend/fetch-connection (get (js->clj params) "id")
-                                                                                           (fn [response]
-                                                                                             (reset! connection-data (:body response))
-                                                                                             (navigate "/connections"))))))} "Add New Connection"]
-                  [:> material/Button {:on-click (fn [] (backend/update-connection
-                                                         (get (js->clj params) "id")
-                                                         (:config @connection-data)
-                                                         (fn [_] (backend/fetch-connection (get (js->clj params) "id")
-                                                                                           (fn [response]
-                                                                                             (reset! connection-data (:body response)))))))} "Update Connection"])]]
+               [:> material/Paper {:sx {:p 3}}
+                [:> material/Stack {:spacing 2}
+                 [:h3 "Configuration"]
+                 [:> material/FormControl {:fullWidth true}
+                  [:> material/InputLabel {:id "auth-type-select-label"} "Authentication Type"]
+                  [:> material/Select {:labelId "auth-type-select-label"
+                                       :value (:auth-type config)
+                                       :label "Auth Type"
+                                       :on-change (update-connection-data-config :auth-type)}
+                   [:> material/MenuItem {:value "basic"} "Basic"]
+                   [:> material/MenuItem {:value "oauth2"} "OAUTH2"]]]
+                 [:> material/FormControl {:fullWidth true}
+                  [:> material/TextField {:value (:host config) :labelId "host-label" :label "Host" :on-change (update-connection-data-config :host)}]]
+                 [:> material/FormControl {:fullWidth true}
+                  [:> material/TextField {:value (:user config) :label "User" :on-change (update-connection-data-config :user)}]]
+                 [:> material/FormControl {:fullWidth true}
+                  [:> material/TextField {:value (:secret config) :label "Secret" :type "password" :on-change (update-connection-data-config :secret)}]]
+                 [:> material/FormControl {:fullWidth true}
+                  [:> material/TextField {:value (:folder config) :label "Folder" :on-change (update-connection-data-config :folder)}]]
+                 [:> material/FormControl {:fullWidth true}
+                  [:> material/TextField {:value (:port config) :label "Port" :on-change (update-connection-data-config :port)}]]
+                 [:> material/FormControl {:fullWidth true}
+                  [:> material/InputLabel {:id "security-select-label"} "Authentication Type"]]
+                 [:> material/FormControl {:fullWidth true}
+                  [:> material/Select {:labelId "security-select-label"
+                                       :value (:security config)
+                                       :label "Security"
+                                       :on-change (update-connection-data-config :security)}
+                   [:> material/MenuItem {:value "ssl"} "SSL"]
+                   [:> material/MenuItem {:value "starttls"} "STARTTLS"]
+                   [:> material/MenuItem {:value "plain"} "PLAIN"]]]
+                 [:> material/FormControl {:fullWidth true}
+                  [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:check-ssl-certs config) :onChange (update-connection-data-config :check-ssl-certs)}) :label "Check SSL Certificates"}]]
+                 [:> material/FormControl {:fullWidth true}
+                  [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:debug config) :onChange (update-connection-data-config :debug)}) :label "IMAP Debug"}]]
+                 (if (= :new mode)
+                   [:> material/Button {:variant :contained
+                                        :on-click (fn [] (backend/add-connection
+                                                          (:config @connection-data)
+                                                          (fn [_] (backend/fetch-connection (get (js->clj params) "id")
+                                                                                            (fn [response]
+                                                                                              (reset! connection-data (:body response))
+                                                                                              (navigate "/connections"))))))} "Add New Connection"]
+                   [:> material/Button {:variant :contained
+                                        :on-click (fn [] (backend/update-connection
+                                                          (get (js->clj params) "id")
+                                                          (:config @connection-data)
+                                                          (fn [_] (backend/fetch-connection (get (js->clj params) "id")
+                                                                                            (fn [response]
+                                                                                              (reset! connection-data (:body response)))))))} "Update Connection"])]]]
               [:> material/Grid {:size 6}
                (when (> (count (:folders @connection-data)) 0)
-                 [:> material/Paper
-                  [:h3 "Parse E-mails from Folders"]
-                  [:> material/FormControl {:fullWidth true}
-                   [:> material/InputLabel {:id "folders-select-label"} "Folders"]
-                   [:> material/Select {:labelId "folders-select-label"
-                                        :value (:folder @parse-settings)
-                                        :label "Folders"
-                                        :on-change (fn [e] (swap! parse-settings assoc-in [:folder] (utils/event-val e)))}
-                    (for [folder (:folders @connection-data)]
-                      [:> material/MenuItem {:value folder} folder])]]
-                  [:> material/FormControl {:fullWidth true}
-                   [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:move @parse-settings) :onChange (fn [_ new] (swap! parse-settings assoc-in [:move?] new))}) :label "Move e-mails after categorization"}]
+                 [:> material/Paper {:sx {:p 3}}
+                  [:> material/Stack {:spacing 2}
+                   [:h3 "Parse E-mails from Folders"]
                    [:> material/FormControl {:fullWidth true}
-                    [:> material/InputLabel {:id "category-select-label"} "Assign following category for all e-mails in folder. Leave blank for automatic category detection."]
-                    [:> material/Select {:labelId "category-select-label"
-                                         :value (:category @parse-settings)
-                                         :label "Assign following category for all e-mails in folder. Leave blank for automatic category detection."
-                                         :on-change (fn [e] (swap! parse-settings assoc-in [:category] (utils/event-val e)))}
-                     (for [category (:categories @connection-data)]
-                       [:> material/MenuItem {:value (str (:id category) "-" (:name category))} (:name category)])]]]
-                  [:> material/Button {:on-click (fn [_] (backend/post-connection-control (get (js->clj params) "id") :parse  @parse-settings nil))} "Parse E-Mails"]])]
+                    [:> material/InputLabel {:id "folders-select-label"} "Folders"]
+                    [:> material/Select {:labelId "folders-select-label"
+                                         :value (:folder @parse-settings)
+                                         :label "Folders"
+                                         :on-change (fn [e] (swap! parse-settings assoc-in [:folder] (utils/event-val e)))}
+                     (for [folder (:folders @connection-data)]
+                       ^{:key folder}
+                       [:> material/MenuItem {:value folder} folder])]]
+                   [:> material/FormControl {:fullWidth true}
+                    [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:move @parse-settings) :onChange (fn [_ new] (swap! parse-settings assoc-in [:move?] new))}) :label "Move e-mails after categorization"}]
+                    [:> material/FormControl {:fullWidth true}
+                     [:> material/InputLabel {:id "category-select-label"} "Assign following category for all e-mails in folder. Leave blank for automatic category detection."]
+                     [:> material/Select {:labelId "category-select-label"
+                                          :value (:category @parse-settings)
+                                          :label "Assign following category for all e-mails in folder. Leave blank for automatic category detection."
+                                          :on-change (fn [e] (swap! parse-settings assoc-in [:category] (utils/event-val e)))}
+                      (for [category (:categories @connection-data)]
+                        ^{:key (:id category)}
+                        [:> material/MenuItem {:value (str (:id category) "-" (:name category))} (:name category)])]]]
+                   [:> material/Button {:variant :contained
+                                        :on-click (fn [_] (backend/post-connection-control
+                                                           (get (js->clj params) "id")
+                                                           :parse
+                                                           @parse-settings
+                                                           (fn [res] (components/show-snackbar (-> res :body :message) (-> res :body :type)))))} "Parse E-Mails"]]])]
               (when (= "oauth2" (:auth-type (:config @connection-data)))
                 [:> material/Grid {:size 12}
                  [:h3 "Authentication Providers"]
@@ -254,43 +266,44 @@
                                                                                        (backend/fetch-connection (get (js->clj params) "id")
                                                                                                                  (fn [response]
                                                                                                                    (reset! connection-data (:body response)))))))} [:> AddIcon]]]]
-                     (for [index (range (count (:auth-providers (:config @connection-data))))
-                           :let [provider (get (:auth-providers (:config @connection-data)) index)]]
-                       [:> material/TableRow {:key (:id provider)}
-                        [:> material/TableCell [:f> inputs/debounced-input
-                                                (:name provider)
-                                                ""
-                                                (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :name] new-value))]]
-                        [:> material/TableCell [:f> inputs/debounced-input
-                                                (:auth-url provider)
-                                                ""
-                                                (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :auth-url] new-value))]]
-                        [:> material/TableCell [:f> inputs/debounced-input
-                                                (:token-url provider)
-                                                ""
-                                                (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :token-url] new-value))]]
-                        [:> material/TableCell [:f> inputs/debounced-input
-                                                (:redirect-url provider)
-                                                ""
-                                                (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :redirect-url] new-value))]]
-                        [:> material/TableCell [:f> inputs/debounced-input
-                                                (:client-id provider)
-                                                ""
-                                                (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :client-id] new-value))]]
-                        [:> material/TableCell [:f> inputs/debounced-input
-                                                (:client-secret provider)
-                                                ""
-                                                (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :client-secret] new-value))]]
-                        [:> material/TableCell [:f> inputs/debounced-input
-                                                (:scope provider)
-                                                ""
-                                                (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :scope] new-value))]]
-                        [:> material/TableCell [delete-auth-provider-button (:name provider) (:id provider) (get (js->clj params) "id")]]])]]]]])]]))
+                     (doall
+                      (for [index (range (count (:auth-providers (:config @connection-data))))
+                            :let [provider (get (:auth-providers (:config @connection-data)) index)]]
+                        [:> material/TableRow {:key (:id provider)}
+                         [:> material/TableCell [:f> inputs/debounced-input
+                                                 (:name provider)
+                                                 ""
+                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :name] new-value))]]
+                         [:> material/TableCell [:f> inputs/debounced-input
+                                                 (:auth-url provider)
+                                                 ""
+                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :auth-url] new-value))]]
+                         [:> material/TableCell [:f> inputs/debounced-input
+                                                 (:token-url provider)
+                                                 ""
+                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :token-url] new-value))]]
+                         [:> material/TableCell [:f> inputs/debounced-input
+                                                 (:redirect-url provider)
+                                                 ""
+                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :redirect-url] new-value))]]
+                         [:> material/TableCell [:f> inputs/debounced-input
+                                                 (:client-id provider)
+                                                 ""
+                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :client-id] new-value))]]
+                         [:> material/TableCell [:f> inputs/debounced-input
+                                                 (:client-secret provider)
+                                                 ""
+                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :client-secret] new-value))]]
+                         [:> material/TableCell [:f> inputs/debounced-input
+                                                 (:scope provider)
+                                                 ""
+                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :scope] new-value))]]
+                         [:> material/TableCell [delete-auth-provider-button (:name provider) (:id provider) (get (js->clj params) "id")]]]))]]]]])]]))
         (finally (reset! loading? true) (reset! connection-data {}))))))

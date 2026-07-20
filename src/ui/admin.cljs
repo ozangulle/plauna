@@ -1,12 +1,13 @@
 (ns ui.admin
-  (:require ["@mui/material" :as material]
-            ["@mui/icons-material/Add" :default AddIcon]
-            ["@mui/icons-material/DeleteForever" :default DeleteForeverIcon]
-            ["@mui/icons-material/WarningRounded" :default WarningRoundedIcon]
-            [reagent.core :as r]
-            [ui.inputs :as inputs]
-            [ui.utils :as utils]
-            [ui.backend :as backend]))
+  (:require
+   ["@mui/icons-material/Add" :default AddIcon]
+   ["@mui/icons-material/DeleteForever" :default DeleteForeverIcon]
+   ["@mui/icons-material/WarningRounded" :default WarningRoundedIcon]
+   ["@mui/material" :as material]
+   [reagent.core :as r]
+   [ui.backend :as backend]
+   [ui.inputs :as inputs]
+   [ui.utils :as utils]))
 
 (defonce preferences-data (r/atom {}))
 
@@ -84,13 +85,13 @@
       [:> material/Divider]
       [:> material/DialogContent "Are you sure you want to delete this category?"]
       [:> material/DialogActions
-       [:> material/Button {:variant "contained"
+       [:> material/Button {:variant :contained
                             :color "error"
                             :onClick (fn [] (backend/delete-category id (fn []
                                                                           (backend/fetch-categories (fn [response]                                                                                                      (reset! categories-data (:body response))
                                                                                                       (reset! open false))))))}
         "Delete"]
-       [:> material/Button {:variant "outlined"
+       [:> material/Button {:variant :contained
                             :onClick #(reset! open false)}
         "Cancel"]]]]))
 
@@ -107,6 +108,7 @@
          [:h4 "Categories"]
          [:> material/List
           (for [category @categories-data]
+            ^{:key category}
             [:> material/ListItem [:> material/ListItemText (:name category)] [:> material/ListItemIcon [delete-category-button (:name category) (:id category)]]])
           [:> material/ListItem
            [:> material/ListItemText
@@ -134,15 +136,17 @@
         [:<>
          [:h4 "Languages"]
          [:> material/List
-          (for [index (range (count @languages-data))
-                :let [language (get @languages-data index)]]
-            [:> material/ListItem (:language language)
-             [:> material/Checkbox {:checked (= 1 (:use_in_training language))
-                                    :on-click (fn [_]
-                                                (backend/update-languages
-                                                 (update-languages (toggle-language language) index)
-                                                 (fn [response]
-                                                   (reset! languages-data (:body response)))))}]])]]))))
+          (doall
+           (for [index (range (count @languages-data))
+                 :let [language (get @languages-data index)]]
+             ^{:key language}
+             [:> material/ListItem (:language language)
+              [:> material/Checkbox {:checked (= 1 (:use_in_training language))
+                                     :on-click (fn [_]
+                                                 (backend/update-languages
+                                                  (update-languages (toggle-language language) index)
+                                                  (fn [response]
+                                                    (reset! languages-data (:body response)))))}]]))]]))))
 
 (defn admin-page []
   (fn []

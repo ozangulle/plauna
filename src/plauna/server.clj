@@ -1,29 +1,31 @@
 (ns plauna.server
-  (:require [cheshire.core :refer [parse-string generate-string]]
-            [clojure.core.async :as async]
-            [clojure.data :as cd]
-            [clojure.java.io :as io]
-            [clojure.string :as st]
-            [compojure.core :as comp]
-            [compojure.route :as route]
-            [plauna.analysis :as analysis]
-            [plauna.application :as app]
-            [plauna.client :as client]
-            [plauna.client.oauth :as oauth]
-            [plauna.core.email :as core-email]
-            [plauna.database :as db]
-            [plauna.files :as files]
-            [plauna.messaging :as messaging]
-            [plauna.preferences :as p]
-            [ring.adapter.jetty :as jetty]
-            [ring.middleware.defaults :refer [wrap-defaults]]
-            [ring.middleware.json :refer [wrap-json-body]]
-            [ring.middleware.keyword-params :refer [wrap-keyword-params]]
-            [ring.middleware.multipart-params :refer [wrap-multipart-params]]
-            [ring.middleware.params :refer [wrap-params]]
-            [ring.util.codec :refer [base64-decode]]
-            [ring.util.response :refer [redirect]]
-            [taoensso.telemere :as t])
+  (:require
+   [cheshire.core :refer [parse-string generate-string]]
+   [clojure.core.async :as async]
+   [clojure.data :as cd]
+   [clojure.java.io :as io]
+   [clojure.string :as st]
+   [compojure.core :as comp]
+   [compojure.route :as route]
+   [plauna.analysis :as analysis]
+   [plauna.application :as app]
+   [plauna.client :as client]
+   [plauna.client.oauth :as oauth]
+   [plauna.core.server-comm :refer [make-server-response]]
+   [plauna.core.email :as core-email]
+   [plauna.database :as db]
+   [plauna.files :as files]
+   [plauna.messaging :as messaging]
+   [plauna.preferences :as p]
+   [ring.adapter.jetty :as jetty]
+   [ring.middleware.defaults :refer [wrap-defaults]]
+   [ring.middleware.json :refer [wrap-json-body]]
+   [ring.middleware.keyword-params :refer [wrap-keyword-params]]
+   [ring.middleware.multipart-params :refer [wrap-multipart-params]]
+   [ring.middleware.params :refer [wrap-params]]
+   [ring.util.codec :refer [base64-decode]]
+   [ring.util.response :refer [redirect]]
+   [taoensso.telemere :as t])
   (:import [java.net ServerSocket]
            [java.util UUID]
            [org.eclipse.jetty.server Server]))
@@ -336,15 +338,17 @@
                  (= :error (:result action))
                  (success-json-with-body {}))
                (comment (redirect-request request {:type :alert :content "Connection failed. Please see the logs for the details."}))
-               (success-json-with-body {}))
+               (success-json-with-body (generate-string (make-server-response :success nil nil))))
              (= "parse" operation) (let [settings (:parse-settings (:body request))
                                          folder (:folder settings)
-                                         move (some? (:move settings))
+                                         move (:move settings)
                                          assigned-category-pair (st/split (:category settings) #"-")
                                          conn-data (client/connection-data-from-id id)
-                                         message-count (app/read-emails-from-folder conn-data folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)} context)]
-                                     (comment (swap! global-messages (fn [mess] (conj mess {:type :success :content (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)}))))
-                                     (success-json-with-body {})))))
+                                         message-count (app/read-emails-from-folder conn-data folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)} context)
+                                         response (make-server-response :success
+                                                                        (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)
+                                                                        nil)]
+                                     (success-json-with-body (generate-string response))))))
 
    (comp/GET "/oauth2/callback" request
      (let [params (:params request)

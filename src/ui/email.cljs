@@ -1,16 +1,17 @@
 (ns ui.email
-  (:require [ui.backend :as backend]
-            [ui.utils :as utils]
-            [ui.inputs :as inputs]
-            [plauna.core.email :as ce]
-            [reagent.core :as r]
-            [react :as react]
-            [cljs.core.async :refer [take!]]
-            [react-router-dom :as rr]
-            ["@mui/material" :as material]
-            ["@mui/lab" :as lab]
-            ["@mui/icons-material/WarningRounded" :default WarningRoundedIcon]
-            ["@mui/icons-material/ArrowBack" :default ArrowBackIcon]))
+  (:require
+   ["@mui/icons-material/ArrowBack" :default ArrowBackIcon]
+   ["@mui/icons-material/WarningRounded" :default WarningRoundedIcon]
+   ["@mui/lab" :as lab]
+   ["@mui/material" :as material]
+   [cljs.core.async :refer [take!]]
+   [plauna.core.email :as ce]
+   [react :as react]
+   [react-router-dom :as rr]
+   [reagent.core :as r]
+   [ui.backend :as backend]
+   [ui.inputs :as inputs]
+   [ui.utils :as utils]))
 
 (def email-data (r/atom {}))
 
@@ -87,13 +88,13 @@
       [:> material/Divider]
       [:> material/DialogContent "Are you sure you want to delete this email?"]
       [:> material/DialogActions
-       [:> material/Button {:variant "contained"
+       [:> material/Button {:variant :contained
                             :color "error"
                             :onClick (fn [] (backend/delete-email id nil)
                                        (navigate "/emails")
                                        (reset! open false))}
         "Delete"]
-       [:> material/Button {:variant "outlined"
+       [:> material/Button {:variant :contained
                             :onClick #(reset! open false)}
         "Cancel"]]]]))
 
@@ -120,7 +121,7 @@
              [:> material/Paper
               [:> material/List
                [:> material/ListItem [:> material/ListItemText
-                                      {:secondary "Message ID" :primary (ce/message-id email)}]]
+                                      {:secondary "Message ID" :primary (ce/message-id email) :sx {:overflow :hidden}}]]
                [:> material/ListItem [:> material/ListItemText
                                       {:secondary "Date" :primary (utils/parse-date (ce/date email))}]]
                [:> material/ListItem [:> material/ListItemText

@@ -1,13 +1,14 @@
 (ns ui.emails
-  (:require [ui.backend :as backend]
-            [ui.inputs :as inputs]
-            [ui.utils :as utils]
-            [ui.components :as components]
-            [plauna.core.email :as ce]
-            [reagent.core :as r]
-            [react-router-dom :as rr]
-            [cljs.core.async :refer [take!]]
-            ["@mui/material" :as material]))
+  (:require
+   ["@mui/material" :as material]
+   [cljs.core.async :refer [take!]]
+   [plauna.core.email :as ce]
+   [react-router-dom :as rr]
+   [reagent.core :as r]
+   [ui.backend :as backend]
+   [ui.components :as components]
+   [ui.inputs :as inputs]
+   [ui.utils :as utils]))
 
 (defonce emails (r/atom {}))
 

@@ -1,7 +1,8 @@
 (ns ui.components
-  (:require ["@mui/material" :as material]
-            [clojure.core.async :refer [put! <! chan timeout go-loop]]
-            [reagent.core :as r]))
+  (:require
+   ["@mui/material" :as material]
+   [clojure.core.async :refer [put! <! chan timeout go-loop]]
+   [reagent.core :as r]))
 
 (def snackbar-chan (chan 10))
 
