@@ -72,14 +72,13 @@
                   :search-text (:search-text parameters)}
      :optional {:categories cat-list}}))
 
-
 (defn- add-sanitized-text-to-enriched-email [context email]
   {:header (:header email)
    :metadata (:metadata email)
    :participants (:participants email)
    :body (mapv (fn [body-part] (if (core-email/body-text-content? body-part)
-                                (conj body-part {:sanitized-content (int/normalize (:analyzer context) body-part)})
-                                body-part)) (:body email))})
+                                 (conj body-part {:sanitized-content (int/normalize (:analyzer context) body-part)})
+                                 body-part)) (:body email))})
 
 (defn fetch-email [context id]
   (let [db (:db context)

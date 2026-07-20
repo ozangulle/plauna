@@ -18,8 +18,7 @@
 (defn save-preferences [preferences] (backend/save-preferences preferences))
 
 (defn update-and-save-log-level [event]
-  (swap! preferences-data (fn [old] (update old :log-level (fn [_] (keyword (utils/event-val event)))
-  )))
+  (swap! preferences-data (fn [old] (update old :log-level (fn [_] (keyword (utils/event-val event))))))
   (save-preferences @preferences-data))
 
 (defn preferences []
@@ -64,8 +63,7 @@
                                  (get @preferences-data :client-health-check-interval)
                                  "IMAP Health Check Interval (sec)"
                                  (fn [_]
-                                   (swap! preferences-data update :client-health-check-interval js/Number
-                                          )
+                                   (swap! preferences-data update :client-health-check-interval js/Number)
                                    (save-preferences @preferences-data))
                                  (fn [new-value] (swap! preferences-data (fn [old] (update old :client-health-check-interval (fn [_] new-value))))
                                    (get @preferences-data :client-health-check-interval))]]]]))))

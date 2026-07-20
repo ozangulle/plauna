@@ -112,8 +112,8 @@
                             :color "error"
                             :onClick (fn [] (backend/delete-auth-provider id (fn []
                                                                                (backend/fetch-connection conn-id (fn [response]
-                                                                                                            (reset! connection-data (:body response))
-                                                                                                            (reset! open false))))))}
+                                                                                                                   (reset! connection-data (:body response))
+                                                                                                                   (reset! open false))))))}
         "Delete"]
        [:> material/Button {:variant :contained
                             :onClick #(reset! open false)}

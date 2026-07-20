@@ -34,8 +34,8 @@
 
 (defn category-update-handler [email]
   (fn [event] (update-key [[[:metadata :category-id] (event-val event)]
-                            [[:metadata :category] (->> (:categories (:optional @email-data)) (filter #(= (event-val event) (:id %))) first :name)]
-                                                  [[:metadata :category-confidence] 1]])))
+                           [[:metadata :category] (->> (:categories (:optional @email-data)) (filter #(= (event-val event) (:id %))) first :name)]
+                           [[:metadata :category-confidence] 1]])))
 
 (defn category-debouncer [] (fn [email] (take! (save-metadata email @move-email) (fn [_] (fetch-email (ce/message-id email))))))
 

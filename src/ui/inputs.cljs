@@ -2,7 +2,7 @@
   (:require [plauna.core.email :as ce]
             [reagent.core :as r]
             [ui.utils :as utils]
-            [cljs.core.async :refer [take! go <!]]
+            [cljs.core.async :refer [go <!]]
             ["@mui/material" :as material]))
 
 (defonce debounce-timeout 1000)

@@ -119,8 +119,8 @@
             [:> material/Button {:variant :contained
                                  :on-click (fn [_] (backend/train-data
                                                     (fn [res] (if (and (= 200 (:status res)) (not= :alert (:type (:body res))))
-                                                                   (components/show-snackbar "Training was successful" :success)
-                                                                   (components/show-snackbar (str "There was an error during training " (:content (:body res))) :error nil)))))} "Train using existing data"]]
+                                                                (components/show-snackbar "Training was successful" :success)
+                                                                (components/show-snackbar (str "There was an error during training " (:content (:body res))) :error nil)))))} "Train using existing data"]]
            [:> material/Box
             {:sx {:display "flex" :justifyContent "center"}}
             [:> material/Tooltip

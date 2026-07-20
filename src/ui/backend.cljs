@@ -23,7 +23,7 @@
 
 (defn fetch-categories [callback] (take! (http/get "/api/admin/categories") callback))
 
-(defn add-category [name callback] (take! (http/post "/api/admin/categories" {:content-type "application/json ":body (serialize {:name name})}) callback))
+(defn add-category [name callback] (take! (http/post "/api/admin/categories" {:content-type "application/json " :body (serialize {:name name})}) callback))
 
 (defn delete-category [id callback] (take! (http/delete (str "/api/admin/categories/" id)) callback))
 

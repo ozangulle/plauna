@@ -13,7 +13,6 @@
 
 (def default-open-duration 5000)
 
-
 (defn start-snackbar-loop []
   (go-loop []
     (let [new-state (<! snackbar-chan)]

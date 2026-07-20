@@ -1,12 +1,10 @@
 (ns plauna.server
   (:require
-   [cheshire.core :refer [parse-string generate-string]]
-   [clojure.core.async :as async]
+   [cheshire.core :refer [generate-string]]
    [clojure.data :as cd]
    [clojure.java.io :as io]
    [clojure.string :as st]
    [compojure.core :as comp]
-   [compojure.route :as route]
    [plauna.analysis :as analysis]
    [plauna.application :as app]
    [plauna.client :as client]
@@ -186,9 +184,9 @@
 
 (defn template->request-parameters [template]
   (fn [raw-request] (reduce (fn [acc [k v]] (if (contains? raw-request k)
-                                                 (conj acc {k ((:type-fn v) (get raw-request k))})
-                                                 (conj acc {k (:default v)})))
-                               {} template)))
+                                              (conj acc {k ((:type-fn v) (get raw-request k))})
+                                              (conj acc {k (:default v)})))
+                            {} template)))
 
 (defn get-status-repl-server [] {:status (some? @repl-server) :port 7888})
 
@@ -363,7 +361,6 @@
          "Bad response - csrf token mismach")))
 
    (comp/ANY "/*" _ (slurp (io/resource "public/index.html")))))
-
 
 (defn upload-progress [_ bytes-read content-length item-count]
   (t/log! {:level :info
