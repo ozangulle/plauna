@@ -19,7 +19,6 @@
    [ring.middleware.defaults :refer [wrap-defaults]]
    [ring.middleware.json :refer [wrap-json-body]]
    [ring.middleware.keyword-params :refer [wrap-keyword-params]]
-   [ring.middleware.multipart-params :refer [wrap-multipart-params]]
    [ring.middleware.params :refer [wrap-params]]
    [ring.util.codec :refer [base64-decode]]
    [ring.util.response :refer [redirect]]
@@ -362,23 +361,8 @@
 
    (comp/ANY "/*" _ (slurp (io/resource "public/index.html")))))
 
-(defn upload-progress [_ bytes-read content-length item-count]
-  (t/log! {:level :info
-           :limit  [[1 5000]]
-           :limit-by content-length
-           :let [read-percent  (* 100 (float (/ bytes-read content-length)))]}
-          ["Writing" item-count "files. Read" read-percent "% until now. Total length: " content-length]))
-
-(defn wrap-json-body-if-json [handler & opts]
-  (let [mw (apply wrap-json-body opts)]
-    (fn [req]
-      (if (some-> req :headers (get "content-type") (re-find "(?i)application/json"))
-        (mw req)
-        (handler req)))))
-
 (defn app [context] (-> (fn [req] ((make-routes context) req))
                         wrap-keyword-params
-                        (wrap-multipart-params {:progress-fn upload-progress})
                         (wrap-json-body {:keywords? true
                                          :malformed-response
                                          {:status 400

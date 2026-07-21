@@ -6,7 +6,6 @@
    ["@mui/material" :as material]
    [cljs.core.async :refer [take!]]
    [plauna.core.email :as ce]
-   [react :as react]
    [react-router-dom :as rr]
    [reagent.core :as r]
    [ui.backend :as backend]
@@ -32,7 +31,7 @@
 
 (defn save-metadata [email move?] (backend/save-metadata-for-email email move?))
 
-(defn category-update-handler [email]
+(defn category-update-handler [_]
   (fn [event] (update-key [[[:metadata :category-id] (event-val event)]
                            [[:metadata :category] (->> (:categories (:optional @email-data)) (filter #(= (event-val event) (:id %))) first :name)]
                            [[:metadata :category-confidence] 1]])))

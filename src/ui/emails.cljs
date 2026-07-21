@@ -88,7 +88,7 @@
   (swap! emails (fn [old] (update-in old [:parameters :size] (fn [_] (event-val event)))))
   (refresh-emails (:parameters @emails)))
 
-(defn handle-page-change [event new-page]
+(defn handle-page-change [_ new-page]
   (swap! emails (fn [old] (update-in old [:parameters :page] (fn [_] (inc new-page)))))
   (refresh-emails (:parameters @emails)))
 

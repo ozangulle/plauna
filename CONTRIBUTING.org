@@ -1,0 +1,101 @@
+* Contributing to Plauna
+
+Thanks for your interest in contributing! Contributions are welcome and can take many forms, including code, documentation improvements, feature suggestions, and design enhancements.
+
+** Ways to Contribute
+
+*** Feature suggestions
+- Propose new capabilities
+- Request enhancements to existing behavior
+- Share ideas based on real-world usage
+
+*** Design improvements
+- Improve UX/UI or interaction flows
+- Suggest visual or usability enhancements
+- Provide design reviews and rationale
+
+*** Code contributions
+- Fix bugs
+- Improve performance or reliability
+- Add new features
+- Refactor or improve existing code
+
+*** Documentation contributions
+- Fix typos and broken links
+- Improve clarity, structure, and examples
+
+** How to Contribute
+
+*** 1) Check existing issues
+Before starting, please look at open issues to avoid duplicate work.
+- If you don’t see an issue for your idea/bug, create one.
+  
+*** 2) Start a discussion
+If your contribution is a larger change (new feature, major refactor, big UX update), please open an issue first to align on scope and direction.
+
+*** 3) Fork and create a branch
+Create a branch for your change:
+
+#+begin_src
+  git checkout -b feature/your-change-name
+#+end_src
+
+*** 4) Make your changes
+
+Follow the project’s existing style and conventions.
+
+If you’re adding code, consider:
+
+    keeping changes focused
+    writing or updating tests when applicable
+    adding documentation for user-facing behavior
+
+*** 5) Test and verify
+
+Run the project’s test/lint commands:
+
+#+begin_src
+  clj-kondo --lint src         # linting
+  cljfmt fix src test          # code style
+  clj -M:test                  # testing
+#+end_src
+
+*** 6) Open a Pull Request
+
+When ready:
+- Open a PR from your branch into the main branch
+- Use a clear title and description
+- Explain what changed and why
+- Link any related issues
+
+* Contribution guidelines
+** Code style and quality
+
+- Keep code readable and consistent with existing patterns.
+- Prefer small, reviewable commits.
+- Avoid unrelated formatting changes unless necessary.
+
+** Documentation
+
+- Update docs when your change affects user behavior.
+- Include screenshots or examples when it helps explain the change.
+
+** Feature/design proposals
+
+When proposing a feature or design change, please include:
+
+- the problem you’re solving
+- the proposed solution
+- expected impact/benefits
+- alternatives considered (if any)
+
+* Reporting bugs
+
+If you encounter a bug:
+
+- open an issue
+- include steps to reproduce, expected vs actual behavior, and relevant logs/screenshots
+
+* LICENSE
+
+By contributing, you agree that your contributions will be licensed under the project’s license.
