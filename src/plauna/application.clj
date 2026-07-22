@@ -11,10 +11,15 @@
     (= filter "without-category") {:where [:= :metadata.category nil] :order-by [[:date :desc]]}
     :else {:order-by [[:date :desc]]}))
 
-(defn- search->sql-clause [search-field search-text]
-  (cond
-    (= search-field "subject") {:where [:like :headers.subject (str "%" search-text "%")] :order-by [[:date :desc]]}
-    :else {:order-by [[:date :desc]]}))
+(defn- search->sql-clause [search-text]
+  (if (some? search-text)
+    {:where [:or
+             [:like :headers.subject (str "%" search-text "%")]
+             [:like :bodies.content (str "%" search-text "%")]
+             [:like :contacts.name (str "%" search-text "%")]
+             [:like :contacts.address (str "%" search-text "%")]]
+     :order-by [[:date :desc]]}
+    {:order-by [[:date :desc]]}))
 
 (defn- combine-maps-with [map1 map2 key combination-key]
   (let [val1 (get map1 key)
@@ -29,7 +34,7 @@
 
 (defn categories
   "There is no entry for 'no entry' in the database. This function adds a 'n/a' entry to the actual list."
-  [db] (conj (int/fetch-categories db) {:id nil :name "n/a"}))
+  [db] (conj (int/fetch-categories db) {:id -1 :name "n/a"}))
 
 (defn connect-to-client
   "Returns {:result :ok} or {:result :redirect :provider provider} in case of oauth2"
@@ -52,12 +57,12 @@
 
 (defn fetch-emails
   "Returns a list of emails. Customizable by parameters which can contain the following keys:
-   :size, :page, :filter (all, enrieched-only, or without-category), :search-field (subject), :search-text"
+   :size, :page, :filter (all, enriched-only, or without-category), :search-field (subject), :search-text"
   [context parameters]
   (let [db (:db context)
         cat-list (categories db)
-        customization-clause (combine-maps-with (filter->sql-clause (:filter parameters)) (search->sql-clause (:search-field parameters) (:search-text parameters)) :where :and)
-        result (int/fetch-emails db {:entity :enriched-email :strict false :page (page/page-request (:page parameters) (:size parameters))} customization-clause)]
+        customization-clause (combine-maps-with (filter->sql-clause (:filter parameters)) (search->sql-clause  (:search-text parameters)) :where :and)
+        result (int/fetch-emails db {:entity :enriched-email :strict true :page (page/page-request (:page parameters) (:size parameters))} customization-clause)]
     {:data (:data result)
      :parameters {:filter (:filter parameters)
                   :total-pages (page/calculate-pages-total (:total result) (:size parameters))
@@ -65,6 +70,23 @@
                   :page (:page result)
                   :total (:total result)
                   :search-text (:search-text parameters)}
+     :optional {:categories cat-list}}))
+
+(defn- add-sanitized-text-to-enriched-email [context email]
+  {:header (:header email)
+   :metadata (:metadata email)
+   :participants (:participants email)
+   :body (mapv (fn [body-part] (if (core-email/body-text-content? body-part)
+                                 (conj body-part {:sanitized-content (int/normalize (:analyzer context) body-part)})
+                                 body-part)) (:body email))})
+
+(defn fetch-email [context id]
+  (let [db (:db context)
+        cat-list (categories db)
+        email (->> (int/fetch-emails db {:entity :enriched-email :strict false} {:where [:= :message-id id]})
+                   first
+                   (add-sanitized-text-to-enriched-email context))]
+    {:data email
      :optional {:categories cat-list}}))
 
 (defn create-new-category! [context category]
@@ -79,8 +101,8 @@
   [email category {:keys [client] :as context}]
   (let [connections (vals (int/connections client))
         connection-id-guess (int/connection-id-for-email client connections email)
-        message-id (-> email :header :message-id)
-        old-category (-> email :metadata :category)]
+        message-id (core-email/message-id email)
+        old-category (core-email/category email)]
     (try
       (cond (nil? (seq connections))
             (error-result nil "There are no active connections.")
@@ -115,13 +137,13 @@
     (let [language-result (int/detect-language analyzer (:email email-message))
           enriched-email (core-email/construct-enriched-email (:email email-message) {:language (:code language-result) :language-confidence (:confidence language-result)} {:category assigned-category :category-id assigned-category-id :category-confidence 1})]
       (int/save-email db enriched-email)
-      (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully saved to the database"])
+      (t/log! :debug ["Email with subject:" (-> email-message :email core-email/subject) "was successfully saved to the database"])
       (move-message move? folder connection-id email-message assigned-category context))
     (let [enriched-email (int/enrich-email analyzer (:email email-message))
-          category (:category (:metadata enriched-email))]
-      (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was categorized as" category])
+          category (core-email/category enriched-email)]
+      (t/log! :debug ["Email with subject:" (-> email-message :email core-email/subject) "was categorized as" category])
       (int/save-email db enriched-email)
-      (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully saved to the database"])
+      (t/log! :debug ["Email with subject:" (-> email-message :email core-email/subject) "was successfully saved to the database"])
       (move-message move? folder connection-id email-message category context))))
 
 (defn handle-incoming-imap-email

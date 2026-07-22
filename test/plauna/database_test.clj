@@ -29,21 +29,21 @@
 
 (deftest enriched-email-simple
   (let [sql (db/data->sql {:entity :enriched-email :strict false})]
-    (is (=  "SELECT headers.message_id, in_reply_to, subject, mime_type, date FROM headers LEFT JOIN metadata ON headers.message_id = metadata.message_id"
-            (first sql)))))
+    (is (= "SELECT DISTINCT headers.message_id, in_reply_to, subject, headers.mime_type, date FROM headers LEFT JOIN metadata ON headers.message_id = metadata.message_id LEFT JOIN communications ON communications.message_id = headers.message_id LEFT JOIN contacts ON contacts.contact_key = communications.contact_key LEFT JOIN bodies ON bodies.message_id = headers.message_id"
+           (first sql)))))
 
 (deftest enriched-email-simple-2
   (let [sql (db/data->sql {:entity :enriched-email :strict true})]
-    (is (=  "SELECT headers.message_id, in_reply_to, subject, mime_type, date FROM headers INNER JOIN metadata ON headers.message_id = metadata.message_id"
-            (first sql)))))
+    (is (= "SELECT DISTINCT headers.message_id, in_reply_to, subject, headers.mime_type, date FROM headers INNER JOIN metadata ON headers.message_id = metadata.message_id INNER JOIN communications ON communications.message_id = headers.message_id INNER JOIN contacts ON contacts.contact_key = communications.contact_key INNER JOIN bodies ON bodies.message_id = headers.message_id"
+           (first sql)))))
 
 (deftest enriched-email-simple-3
   (let [sql (db/data->sql {:entity :enriched-email :strict true} {:where [:= :message-id "123"]})]
-    (is (=  "SELECT headers.message_id, in_reply_to, subject, mime_type, date FROM headers INNER JOIN metadata ON headers.message_id = metadata.message_id WHERE headers.message_id = ?"
-            (first sql)))))
+    (is (= "SELECT DISTINCT headers.message_id, in_reply_to, subject, headers.mime_type, date FROM headers INNER JOIN metadata ON headers.message_id = metadata.message_id INNER JOIN communications ON communications.message_id = headers.message_id INNER JOIN contacts ON contacts.contact_key = communications.contact_key INNER JOIN bodies ON bodies.message_id = headers.message_id WHERE headers.message_id = ?"
+           (first sql)))))
 
 (deftest enriched-email-simple-4
   (let [sql (db/data->sql {:entity :enriched-email :strict true} {:where [:and [:= :message-id "123"] [:<> :language nil] [:<> :category nil]]})]
-    (is (= "SELECT headers.message_id, in_reply_to, subject, mime_type, date FROM headers INNER JOIN metadata ON headers.message_id = metadata.message_id WHERE (headers.message_id = ?) AND (metadata.language IS NOT NULL) AND (metadata.category IS NOT NULL)"
+    (is (= "SELECT DISTINCT headers.message_id, in_reply_to, subject, headers.mime_type, date FROM headers INNER JOIN metadata ON headers.message_id = metadata.message_id INNER JOIN communications ON communications.message_id = headers.message_id INNER JOIN contacts ON contacts.contact_key = communications.contact_key INNER JOIN bodies ON bodies.message_id = headers.message_id WHERE (headers.message_id = ?) AND (metadata.language IS NOT NULL) AND (metadata.category IS NOT NULL)"
            (first sql)))))
 

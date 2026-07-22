@@ -192,4 +192,5 @@
 (defrecord BasicAnalyzer []
   int/Analyzer
   (enrich-email [_ email] (detect-language-and-categorize-email email))
-  (detect-language [_ email] (language-result email)))
+  (detect-language [_ email] (language-result email))
+  (normalize [_ body-part] (normalize-body-part body-part)))

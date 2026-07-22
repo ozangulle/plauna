@@ -1,5 +1,5 @@
 (ns plauna.application-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [plauna.interfaces :as int]
             [taoensso.telemere :as t]
             [plauna.application :as app]))
@@ -83,7 +83,7 @@
                      (swap! query (fn [_] important-query))
                      {:total 10 :size 1 :page 1}))]
     (app/fetch-emails {:db database} {:search-field "subject" :search-text "test text" :size 1})
-    (is (= {:where [:like :headers.subject "%test text%"] :order-by [[:date :desc]]} @query))))
+    (is (= {:where [:or [:like :headers.subject "%test text%"] [:like :bodies.content "%test text%"] [:like :contacts.name "%test text%"] [:like :contacts.address "%test text%"]], :order-by [[:date :desc]]} @query))))
 
 (deftest emails-query-search-filter
   (let [query (atom "")
@@ -93,7 +93,7 @@
                      (swap! query (fn [_] important-query))
                      {:total 10 :size 1 :page 1}))]
     (app/fetch-emails {:db database} {:filter "enriched-only" :search-field "subject" :search-text "test text" :size 1})
-    (is (= {:where [:and [:and [:<> :metadata.category nil] [:<> :metadata.language nil]] [:like :headers.subject "%test text%"]] :order-by [[:date :desc]]} @query))))
+    (is (= {:where [:and [:and [:<> :metadata.category nil] [:<> :metadata.language nil]] [:or [:like :headers.subject "%test text%"] [:like :bodies.content "%test text%"] [:like :contacts.name "%test text%"] [:like :contacts.address "%test text%"]]], :order-by [[:date :desc]]} @query))))
 
 (deftest create-a-category
   (let [db-called (atom false)

@@ -1,16 +1,19 @@
-FROM clojure:temurin-25-tools-deps-bookworm-slim as build
-RUN apt update && apt install -y nodejs npm
-COPY . /usr/src/app/
+FROM clojure:temurin-25-tools-deps-bookworm-slim AS build
 WORKDIR /usr/src/app
-RUN npm install
-RUN npm run build
-# FIXME Tests are currently disabled because some of them fail at random due to concurrency
-# RUN clojure -M:test
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends nodejs npm \
+  && rm -rf /var/lib/apt/lists/*
+COPY package.json ./
+COPY package-lock.json* ./
+RUN npm ci
+COPY . .
+RUN clojure -M:cljs release app
 RUN clojure -T:build uber
 
+
 FROM eclipse-temurin:25-alpine
-COPY --from=build /usr/src/app/target/plauna-standalone.jar /app/
-EXPOSE 8080
 WORKDIR /app
-RUN mkdir /var/lib/plauna # Default location for data files
-CMD ["sh", "-c", "java -jar plauna-standalone.jar $PLAUNA_ARGS"]
+COPY --from=build /usr/src/app/target/plauna-standalone.jar /app/plauna-standalone.jar
+EXPOSE 8080
+RUN mkdir -p /var/lib/plauna
+CMD ["sh", "-c", "java -jar /app/plauna-standalone.jar $PLAUNA_ARGS"]

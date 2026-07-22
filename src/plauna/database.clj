@@ -204,14 +204,14 @@
   (jdbc/execute! (ds) (insert->insert-ignore (honey/format {:insert-into :category-training-preferences :columns [:language :use-in-training] :values preferences}))))
 
 (defn update-language-preference [preference]
-  (jdbc/execute! (ds) ["UPDATE category_training_preferences SET use_in_training = ?  WHERE id = ?" (:use preference) (:id preference)] builder-function))
+  (jdbc/execute! (ds) ["UPDATE category_training_preferences SET use_in_training = ?  WHERE id = ?" (:use_in_training preference) (:id preference)] builder-function))
 
 ;;;;;;;;;;;;;; Refactored call stuff
 
 (defn headers-for-strict-options [strict]
   (if strict
-    "SELECT headers.message_id, in_reply_to, subject, mime_type, date FROM headers INNER JOIN metadata ON headers.message_id = metadata.message_id"
-    "SELECT headers.message_id, in_reply_to, subject, mime_type, date FROM headers LEFT JOIN metadata ON headers.message_id = metadata.message_id"))
+    "SELECT DISTINCT headers.message_id, in_reply_to, subject, headers.mime_type, date FROM headers INNER JOIN metadata ON headers.message_id = metadata.message_id INNER JOIN communications ON communications.message_id = headers.message_id INNER JOIN contacts ON contacts.contact_key = communications.contact_key INNER JOIN bodies ON bodies.message_id = headers.message_id"
+    "SELECT DISTINCT headers.message_id, in_reply_to, subject, headers.mime_type, date FROM headers LEFT JOIN metadata ON headers.message_id = metadata.message_id LEFT JOIN communications ON communications.message_id = headers.message_id LEFT JOIN contacts ON contacts.contact_key = communications.contact_key LEFT JOIN bodies ON bodies.message_id = headers.message_id"))
 
 (defn body-parts-for-options [] "SELECT * FROM bodies INNER JOIN metadata ON metadata.message_id = bodies.message_id")
 

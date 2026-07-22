@@ -2,7 +2,7 @@
   (:require [clojure.math :as math]
             [clojure.string :as s]))
 
-(set! *warn-on-reflection* true)
+;(set! *warn-on-reflection* true) cljs does not like this
 
 (defrecord Header [message-id in-reply-to subject mime-type date])
 
@@ -98,3 +98,17 @@
              (some? (:secret data-map))
              (some? (:folder data-map)))
         (map->ImapConnection (type-check-imap-connection data-map))))
+
+(defn message-id [email] (-> email :header :message-id))
+
+(defn subject [email] (-> email :header :subject))
+
+(defn date [email] (-> email :header :date))
+
+(defn category [email] (-> email :metadata :category))
+
+(defn category-confidence [email] (-> email :metadata :category-confidence))
+
+(defn language [email] (-> email :metadata :language))
+
+(defn language-confidence [email] (-> email :metadata :language-confidence))

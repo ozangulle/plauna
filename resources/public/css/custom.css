@@ -1,6 +1,9 @@
-/*@config "../js/tailwind.config.js";*/
+.ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-pverflow: ellipsis;
+}
 
-@import "tailwindcss";
-@plugin "daisyui" {
-  themes: autumn --default;
+th {
+    font-weight: 700 !important
 }

@@ -46,3 +46,6 @@ jobs:
           file: Dockerfile
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+          cache-from: type=registry,ref=ozangulle/plauna:buildcache
+          cache-to: type=registry,ref=ozangulle/plauna:buildcache,mode=max,ignore-error=true

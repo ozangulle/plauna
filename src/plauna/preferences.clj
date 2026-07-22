@@ -25,7 +25,7 @@
 
 (defn log-level [] (w/lookup-or-miss cache
                                      :log-level
-                                     (fn [key] (preference-with-default key or :info))))
+                                     (fn [key] (keyword (preference-with-default key or :info)))))
 
 (defn language-detection-threshold [] (w/lookup-or-miss cache
                                                         :language-detection-threshold
