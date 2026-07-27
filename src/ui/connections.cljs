@@ -216,7 +216,7 @@
                        ^{:key folder}
                        [:> material/MenuItem {:value folder} folder])]]
                    [:> material/FormControl {:fullWidth true}
-                    [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:move @parse-settings) :onChange (fn [_ new] (swap! parse-settings assoc-in [:move?] new))}) :label "Move e-mails after categorization"}]
+                    [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:move @parse-settings) :onChange (fn [_ new] (swap! parse-settings assoc-in [:move] new))}) :label "Move e-mails after categorization"}]
                     [:> material/FormControl {:fullWidth true}
                      [:> material/InputLabel {:id "category-select-label"} "Assign following category for all e-mails in folder. Leave blank for automatic category detection."]
                      [:> material/Select {:labelId "category-select-label"
