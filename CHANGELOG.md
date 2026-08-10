@@ -1,6 +1,31 @@
-# Changelog
+## [2026-08-01.0] - 2026-08-10
 
-All notable changes to this project will be documented in this file.
+### 🚀 Features
+
+- Add search functionality to the email list
+- Bulk categorization from IMAP folders
+- Change UI from static HTML to SPA using ClojureScript
+
+### 🐛 Bug Fixes
+
+- Server error due to changes in pagination structure
+- Creating categories and moving emails fail
+- *(client)* Empty folder name not recognized as default folder name
+- Empty strings are treated as nil in default folder names
+- Non latin texts are not normalized correctly
+- Moving messages in directory marks them as read
+- *(ui)* "move emails after categorization" cannot be selected
+
+### 🚜 Refactor
+
+- Logic for moving emails
+- Simplify logic for incoming emails and add tests
+
+### ⚙️ Miscellaneous Tasks
+
+- Update dependencies and docker images
+- Prepare CHANGELOG.md for release
+- Update README.md and cleanup code
 
 ## [2026-03-18.0] - 2026-03-18
 
