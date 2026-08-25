@@ -3,7 +3,7 @@
                    :ns-default build
                    :jvm-opts ["-Dclojure.compiler.direct-linking=true" "-Xmx4000m"]}
            :cljs {:extra-deps {cljs-http/cljs-http {:mvn/version "0.1.49"}
-                               thheller/shadow-cljs {:mvn/version "3.4.6"}
+                               thheller/shadow-cljs {:mvn/version "3.4.12"}
                                org.clojure/clojurescript {:mvn/version "1.12.145"}
                                re-frame/re-frame {:mvn/version "1.4.7"}}
                   :main-opts ["-m" "shadow.cljs.devtools.cli"]}
