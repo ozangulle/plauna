@@ -9,6 +9,7 @@
    [plauna.application :as app]
    [plauna.client :as client]
    [plauna.client.oauth :as oauth]
+   [plauna.client.connection :as imap-conn]
    [plauna.core.server-comm :refer [make-server-response]]
    [plauna.core.email :as core-email]
    [plauna.database :as db]
@@ -22,7 +23,8 @@
    [ring.middleware.params :refer [wrap-params]]
    [ring.util.codec :refer [base64-decode]]
    [ring.util.response :refer [redirect]]
-   [taoensso.telemere :as t])
+   [taoensso.telemere :as t]
+   [plauna.interfaces :as int])
   (:import [java.net ServerSocket]
            [java.util UUID]
            [org.eclipse.jetty.server Server]))
@@ -33,11 +35,7 @@
 
 (defonce repl-server (atom nil))
 
-(def html-headers {"Content-Type" "text/html; charset=UTF-8"})
-
 (defonce global-messages (atom []))
-
-(defn add-to-messages [message] (swap! global-messages (fn [messages] (conj messages message))))
 
 (defn interleave-all [& seqs]
   (reduce (fn [acc index] (into acc (map #(get % index) seqs)))
@@ -65,28 +63,19 @@
      :category-confidence  (when category-exists (Float/parseFloat (:category-confidence params)))
      :language-confidence (when language-exists (Float/parseFloat (:language-confidence params)))}))
 
-(defn save-metadata-form [params]
-  (let [transformed (flatten-map params)]
-    (dorun (map (fn [x] (let [request (params->update-request x)]
-                          (db/update-metadata (:message-id x) (:category-id request) (:category-confidence request) (:language request) (:language-confidence request)))) transformed))))
-
 (defn save-metadata-request [metadata-request]
   (let [metadata (:metadata metadata-request)]
-    (db/update-metadata (:message-id metadata-request) (:category-id metadata) (:category-confidence metadata) (:language metadata) (:language-confidence metadata))))
-
-(defn success-html-with-body [body]
-  {:status  200
-   :headers {"Content-Type" "text/html; charset=UTF-8"}
-   :body    body})
+    (db/update-metadata (:message-id metadata-request) (:category-id metadata) (:category-confidence metadata) (:language metadata) (:language-confidence metadata) (:connection-id metadata))))
 
 (defn success-json-with-body [body]
   {:status  200
    :headers {"Content-Type" "application/json; charset=UTF-8"}
    :body    body})
 
-(defn redirect-to-referer [request]
-  {:status 303
-   :headers {"Location" (get (:headers request) "referer")}})
+(defn error-json-with-body [code body]
+  {:status  code
+   :headers {"Content-Type" "application/json; charset=UTF-8"}
+   :body    (generate-string body)})
 
 (defn redirect-request
   ([request]
@@ -139,40 +128,6 @@
      :name       (:name category)
      :confidence (:confidence category)}))
 
-(defn categorize-uncategorized-n-emails [n]
-  (let [languages-to-use (map :language (db/get-activated-language-preferences))
-        uncategorized-bodies (:data (db/fetch-data {:entity :body-part :page {:page 0 :size n}} {:where [:and [:in :language languages-to-use] [:<> :language nil] [:= :category nil] [:= :mime-type "text/html"]]}))
-        trained-emails (map (fn [email] (conj {:message-id (-> email :body-part :message-id)} (categorize-content (-> email :body-part :sanitized-content) (-> email :metadata :language)))) uncategorized-bodies)]
-    (doseq [trained-email trained-emails] (db/update-metadata-category (:message-id trained-email) (:id trained-email) (:confidence trained-email)))))
-
-(defn mime-type-statistics [period]
-  (db/query-db {:select [[[:count :headers.message-id] :count] :bodies.mime-type [(db/interval-for-honey period) :interval]] :from [:bodies]
-                :join [:headers [:= :bodies.message-id :headers.message_id]]
-                :where [:<> :interval nil]
-                :group-by [:interval :bodies.mime-type]
-                :order-by [[:count :desc]]}))
-
-(defn language-statistics-by-period [period]
-  (db/query-db {:select [[[:count :metadata.language] :count] :metadata.language [(db/interval-for-honey period) :interval]] :from [:metadata]
-                :join [:headers [:= :metadata.message-id :headers.message_id]]
-                :group-by [:language :interval]}))
-
-(defn category-statistics-by-period [period]
-  (let [year (:year period)
-        categories (reduce (fn [acc el] (merge acc {(:id el) (:name el)})) {} (db/get-categories))
-        statistics (if (some? year)
-                     (db/query-db {:select [[[:count :metadata.category] :count] :metadata.category [(db/interval-for-honey (:interval period)) :interval]] :from [:metadata]
-                                   :join [:headers [:= :metadata.message-id :headers.message_id]]
-                                   :where [:and [:<> :category nil] [:like :interval (str year "%")]]
-                                   :group-by [:category :interval]})
-                     (db/query-db {:select [[[:count :metadata.category] :count] :metadata.category [(db/interval-for-honey (:interval period)) :interval]] :from [:metadata]
-                                   :join [:headers [:= :metadata.message-id :headers.message_id]]
-                                   :where [:<> :category nil]
-                                   :group-by [:category :interval]}))]
-    (map (comp
-          (fn [map] (if (= 0 (get map :category)) map (update map :category (fn [cat-key] (get categories cat-key)))))
-          (fn [map] (update map :category #(if (int? %) % (Integer/parseInt %))))) statistics)))
-
 (defn enriched-email-by-message-id [id] (first (db/fetch-data {:entity :enriched-email :strict false} {:where [:= :message-id id]})))
 
 ;; TODO change name template
@@ -187,15 +142,13 @@
                                               (conj acc {k (:default v)})))
                             {} template)))
 
-(defn get-status-repl-server [] {:status (some? @repl-server) :port 7888})
+(defn connection-information [id] (let [conn (db/get-connection id)] (merge conn {:connected (int/connected? (client/get-connection id))})))
 
-(defn connection-information [id] (let [conn (db/get-connection id)] (merge conn (client/monitor->map (get @client/connections (:id conn))))))
-(defn connection-folders [conn]
-  (if (= true (:connected conn))
-    (client/folders-in-store (:store (client/connection-data-from-id (:id conn))))
-    []))
-
-(defn empty-global-messages [] (reset! global-messages []))
+(defn connection-folders [connection-config]
+  (let [conn (client/get-connection (:id connection-config))]
+    (if (true? (int/connected? conn))
+      (int/list-folders conn)
+      [])))
 
 (defn make-routes [context]
   (comp/routes
@@ -244,17 +197,22 @@
      (success-json-with-body (generate-string "OK")))
 
    (comp/POST "/api/metadata" request
-     (if (:move? (:body request))
-       (let [message-id (:message-id (:body request))
-             email-before-update (enriched-email-by-message-id message-id)
-             new-category-id (:category-id (:metadata (:body request)))
-             new-category-name (get (first (filter #(= (:id %) new-category-id) (db/get-categories))) :name "")
-             process (app/move-email-to-category email-before-update new-category-name context)]
-         (if (= :error (:result process))
-           (t/log! :error ["There was an error handling the move request" process])
-           (save-metadata-request (:body request))))
-       (save-metadata-request (:body request)))
-     (success-json-with-body {}))
+     (let [metadata (:metadata (:body request))]
+       (if (:move? (:body request))
+         (if (or (nil? (:connection-id metadata)) (empty? (:connection-id metadata)))
+           (error-json-with-body 400 {:message "Connection id cannot be empty if you want to move the email."})
+           (let [message-id (:message-id (:body request))
+                 email-before-update (enriched-email-by-message-id message-id)
+                 new-category-id (:category-id metadata)
+                 new-category-name (get (first (filter #(= (:id %) new-category-id) (db/get-categories))) :name "")
+                 connection (client/get-connection (:connection-id metadata))
+                 process (app/move-email-to-category connection email-before-update new-category-name)]
+             (if (= :error (:result process))
+               (t/log! :error ["There was an error handling the move request" process])
+               (do (save-metadata-request (:body request))
+                   (success-json-with-body {})))))
+         (do (save-metadata-request (:body request))
+             (success-json-with-body {})))))
 
    (comp/POST "/api/training" _
      (let [result (write-emails-to-training-files-and-train)]
@@ -275,12 +233,12 @@
      {:status  200})
 
    (comp/GET "/api/admin/connections" _
-     (success-json-with-body (generate-string (mapv (fn [conn] (merge conn (client/monitor->map (get @client/connections (:id conn))))) (db/get-connections)))))
+     (success-json-with-body (generate-string (mapv (fn [connection-config] (merge connection-config {:connected (int/connected? (client/get-connection (:id connection-config)))})) (db/get-connections)))))
 
    (comp/POST "/api/admin/connections" request
      (let [params (:body request)
            config {:host (get params :host) :user (get params :user) :secret (get params :secret) :folder (get params :folder "") :debug (= "true" (get params :debug)) :security (get params :security) :port (get params :port) :check-ssl-certs (= "true" (get params :check-ssl-certs))}
-           id (client/id-from-config config)]
+           id (imap-conn/id-from-config config)]
        (db/add-connection (merge config {:id id}))
        (success-json-with-body {})))
 
@@ -322,10 +280,17 @@
    (comp/POST "/api/admin/connections/:id/controls" request
      (let [id (:id (:route-params request))
            operation (:operation (:body request))]
-       (cond (= "reconnect" operation) (do (client/reconnect (client/connection-data-from-id id))                  (success-json-with-body {}))
-             (= "disconnect" operation) (do (client/disconnect (client/connection-data-from-id id))                  (success-json-with-body {}))
+       (cond (= "reconnect" operation)
+             (if (client/restart-connection id)
+               (success-json-with-body {})
+               (error-json-with-body 408 {:message "Operation timed out"}))
+             (= "disconnect" operation) (let [connection ^plauna.interfaces.IMAPConnection (client/get-connection id)]
+                                          (if (int/connected? connection)
+                                            (do (.disconnect-and-stop-monitoring connection)
+                                                (success-json-with-body {}))
+                                            (error-json-with-body 400 {:message "The connection is not active."})))
              (= "connect" operation)
-             (let [action (app/connect-to-client context id)]
+             (let [action (app/connect-to-client (client/get-connection id) context)]
                (cond
                  (= :redirect (:result action))
                  (let [csrf (.toString (UUID/randomUUID))]
@@ -334,14 +299,13 @@
                  (success-json-with-body {})
                  (= :error (:result action))
                  (success-json-with-body {}))
-               (comment (redirect-request request {:type :alert :content "Connection failed. Please see the logs for the details."}))
                (success-json-with-body (generate-string (make-server-response :success nil nil))))
              (= "parse" operation) (let [settings (:parse-settings (:body request))
                                          folder (:folder settings)
                                          move (:move settings)
                                          assigned-category-pair (st/split (:category settings) #"-")
-                                         conn-data (client/connection-data-from-id id)
-                                         message-count (app/read-emails-from-folder conn-data folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)} context)
+                                         connection (client/get-connection id)
+                                         message-count (app/read-emails-from-folder connection folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)})
                                          response (make-server-response :success
                                                                         (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)
                                                                         nil)]
@@ -354,7 +318,7 @@
          (try
            (let [response (oauth/exchange-code-for-access-token (:provider session) (:code params))]
              (db/save-oauth-token (assoc response :connection-id (:connection-id session)))
-             (app/connect-to-client context (:connection-id session)))
+             (app/connect-to-client (client/get-connection (:connection-id session)) context))
            (redirect "/admin/connections")
            (catch Exception e (t/log! :error e) (redirect "/admin/connections")))
          "Bad response - csrf token mismach")))

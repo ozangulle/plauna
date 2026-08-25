@@ -26,3 +26,14 @@
   (enrich-email [this email])
   (detect-language [this email])
   (normalize [this body-part]))
+
+(defprotocol IMAPConnection
+  (connect [this])
+  (connected? [this])
+  (list-folders [this])
+  (no-of-messages-in-folder [this folder-name])
+  (nth-message-in-folder [this folder-name n])
+  (move-message [this message source-name target-name])
+  (move-email-by-id [this message-id source-name target-name])
+  (monitor-folders [this])
+  (disconnect-and-stop-monitoring [this]))

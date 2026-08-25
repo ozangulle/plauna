@@ -38,20 +38,23 @@
 
 (defn connect-to-client
   "Returns {:result :ok} or {:result :redirect :provider provider} in case of oauth2"
-  [{:keys [db client] :as context} id]
+  [connection {:keys [db] :as _}]
   (try
-    (let [connection (int/fetch-connection db id)]
-      (if (= "oauth2" (:auth-type connection))
-        (let [auth-provider (int/fetch-auth-provider db (:auth-provider connection))
-              oauth-data (int/fetch-oauth-token-data db id)]
-          (cond
-            (nil? auth-provider) (throw (ex-info "Auth type is 'oauth2' but there is no auth provider." {:connection connection}))
-            (or (nil? oauth-data) (nil? (:access-token oauth-data)) (nil? (:refresh-token oauth-data)))
-            (do
-              (t/log! :warn ["Connection" (:user connection) (:host connection) "is set to use oauth2 but has no tokens in the db. You need to login manually from the 'Connections' page first."])
-              (success-result :redirect {:provider (int/fetch-auth-provider db (:auth-provider connection))}))
-            :else (do (int/start-monitor client connection context) (success-result :ok nil))))
-        (do (int/start-monitor client connection context) {:result :ok})))
+    (if (= "oauth2" (:auth-type (:config connection)))
+      (let [auth-provider (int/fetch-auth-provider db (:auth-provider connection))
+            oauth-data (int/fetch-oauth-token-data db (:id connection))]
+        (cond
+          (nil? auth-provider) (throw (ex-info "Auth type is 'oauth2' but there is no auth provider." {:connection connection}))
+          (or (nil? oauth-data) (nil? (:access-token oauth-data)) (nil? (:refresh-token oauth-data)))
+          (do
+            (t/log! :warn ["Connection" (:user connection) (:host connection) "is set to use oauth2 but has no tokens in the db. You need to login manually from the 'Connections' page first."])
+            (success-result :redirect {:provider (int/fetch-auth-provider db (:auth-provider (:config connection)))}))
+          :else (do (int/connect connection)
+                    (int/monitor-folders connection)
+                    (success-result :ok nil))))
+      (do (int/connect connection)
+          (int/monitor-folders connection)
+          {:result :ok}))
     (catch Exception e (do (t/log! :error ["There was an error when trying to log in:" e])
                            (error-result e "There was an error when trying to log in.")))))
 
@@ -97,74 +100,68 @@
       (int/create-category-directories! client connection-data [category]))))
 
 (defn move-email-to-category
-  "Email address of the recipient is usually the 'username' in the connection data. It may be different, if the user is using some kind of email masking service. If the email and the username match, we know where to look for. If not, we have to loop over the connections and try to find the email by id before moving it to its new directory. This all pressupposes that the message-id is really unique."
-  [email category {:keys [client] :as context}]
-  (let [connections (vals (int/connections client))
-        connection-id-guess (int/connection-id-for-email client connections email)
-        message-id (core-email/message-id email)
-        old-category (core-email/category email)]
-    (try
-      (cond (nil? (seq connections))
-            (error-result nil "There are no active connections.")
+  [connection email category]
+  (try
+    (let [message-id (core-email/message-id email)
+          old-category (core-email/category email)
+          result (int/move-email-by-id connection message-id old-category category)]
+      (if (true? result)
+        (success-result :ok nil)
+        (error-result nil "Moving email failed. Please check the logs.")))
+    (catch Exception e (t/log! :error e) (error-result e "Moving email failed. Please check the logs."))))
 
-            (some? connection-id-guess)
-            (do
-              (t/log! :debug ["Email seems to belong to the connection with the id" connection-id-guess])
-              (if (true? (int/move-email-between-categories client connection-id-guess message-id old-category category context))
-                (success-result :ok nil)
-                (error-result nil "Moving email failed. Please check the logs.")))
-
-            :else
-            (let [results (for [conn connections
-                                :let [id (get-in conn [:config :id])]]
-                            (do (t/log! :debug ["Move message-id" message-id])
-                                (int/move-email-between-categories client id message-id old-category category context)))]
-              (if (some true? results)
-                (success-result :ok nil)
-                (error-result nil "Moving email failed. Please check the logs."))))
-
-      (catch Exception e (t/log! :error e) (error-result e "Moving email failed. Please check the logs.")))))
-
-(defn- move-message [move? folder connection-id email-message category context]
+(defn- move-message [move? connection folder email message category]
   (if (and (true? move?) (some? category))
-    (do (int/move-email-to-category (:client context) connection-id (:message email-message) folder category)
-        (t/log! :debug ["Email with subject:" (-> email-message :email :header :subject) "was successfully moved to the corresponding folder"]))
-    (do (t/log! :debug ["move option:" move? "category:" category "the email" (-> email-message :email :header :subject) "will not move moved"])
+    (do (int/move-message connection message folder category)
+        (t/log! :debug ["Email with subject:" (core-email/subject email) "was successfully moved to the corresponding folder"]))
+    (do (t/log! :debug ["move option:" move? "category:" category "the email" (core-email/subject email) "will not be moved"])
         :na)))
 
-(defn- incoming-email-workflow [email-message connection-id folder {:keys [move? assigned-category assigned-category-id]} {:keys [analyzer db] :as context}]
-  (if (some? assigned-category)
-    (let [language-result (int/detect-language analyzer (:email email-message))
-          enriched-email (core-email/construct-enriched-email (:email email-message) {:language (:code language-result) :language-confidence (:confidence language-result)} {:category assigned-category :category-id assigned-category-id :category-confidence 1})]
-      (int/save-email db enriched-email)
-      (t/log! :debug ["Email with subject:" (-> email-message :email core-email/subject) "was successfully saved to the database"])
-      (move-message move? folder connection-id email-message assigned-category context))
-    (let [enriched-email (int/enrich-email analyzer (:email email-message))
-          category (core-email/category enriched-email)]
-      (t/log! :debug ["Email with subject:" (-> email-message :email core-email/subject) "was categorized as" category])
-      (int/save-email db enriched-email)
-      (t/log! :debug ["Email with subject:" (-> email-message :email core-email/subject) "was successfully saved to the database"])
-      (move-message move? folder connection-id email-message category context))))
+(defn- incoming-email-workflow
+  ([email connection]
+   (let [{:keys [analyzer db]} (:context connection)
+         enriched-email (int/enrich-email analyzer email)
+         enriched-email-with-connection-id (assoc-in enriched-email [:metadata :connection-id] (:id connection))
+         category (core-email/category enriched-email)]
+     (t/log! :info ["Email with subject:" (core-email/subject email) "was categorized as" category])
+     (int/save-email db enriched-email-with-connection-id)
+     {:category category}))
+  ([email message folder connection {:keys [move? assigned-category assigned-category-id]}]
+   (let [{:keys [analyzer db]} (:context connection)]
+     (if (not (empty? assigned-category))
+       (let [language-result (int/detect-language analyzer email)
+             enriched-email (core-email/construct-enriched-email email {:language (:code language-result) :language-confidence (:confidence language-result)} {:category assigned-category :category-id assigned-category-id :category-confidence 1} (:id connection))]
+         (int/save-email db enriched-email)
+         (t/log! :info ["Email with subject:" (core-email/subject email) "was successfully saved to the database"])
+         (move-message move? connection folder email message assigned-category)
+         {:category assigned-category})
+       (let [enriched-email (int/enrich-email analyzer email)
+             enriched-email-with-connection-id (assoc-in enriched-email [:metadata :connection-id] (:id connection))
+             category (core-email/category enriched-email)]
+         (int/save-email db enriched-email-with-connection-id)
+         (t/log! :info ["Email with subject:" (core-email/subject email) "was successfully saved to the database"])
+         (move-message move? connection folder email message category)
+         {:category category})))))
 
 (defn handle-incoming-imap-email
   "Handle incoming emails synchronously on a single thread. Returns a result."
-  [parsed-email {:keys [connection-id origin-folder message] :as options} context]
-  (try (let [process-result (incoming-email-workflow {:email parsed-email :message message} connection-id origin-folder options context)]
-         (success-result :ok {:move process-result}))
+  [parsed-email connection]
+  (try (let [result (incoming-email-workflow parsed-email connection)]
+         (success-result :ok result))
        (catch Exception e (error-result e "Error encountered when processing incoming email"))))
 
 (defn read-emails-from-folder
   "Read all emails from a folder and process them. Returns the number of messages in the folder. Emails are processed on another thread."
-  [connection-data folder-name options {:keys [client] :as context}]
-  (let [messages-result (int/number-of-messages-in-folder client connection-data folder-name)
+  [^plauna.interfaces.IMAPConnection connection folder-name options]
+  (let [messages-result (int/no-of-messages-in-folder connection folder-name)
         folder (:folder messages-result)]
     (if (> (:message-count messages-result) 0)
       (do
         (t/log! :info ["There are" (:message-count messages-result) "emails in" folder-name "The messages will get processed asynchronously"])
         (async/go
           ;; reading email is index 1
-          (doseq [n (range 1 (inc (:message-count messages-result)))
-                  :let [email-message (int/nth-email-from-folder client n folder)]]
-            (incoming-email-workflow email-message (:connection-id messages-result) folder options context))))
+          (doseq [n (range (:message-count messages-result) 0 -1)
+                  :let [email-message (int/nth-message-in-folder connection folder-name n)]]
+            (incoming-email-workflow (:email email-message) (:message email-message) folder connection options))))
       (t/log! :info ["There are no emails in the folder. Doing nothing."]))
     (:message-count messages-result)))

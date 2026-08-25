@@ -64,4 +64,13 @@
         selected (->> categories (filter #(= (ce/category email) (:name %))) first)]
     [:> material/FormControl
      [:> material/InputLabel {:id "category-select-label"} label]
-     (into [:> material/Select {:value (get selected :id -1) :label-id "category-select-label" :on-click #(.stopPropagation %) :on-change func}] (mapv (fn [category] [:> material/MenuItem {:value (:id category)} (:name category)]) categories))]))
+     (into [:> material/Select {:value (get selected :id -1) :label-id "category-select-label" :label label :on-click #(.stopPropagation %) :on-change func}] (mapv (fn [category] [:> material/MenuItem {:value (:id category)} (:name category)]) categories))]))
+
+(defn select-input [email label selected-fn value-name-pair selection-list debouncer-action on-change-handler]
+  (let [debouncer (make-debouncer (fn [email] (when (some? email) (debouncer-action email))) debounce-timeout)
+        func (fn [event] ((comp debouncer handle-na-category-id on-change-handler) event))
+        selected (first (sequence selected-fn selection-list))
+        label-id (gensym "select-label")]
+    [:> material/FormControl
+     [:> material/InputLabel {:id label-id} label]
+     (into [:> material/Select {:value (get selected :id "") :label-id label-id :label label :on-click #(.stopPropagation %) :on-change func}] (mapv (fn [item] [:> material/MenuItem {:value ((first value-name-pair) item)} ((second value-name-pair) item)]) selection-list))]))

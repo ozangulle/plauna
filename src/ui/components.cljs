@@ -27,6 +27,8 @@
         (recur)))))
 
 (defn show-snackbar
+  "Possible severity values are :info, :warning, :success
+  Set duration to nil to prevent auto-close"
   ([message] (show-snackbar message :info))
   ([message severity] (show-snackbar message severity default-open-duration))
   ([message severity duration]

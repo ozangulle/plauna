@@ -1,483 +1,67 @@
 (ns plauna.client
   (:require
-   [plauna.preferences :as p]
-   [plauna.database :as db]
-   [plauna.client.oauth :as oauth]
-   [clojure.string :as s]
-   [taoensso.telemere :as t]
+   [clojure.core.async :as async]
+   [plauna.client.connection :as imap-conn]
+   [plauna.core.common-records :as records]
    [plauna.interfaces :as int]
-   [plauna.application :as app])
-  (:import
-   (plauna.core.email Header Body-Part Participant Email)
-   (clojure.lang PersistentVector)
-   (jakarta.mail Store Session Folder BodyPart Multipart Message Message$RecipientType Flags$Flag AuthenticationFailedException)
-   (jakarta.mail.internet InternetAddress)
-   (org.eclipse.angus.mail.imap IMAPFolder IMAPMessage)
-   (jakarta.mail.event MessageCountAdapter MessageCountEvent MessageCountListener)
-   (jakarta.mail.search MessageIDTerm)
-   (java.lang AutoCloseable)
-   (java.util Properties UUID)
-   (java.util.concurrent Executors)
-   (org.eclipse.angus.mail.imap IdleManager IMAPStore)
-   (java.util.concurrent Executors TimeUnit ScheduledExecutorService ScheduledFuture)))
+   [taoensso.telemere :as t]))
 
 (set! *warn-on-reflection* true)
 
-(defonce executor-service (Executors/newSingleThreadScheduledExecutor))
-
-(defonce parent-folder-name "Categories")
-
 (defonce connections (atom {}))
-
-(defonce health-checks (atom {}))
-
-(declare connect)
-
-(declare reconnect)
-
-(declare start-monitoring)
-
-(declare stop-monitoring)
-
-(declare schedule-health-checks)
-
-(defn default-port-for-security [security]
-  (if (= security "ssl") 993 143))
-
-(defn oauth2? [connection-config] (= "oauth2" (:auth-type connection-config)))
-
-(defn security [connection-config]
-  (let [security (get connection-config :security "ssl")]
-    (if (some #(= security %) ["ssl" "starttls" "plain"])
-      security
-      "ssl")))
-
-(defn port [connection-config]
-  (str (get connection-config :port (default-port-for-security (security connection-config)))))
-
-(defn check-ssl-certs? [connection-config] (get connection-config :check-ssl-certs true))
-
-(defn default-imap-properties ^Properties [connection-config]
-  (doto (new Properties)
-    (.setProperty "mail.imap.port" (port connection-config))
-    (.setProperty "mail.imap.usesocketchannels" "true")
-    (.setProperty "mail.imap.timeout" "5000")
-    (.setProperty "mail.imap.partialfetch" "false")
-    (.setProperty "mail.imap.fetchsize" "1048576")))
-
-(defn oauth-properties [connection-config]
-  (fn [^Properties properties]
-    (if (oauth2? connection-config)
-      (doto properties (.setProperty "mail.imap.auth.mechanisms" "XOAUTH2"))
-      properties)))
-
-(defn security-properties [connection-config]
-  (let [security-key (security connection-config)]
-    (fn [^Properties properties]
-      (cond (= security-key "ssl") (doto properties (.setProperty "mail.imap.ssl.enable" "true"))
-            (= security-key "starttls") (doto properties (.setProperty "mail.imap.starttls.enable" "true"))
-            (= security-key "plain") properties
-            :else (doto properties (.setProperty "mail.imap.ssl.enable" "true"))))))
-
-(defn certification-check-properties [connection-config]
-  (if (not (check-ssl-certs? connection-config))
-    (fn [^Properties properties] (doto properties (.setProperty "mail.imap.ssl.trust" "*")))
-    (fn [^Properties properties] properties)))
-
-(defn set-debug-mode [connection-config]
-  (let [debug? (get connection-config :debug false)]
-    (fn [^Session session]
-      (if debug? (doto session (.setDebug true)) session))))
-
-(defn config->session [connection-config]
-  (-> (default-imap-properties connection-config)
-      ((security-properties connection-config))
-      ((oauth-properties connection-config))
-      ((certification-check-properties connection-config))
-      Session/getInstance
-      ((set-debug-mode connection-config))))
-
-(defn connection-config->store [connection-config]
-  (let [session ^Session (config->session connection-config)]
-    (.getStore session "imap")))
-
-(defn login
-  ([connection-config ^Store store]
-   (if (oauth2? connection-config)
-     (let [tokens (db/get-oauth-tokens (:id connection-config))]
-       (.connect store (:host connection-config) (:user connection-config) (:access-token tokens)))
-     (.connect store (:host connection-config) (:user connection-config) (:secret connection-config)))
-   store)
-  ([connection-config]
-   (login connection-config (connection-config->store connection-config))))
-
-(defn folder-separator [^Store store] (.getSeparator (.getDefaultFolder store)))
-
-(defn create-folder [^Store store ^String folder-name result-map]
-  (let [folder ^IMAPFolder (.getFolder store folder-name)]
-    (if (not (.exists folder))
-      (do (.create folder Folder/HOLDS_MESSAGES)
-          (conj result-map {folder-name :created}))
-      (conj result-map {folder-name :already-exists}))))
-
-(defn structured-folder-name [store lower-case-folder-name]
-  (str parent-folder-name (folder-separator store) (s/capitalize lower-case-folder-name)))
-
-(defn create-folders
-  ([store folder-names]
-   (create-folders store folder-names {}))
-  ([store folder-names result-map]
-   (if (empty? folder-names)
-     result-map
-     (let [result (create-folder store (structured-folder-name store (first folder-names)) result-map)]
-       (recur store (rest folder-names) result)))))
-
-(defn swap-new-period-check [identifier future]
-  (swap! health-checks (fn [futures new-future] (conj futures {identifier new-future})) future))
-
-;; Primitives
-
-(defn clean-config [config]
-  (-> (dissoc config :secret)
-      (dissoc :debug)))
-
-(defn id-from-config [config]
-  (str (UUID/nameUUIDFromBytes (.getBytes ^String (str (hash (clean-config config)))))))
-
-(defrecord ConnectionData [config ^Store store ^Folder folder ^IdleManager idle-manager capabilities ^MessageCountListener message-count-listener]
-  AutoCloseable
-  (close [this]
-    (t/log! :info "Closing the idle manager, removing from health checks, closing the folder and the store.")
-    (.stop idle-manager)
-    (stop-monitoring this)
-    (swap! health-checks dissoc (:id config))
-    (when (.isOpen folder)
-      (.close folder))
-    (.close store)))
 
 (defn get-connections [] (vals @connections))
 
-(defn connection-data-from-id ^ConnectionData [id]
-  (get @connections id))
+(defn get-connection [id] (get @connections id))
 
-(defn add-to-connections [^ConnectionData connection-data]
-  (swap! connections conj {(:id (.config connection-data)) connection-data}))
+(def type-check-imap-connection
+  ;; These fields used to optional in the configuration. Now we need to make sure that they are set properly.
+  (comp (fn [connection] (update connection :check-ssl-certs #(or (nil? %) (= % true))))
+        (fn [connection] (update connection :debug (fn [x] (if (nil? x) false x))))
+        (fn [connection] (update connection :security (fn [x] (if (nil? x) "ssl" x))))))
 
-;; Construct email from message
+(defn- construct-imap-connection-from-config-file [data-map]
+  (cond (and (some? (:host data-map))
+             (some? (:user data-map))
+             (some? (:secret data-map))
+             (some? (:folder data-map)))
+        (records/map->ImapConnection (type-check-imap-connection data-map))))
 
-(defn text? [content-type] (s/starts-with? (s/lower-case content-type) "text"))
+(defn create-connection-from-config-and-start-watching [client-config context]
+  (let [config (construct-imap-connection-from-config-file client-config)
+        notification-channel (async/chan)
+        imap-connection (imap-conn/create-connection config context notification-channel)]
+    (swap! connections assoc (:id imap-connection) imap-connection)
+    (int/connect imap-connection)
+    (int/monitor-folders imap-connection)
+    (async/go-loop []
+      (let [event (async/<! notification-channel)]
+        (t/log! :info ["Connection" (:id imap-connection) "returned the following event:" event])
+        (cond (= :disconnected event)
+              (do
+                (try
+                  (let [new-imap-connection ^plauna.interfaces.IMAPConnection (imap-conn/create-connection config context notification-channel)]
+                    (swap! connections assoc (:id new-imap-connection) new-imap-connection)
+                    (int/connect new-imap-connection)
+                    (int/monitor-folders new-imap-connection))
+                  (catch Exception e (t/log! :error e)))
+                (recur))
+              (= :timeout event)
+              (do (Thread/sleep 60000)
+                  (let [current-connection (get-connection (:id imap-connection))]
+                    (int/connect current-connection)
+                    (int/monitor-folders current-connection)
+                    (recur))))))))
 
-(defn mime-type [content-type] (s/lower-case (first (s/split content-type #";"))))
-
-(defonce fallback-charset "us-ascii")
-
-(defn charset [content-type] (if (text? content-type)
-                               (s/lower-case (or (second (s/split (second (s/split content-type #";")) #"=")) fallback-charset))
-                               fallback-charset))
-
-(defn disposition [disposition] (when (some? disposition) (s/lower-case disposition)))
-
-(defn create-header [^IMAPMessage message]
-  (new Header (.getMessageID message) (.getInReplyTo message) (.getSubject message) (mime-type (.getContentType message)) (quot (.getTime (.getSentDate message)) 1000)))
-
-(defmulti create-body-part (fn [body-part _] (type body-part)))
-
-(defmethod create-body-part String [content ^IMAPMessage message]
-  (new Body-Part (.getMessageID message) (charset (.getContentType message)) (mime-type (.getContentType message)) (first (.getHeader message "Content-transfer-encoding")) content (.getFileName message) (.getDisposition message)))
-
-(defmethod create-body-part BodyPart [^BodyPart bodypart ^IMAPMessage message]
-  (if (instance? Multipart (.getContent bodypart))
-    (create-body-part (.getContent bodypart) message)
-    (new Body-Part (.getMessageID message) (charset (.getContentType bodypart)) (mime-type (.getContentType bodypart)) (first (.getHeader bodypart "Content-transfer-encoding")) (.getContent bodypart) (.getFileName bodypart) (disposition (.getDisposition bodypart)))))
-
-(defmethod create-body-part Multipart [^Multipart multipart ^IMAPMessage message]
-  (for [i (range 0 (.getCount multipart))] (doall (create-body-part (.getBodyPart multipart i) message))))
-
-;; TODO remove duplication with parser.clj
-(defn uuid [^String name] (str (java.util.UUID/nameUUIDFromBytes (.getBytes name))))
-
-(defmulti create-participant (fn [address _ _] (type address)))
-
-(defmethod create-participant InternetAddress [^InternetAddress address contact-type message-id]
-  (let [name (.getPersonal address)
-        address (.getAddress address)
-        contact-key (uuid (str name address))]
-    (new Participant address name contact-key contact-type message-id)))
-
-(defn create-participants [^IMAPMessage message]
-  (let [sender (.getSender message)
-        message-id (.getMessageID message)
-        sender-participant (create-participant sender :sender message-id)
-        recipient-participants (mapv (fn [address] (create-participant address :receiver message-id)) (.getRecipients message Message$RecipientType/TO))
-        cc-participants (mapv (fn [address] (create-participant address :cc message-id)) (.getRecipients message Message$RecipientType/CC))
-        bcc-participants (mapv (fn [address] (create-participant address :cc message-id)) (.getRecipients message Message$RecipientType/BCC))]
-    (flatten [sender-participant recipient-participants cc-participants bcc-participants])))
-
-(defn message->email [^IMAPMessage message]
-  (new Email
-       (create-header message)
-       (flatten [(create-body-part (.getContent message) message)])
-       (create-participants message)))
-
-;; Calls
-
-(defn capability-name [^IMAPStore store ^String cap-name]
-  (when (.hasCapability store cap-name)
-    (keyword (clojure.string/lower-case cap-name))))
-
-(defn capabilities [^Store store]
-  (filterv some? (mapv #(capability-name store %) ["MOVE"])))
-
-(defn start-idling-for-id [id]
-  (let [^ConnectionData connection-data (connection-data-from-id id)]
-    (t/log! :debug ["Starting to idle for id:" id "using connection-data" connection-data])
-    (.watch ^IdleManager (.idle-manager connection-data) (.folder connection-data))))
-
-(defn message-count-listener [connection-id folder folder-name context]
-  (proxy [MessageCountAdapter] []
-    (messagesAdded [^MessageCountEvent event]
-      (t/log! :debug "Received new message event.")
-      (doseq [message ^IMAPMessage (.getMessages event)]
-        (t/log! :debug ["Processing message:" message])
-        (.setPeek ^IMAPMessage message true)
-        (let [parsed-email (message->email message)
-              process (app/handle-incoming-imap-email parsed-email
-                                                      {:connection-id connection-id :origin-folder folder :message message :move? true}
-                                                      context)]
-          (if (= :error (:result process))
-            (t/log! :error ["An error occured while handling incoming message" (:exception process)])
-            (t/log! :info ["The email with subject" (-> parsed-email :header :subject) "was handled successfully"])))
-        (let [conn-data ^ConnectionData (connection-data-from-id connection-id)]
-          (t/log! :debug ["Idling on the folder" folder-name "while waiting for new messages."])
-          (.watch ^IdleManager (.idle-manager conn-data) (.folder conn-data)))))))
-
-(defn open-folder-in-store [^Store store ^String folder-name]
-  (let [folder ^IMAPFolder (.getFolder store folder-name)]
-    (when (not (.isOpen folder))
-      (.open folder Folder/READ_WRITE))
-    folder))
-
-(defn copy-message [^Message message ^Folder source-folder ^Folder target-folder]
-  (try
-    (.setPeek ^IMAPMessage message true)
-    (.copyMessages source-folder (into-array Message [message]) target-folder)
-    (t/log! :debug ["Copied" message])
-    (.setFlag message Flags$Flag/DELETED true)
-    (t/log! :debug ["Set DELETED flag for" message])
-    (.expunge source-folder)
-    (t/log! :debug ["Expunged source folder"])
-    (catch Exception e (t/log! {:level :error :error e} ["There was an error copying and deleting the message" message]))))
-
-(defn inbox-or-category-folder-name [^Store store ^String folder-name default]
-  (let [real-default (if (s/blank? default) "INBOX" default)]
-    (if (nil? folder-name) real-default (structured-folder-name store folder-name))))
-
-(defn move-message
-  "Find the proper location for the email and move it there. Returns the name of the folder to which the email was moved."
-  [connection-id ^Message message ^Folder source-folder ^String target-name]
-  (let [connection-data (connection-data-from-id connection-id)
-        store (:store connection-data)
-        capabilities ^PersistentVector (:capabilities connection-data)
-        structured-folder (inbox-or-category-folder-name store target-name (-> connection-data :config :folder))
-        target-folder ^IMAPFolder (.getFolder ^Store store ^String structured-folder)]
-    (if (.contains capabilities :move)
-      (do (t/log! :debug ["Moving message from" source-folder "to" target-folder])
-          (.setPeek ^IMAPMessage message true)
-          (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder)
-          structured-folder)
-      (do (t/log! :debug "Server does not support the IMAP MOVE command. Using copy and delete as fallback.")
-          (copy-message message source-folder target-folder)
-          structured-folder))))
-
-(defn monitor->map [monitor]
-  (if (nil? monitor)
-    {:connected false :folder-open false}
-    (let [store ^Store (-> monitor :store)
-          folder ^IMAPFolder (-> monitor :folder)]
-      {:connected (.isConnected ^Store store)
-       :folder-open    (.isOpen ^IMAPFolder folder)})))
-
-(defn folders-in-store [^Store store]
-  (.list (.getDefaultFolder store) "*"))
-
-(defn connected? [^ConnectionData connection-data] (.isConnected ^Store (:store connection-data)))
-
-(defn- set-message-as-peek [^IMAPMessage message] (.setPeek message true))
-
-(defn- set-messages-as-peek [messages] (doseq [message messages] (set-message-as-peek message)))
-
-(defn move-messages-by-id-between-category-folders
-  "Return true if the message could be moved. False if not."
-  [^String id message-id ^String source-name ^String target-name context]
-  (let [^ConnectionData connection-data (connection-data-from-id id)]
-    (if (connected? connection-data)
-      (let [^Store store (:store connection-data)
-            ^String source-folder-name (inbox-or-category-folder-name store source-name (-> connection-data :config :folder))
-            ^String target-folder-name (inbox-or-category-folder-name store target-name (-> connection-data :config :folder))]
-        (with-open [^IMAPFolder target-folder (open-folder-in-store store target-folder-name)
-                    ^IMAPFolder source-folder (open-folder-in-store store source-folder-name)]
-          (let [found-messages (.search source-folder (MessageIDTerm. message-id))]
-            (t/log! :debug ["Found" (count found-messages) "messages when searched for the message-id:" message-id])
-            (if (some? (seq found-messages))
-              (if (= target-folder-name (:folder (:config connection-data)))
-                (do
-                  (stop-monitoring connection-data)
-                  (set-messages-as-peek found-messages)
-                  (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
-                  (.moveMessages source-folder (into-array Message found-messages) target-folder)
-                  (start-monitoring connection-data context)
-                  true)
-                (do
-                  (set-messages-as-peek found-messages)
-                  (t/log! :debug ["Moving e-mail from" source-folder-name "to" target-folder-name])
-                  (.moveMessages source-folder (into-array Message found-messages) target-folder)
-                  true))
-              (do (t/log! :info ["No messages found in" source-folder-name "in store" (.getURLName store)])
-                  false)))))
-      (do
-        (t/log! :info ["IMAP store in connection" (:id (:config connection-data)) "is not connected. Cancelling the move attempt."])
-        false))))
-
-(defn refresh-access-token [connection-config]
-  (let [provider (db/get-auth-provider (:auth-provider connection-config))
-        token-data (db/get-oauth-tokens (:id connection-config))
-        new-access-token (try (oauth/exchange-refresh-token-for-access-token provider (:refresh-token token-data)) (catch Exception e (t/log! :error e)))]
-    (if (some? new-access-token)
-      (db/update-access-token (:id connection-config) new-access-token)
-      (do (t/log! :info ["Data for new access token was nil. Deleting the access token data in the database. The user will need to log in manually again."])
-          (db/delete-access-token (:id connection-config))))))
-
-(defn monitor-folder-name [folder-name]
-  (if (or (nil? folder-name) (s/blank? folder-name)) "INBOX" folder-name))
-
-;; Public Interface
-
-(defn construct-connection-data [connection-config context]
-  (let [idle-manager (IdleManager. (config->session connection-config) (Executors/newCachedThreadPool))
-        store (login connection-config)
-        id (:id connection-config)
-        folder-name-to-monitor (monitor-folder-name (:folder connection-config))
-        folder (open-folder-in-store store folder-name-to-monitor)
-        listener (message-count-listener id folder folder-name-to-monitor context)
-        connection-data (->ConnectionData connection-config store folder idle-manager (capabilities store) listener)]
-    (add-to-connections connection-data)
-    connection-data))
-
-(defn disconnect [^AutoCloseable connection-data] (.close connection-data))
-
-(defn disconnect-all [] (doseq [connection (vals @connections)] (disconnect connection)))
-
-(defn reconnect [^ConnectionData connection-data]
-  (try
-    (t/log! :info ["Trying to reconnect to" (-> connection-data .config :host) "as" (-> connection-data .config :user)])
-    (when (oauth2? (.config connection-data)) (refresh-access-token (.config connection-data)))
-    (login (.config connection-data) (.store connection-data))
-    (catch AuthenticationFailedException e (t/log! :error e))))
-
-(defn start-monitoring [connection-data context]
-  (try
-    (.addMessageCountListener ^IMAPFolder (:folder connection-data) (message-count-listener (:id (:config connection-data)) (:folder connection-data) (-> connection-data :config :folder) context))
-    (t/log! :info ["Started monitoring for" (:folder (:config connection-data)) "in" (.getURLName ^Store (:store connection-data))])
-    (.watch ^IdleManager (:idle-manager connection-data) ^Folder (:folder connection-data))
-    (catch Exception e
-      (t/log! {:level :error :error e} (.getMessage e))))
-  connection-data)
-
-(defn stop-monitoring [connection-data]
-  (t/log! :info ["Removing message count listener from folder" (-> connection-data :config :folder)])
-  (let [connection-id (:id (:config connection-data))
-        sf ^ScheduledFuture (get @health-checks connection-id)]
-    (when (some? sf) (.cancel sf true)))
-  (.removeMessageCountListener ^IMAPFolder (:folder connection-data) (:message-count-listener connection-data))
-  connection-data)
-
-(defn create-category-folders!
-  "Creates folders for the selected categories. Checks if the connection is still intact. Does nothing, if the connection is not intact."
-  [connection-data categories]
-  (if (connected? connection-data)
-    (do (t/log! :info ["Creating directories from category names" categories])
-        (let [result (create-folders (:store connection-data) categories)]
-          (t/log! {:level :info
-                   :data  {:result result}}
-                  "Created the directories.")))
-    (t/log! :info "Could not create directories on the IMAP server: The store is not connected."))
-  connection-data)
-
-(defn schedule-health-checks [^ConnectionData connection-data]
-  (let [^Store store (:store connection-data)
-        ^Folder folder (:folder connection-data)
-        config (:config connection-data)
-        scheduled-future (.scheduleAtFixedRate ^ScheduledExecutorService executor-service
-                                               #(do
-                                                  (try
-                                                    (t/log! :debug ["Checking if the connection for" (:user config) "is open"])
-                                                    (if (.isConnected store)
-                                                      (t/log! :debug "Store is still connected.")
-                                                      (do
-                                                        (t/log! :warn "Connection lost. Reconnecting to email server...")
-                                                        (reconnect connection-data)))
-                                                    (t/log! :debug ["Checking if the folder " (:folder config) "is open"])
-                                                    (if (.isOpen folder)
-                                                      (t/log! :debug "Folder is still open.")
-                                                      (do (t/log! :info "Folder is closed. Opening it again.")
-                                                          (.open folder Folder/READ_WRITE)))
-                                                    (t/log! :debug "Idling and waiting for messages after a health check.")
-                                                    (start-idling-for-id (:id config))
-                                                    (catch Exception e
-                                                      (t/log! {:level :error :error e} "There was an error during health check. The connection is probably in a broken state."))))
-                                               120 (p/client-health-check-interval) TimeUnit/SECONDS)]
-    (swap-new-period-check (:id config) scheduled-future)
-    connection-data))
-
-(defn folder-from-connection [connection-data folder-name]
-  (let [^Store store (:store connection-data)]
-    (open-folder-in-store store folder-name)))
-
-(defn id-from-connection [connection-data] (get-in connection-data [:config :id]))
-
-(defmulti connect (fn [config _] (:auth-type config)))
-
-(defmethod connect "oauth2" [connection-config context]
-  (refresh-access-token connection-config)
-  (try (-> (construct-connection-data connection-config context)
-           (start-monitoring context)
-           schedule-health-checks)
-       (catch AuthenticationFailedException e (t/log! :error e))))
-
-(defmethod connect :default [connection-config context]
-  (-> (construct-connection-data connection-config context)
-      (start-monitoring context)
-      schedule-health-checks))
-
-(defn connection-id-for-email
-  "Tries to find out the id of the connection the email belongs to. Returns nil if no active connection is found."
-  [connection-data-vec email]
-  (loop  [connections connection-data-vec
-          result nil]
-    (if (or (some? result) (nil? (seq connections)))
-      result
-      (let [^ConnectionData connection (first connections)
-            recipients (filterv #(= :receiver (:type %)) (:participants email))
-            connection-user (get-in connection [:config :user])
-            match (get (filterv (fn [sender] (= (:address sender) connection-user)) recipients) 0)]
-        (if (some? match) (recur (rest connections) (get-in connection [:config :id])) (recur (rest connections) nil))))))
-
-(defrecord ImapClient []
-  int/EmailClient
-  (start-monitor [_ config context] (connect config context))
-  (connections [_] @connections)
-  (create-category-directories! [_ connection-data category-names] (create-category-folders! connection-data category-names))
-  (connection-id-for-email [_ connections email] (connection-id-for-email connections email))
-  (move-email-between-categories [_ connection-id message-id old-category new-category context] (move-messages-by-id-between-category-folders connection-id message-id old-category new-category context))
-  (move-email-to-category [_ connection-id message original-folder category] (move-message connection-id message original-folder category))
-  (number-of-messages-in-folder [_ connection-data folder-name]
-    (let [folder ^Folder (folder-from-connection  connection-data folder-name)]
-      {:message-count (.getMessageCount folder)
-       :connection-id (id-from-connection connection-data)
-       :folder folder}))
-  (nth-email-from-folder [_ n folder]
-    (let [message (.getMessage ^IMAPFolder folder n)]
-      (set-message-as-peek message)
-      (t/log! :debug ["Reading message number" n "from" (.getName ^IMAPFolder folder)])
-      {:email (message->email message)
-       :message message})))
+(defn restart-connection
+  "Returns true if it was successful or false"
+  [id]
+  (let [connection ^plauna.interfaces.IMAPConnection (get-connection id)]
+                                         (.disconnect-and-stop-monitoring connection)
+                                         (let [[v c] (async/alts!! [(:notification-channel connection)
+                                                                    (async/timeout 5000)])]
+                                           (t/log! :info ["Reconnect operation returned" v "from the channel" c])
+                                           (if (= c (:notification-channel connection))
+                                             (do (.connect connection)
+                                                 true)
+                                             false))))

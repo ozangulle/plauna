@@ -2,6 +2,7 @@
   (:require [clojure.java.io]
             [clojure.walk :refer [postwalk]]
             [plauna.files :as files]
+            [plauna.core.common-records :as records]
             [plauna.util.async :as async-utils]
             [plauna.core.email :as core.email]
             [clojure.string :as string]
@@ -94,8 +95,8 @@
     (jdbc/execute! (jdbc/get-connection (db))
                    (->> (builder/for-insert-multi
                          :metadata
-                         [:message_id :language :language_confidence :category :category_confidence]
-                         (mapv (juxt :message-id :language :language-confidence :category-id :category-confidence) metadata) {})
+                         [:message_id :language :language_confidence :category :category_confidence :connection_id]
+                         (mapv (juxt :message-id :language :language-confidence :category-id :category-confidence :connection-id) metadata) {})
                         (insert->insert-update))
                    {:batch true})))
 
@@ -149,7 +150,7 @@
   {:yearly [:strftime "%Y" [:datetime :date "unixepoch"]]
    :monthly [:strftime "%Y-%m" [:datetime :date "unixepoch"]]})
 
-(defn update-metadata [message_id category cat-confidence language lang-confidence]
+(defn update-metadata [message_id category cat-confidence language lang-confidence connection-id]
   (jdbc/execute! (ds) (-> (insert-into :metadata)
                           (values [{:message_id          message_id
                                     :category            category
@@ -157,14 +158,16 @@
                                     :category_confidence cat-confidence
                                     :language            language
                                     :language_modified   [:strftime "%s" "now"]
-                                    :language_confidence lang-confidence}])
+                                    :language_confidence lang-confidence
+                                    :connection-id       connection-id}])
                           (upsert (-> (on-conflict :message_id)
                                       (do-update-set :category
                                                      :category_modified
                                                      :category_confidence
                                                      :language
                                                      :language_modified
-                                                     :language_confidence)))
+                                                     :language_confidence
+                                                     :connection_id)))
                           (honey/format))))
 
 (defn update-metadata-category [message_id category confidence]
@@ -257,13 +260,13 @@
 
 (defn fetch-headers [entity-clause sql-clause] (jdbc/execute! (ds) (data->sql entity-clause sql-clause) builder-function-kebab))
 
-(defn fetch-metadata [message-id] (jdbc/execute-one! (ds) ["SELECT message_id, language, language_modified, language_confidence, metadata.category AS category_id, category_modified, category_confidence, categories.name AS category FROM metadata LEFT JOIN categories ON metadata.category = categories.id WHERE metadata.message_id = ?" message-id] builder-function-kebab))
+(defn fetch-metadata [message-id] (jdbc/execute-one! (ds) ["SELECT message_id, language, language_modified, language_confidence, metadata.category AS category_id, category_modified, category_confidence, categories.name AS category, connection_id FROM metadata LEFT JOIN categories ON metadata.category = categories.id WHERE metadata.message_id = ?" message-id] builder-function-kebab))
 
 (defn fetch-bodies [message-id] (jdbc/execute! (ds) ["SELECT * FROM bodies WHERE message_id = ?" message-id] builder-function-kebab))
 
 (defn fetch-participants [message-id] (jdbc/execute! (ds) ["SELECT * FROM communications LEFT JOIN contacts ON contacts.contact_key = communications.contact_key WHERE message_id = ? " message-id] builder-function-kebab))
 
-(defn db->metadata [db-metadata] (apply core.email/->Metadata ((juxt :message-id :language :language-modified :language-confidence :category :category-id :category-modified :category-confidence) db-metadata)))
+(defn db->metadata [db-metadata] (apply core.email/->Metadata ((juxt :message-id :language :language-modified :language-confidence :category :category-id :category-modified :category-confidence :connection-id) db-metadata)))
 
 (defn related-data-to-header [header]
   (let [message-id (:message-id header)
@@ -329,7 +332,7 @@
     (when (some? result) (:value result))))
 
 (defn db-connection->model [db-conn]
-  (apply (comp core.email/map->ImapConnection
+  (apply (comp records/map->ImapConnection
                (fn [conn] (update conn :check-ssl-certs #(= % 1)))
                (fn [conn] (update conn :debug #(= % 1)))) [db-conn]))
 

@@ -6,27 +6,37 @@
 
 (t/set-ns-filter! {:disallow "plauna.*"})
 
+(defn fake-connection-with-config [config]
+  (defrecord TestConnection [config] int/IMAPConnection
+             (connect [_])
+             (monitor-folders [_]))
+  (->TestConnection config))
+
 (deftest basic-auth
   (let [database (reify int/DB (fetch-connection [_ id] {:id id :auth-type "basic"}))
-        client (reify int/EmailClient (start-monitor [_ config context]))
-        context {:db database :client client}]
-    (is (= {:result :ok} (app/connect-to-client context "abc"))  "Basic authentication calls email-client's login method and returns ok")))
+        connection (reify int/IMAPConnection
+                     (connect [_])
+                     (monitor-folders [_]))
+        context {:db database :client connection}]
+    (is (= {:result :ok} (app/connect-to-client connection context))  "Basic authentication calls email-client's login method and returns ok")))
 
 (deftest basic-auth-2
   (let [database (reify int/DB (fetch-connection [_ id] {:id id}))
-        client (reify int/EmailClient (start-monitor [_ config context]))
-        context {:db database :client client}]
-    (is (= {:result :ok} (app/connect-to-client context "abc"))  "If no auth-type is defined, fall back on basic auth and return ok")))
+        connection (reify int/IMAPConnection
+                     (connect [_])
+                     (monitor-folders [_]))
+        context {:db database :client connection}]
+    (is (= {:result :ok} (app/connect-to-client connection context))  "If no auth-type is defined, fall back on basic auth and return ok")))
 
 (deftest oauth2-auth
   (let [database (reify int/DB
                    (fetch-connection [_ id] {:id id :auth-type "oauth2" :auth-provider 2})
                    (fetch-oauth-token-data [_ id] nil)
                    (fetch-auth-provider [_ id] {:id id}))
-        client (reify int/EmailClient (start-monitor [_ config context]))
-        context {:db database :client client}]
+        connection (fake-connection-with-config {:auth-type "oauth2" :auth-provider 2})
+        context {:db database :client connection}]
     (is (= {:result :redirect, :provider {:id 2}}
-           (app/connect-to-client context "abc"))
+           (app/connect-to-client connection context))
         "auth-type 'oauth2' with auth provider but no token data returns a :redirect with the provider")))
 
 (deftest oauth2-auth-2
@@ -34,10 +44,10 @@
                    (fetch-connection [_ id] {:id id :auth-type "oauth2" :auth-provider 2})
                    (fetch-oauth-token-data [_ id] {:access-token "not empty" :refresh-token "not empty"})
                    (fetch-auth-provider [_ id] {:id id}))
-        client (reify int/EmailClient (start-monitor [_ config context]))
-        context {:db database :client client}]
+        connection (fake-connection-with-config {:auth-type "oauth2" :auth-provider 2})
+        context {:db database :client connection}]
     (is (= {:result :ok}
-           (app/connect-to-client context "abc"))
+           (app/connect-to-client connection context))
         "auth-type 'oauth2' with auth provider and token data calls client login and returns ok")))
 
 (deftest oauth2-auth-3
@@ -45,20 +55,20 @@
                    (fetch-connection [_ id] {:id id :auth-type "oauth2" :auth-provider 2})
                    (fetch-oauth-token-data [_ id] nil)
                    (fetch-auth-provider [_ id] nil))
-        client (reify int/EmailClient (start-monitor [_ config context]))
-        context {:db database :client client}]
-    (is (= :error (:result (app/connect-to-client context "abc"))))
-    "auth-type 'oauth2' with no auth provider returns an errorq"))
+        connection (fake-connection-with-config {:auth-type "oauth2" :auth-provider 2})
+        context {:db database :client connection}]
+    (is (= :error (:result (app/connect-to-client connection context))))
+    "auth-type 'oauth2' with no auth provider returns an error"))
 
 (deftest oauth2-auth-4
   (let [database (reify int/DB
                    (fetch-connection [_ id] {:id id :auth-type "oauth2" :auth-provider 2})
                    (fetch-oauth-token-data [_ id] {:access-token "not empty"})
                    (fetch-auth-provider [_ id] {:id id}))
-        client (reify int/EmailClient (start-monitor [_ config context]))
-        context {:db database :client client}]
+        connection (fake-connection-with-config {:auth-type "oauth2" :auth-provider 2})
+        context {:db database :client connection}]
     (is (= {:result :redirect, :provider {:id 2}}
-           (app/connect-to-client context "abc"))
+           (app/connect-to-client connection context))
         "auth-type 'oauth2' with auth provider and access token but no refresh token calls client login and returns ok")))
 
 (deftest emails-query-filter-wo-search
@@ -106,92 +116,3 @@
     (is (= true @db-called))
     (is (= true @client-called)))
   "Creating a new category makes correct database and client calls")
-
-(deftest move-email-without-connections
-  (let [client (reify int/EmailClient
-                 (connections [_] {})
-                 (connection-id-for-email [_ _ _] nil))
-        test-result (app/move-email-to-category {} "test" {:client client})]
-    (is (= :error (:result test-result))))
-  "If there are no connections, just moving email returns an error result.")
-
-(deftest move-email-with-guessed-connection-id-success
-  (let [client (reify int/EmailClient
-                 (connections [_] {"test" {}})
-                 (connection-id-for-email [_ _ _] "test")
-                 (move-email-between-categories [_ _ _ _ _ _] true))
-        test-result (app/move-email-to-category {} "test-cat" {:client client})]
-    (is (= :ok (:result test-result))))
-  "Successfully moving an email with a guessed connection id returns result :ok")
-
-(deftest move-email-with-guessed-connection-id-error
-  (let [client (reify int/EmailClient
-                 (connections [_] {"test" {}})
-                 (connection-id-for-email [_ _ _] "test")
-                 (move-email-between-categories [_ _ _ _ _ _] false))
-        test-result (app/move-email-to-category {} "test-cat" {:client client})]
-    (is (= :error (:result test-result))))
-  "Unsuccessfully moving an email with a guessed connection id returns result :error")
-
-(deftest move-email-without-guessed-connection-id-success
-  (let [client (reify int/EmailClient
-                 (connections [_] {"test1" {:config {:id "test1"}} "test2" {:config {:id "test2"}}})
-                 (connection-id-for-email [_ _ _] nil)
-                 (move-email-between-categories [_ id _ _ _ _] (= id "test2")))
-        test-result (app/move-email-to-category {} "test-cat" {:client client})]
-    (is (= :ok (:result test-result))))
-  "Successfully moving an email without guessed connection id returns result :ok even if the process failed in some other connection.")
-
-(deftest move-email-without-guessed-connection-id-error
-  (let [client (reify int/EmailClient
-                 (connections [_] {"test1" {:config {:id "test1"}} "test2" {:config {:id "test2"}}})
-                 (connection-id-for-email [_ _ _] nil)
-                 (move-email-between-categories [_ id _ _ _ _] (= id "test3")))
-        test-result (app/move-email-to-category {} "test-cat" {:client client})]
-    (is (= :error (:result test-result))))
-  "Unsuccessfully moving an email without guessed connection id returns result :error")
-
-(deftest handle-incoming-email-analyzer-exception
-  (let [analyzer (reify int/Analyzer (enrich-email [_ _] (throw (ex-info "test exception" {}))))
-        test-result (app/handle-incoming-imap-email {} {} {:analyzer analyzer})]
-    (is (= :error (:result test-result))))
-  "Return an error result if something goes wrong with the analyzer")
-
-(deftest handle-incoming-email-db-exception
-  (let [analyzer (reify int/Analyzer (enrich-email [_ _] "test"))
-        db (reify int/DB (save-email [_ _] (throw (ex-info "test exception" {}))))
-        test-result (app/handle-incoming-imap-email {} {} {:analyzer analyzer :db db})]
-    (is (= :error (:result test-result))))
-  "Return an error result of something goes wrong with the database")
-
-(deftest handle-incoming-email-client-exception
-  (let [analyzer (reify int/Analyzer (enrich-email [_ _] {:metadata {:category "test"}}))
-        db (reify int/DB (save-email [_ _] true))
-        client (reify int/EmailClient (move-email-to-category [_ _ _ _ _] (throw (ex-info "test exception" {}))))
-        test-result (app/handle-incoming-imap-email {} {:move? true} {:analyzer analyzer :db db :client client})]
-    (is (= :error (:result test-result))))
-  "Return error if move=true and something goes wrong in the client")
-
-(deftest handle-incoming-email-client-exception-move-false
-  (let [analyzer (reify int/Analyzer (enrich-email [_ _] {:metadata {:category "test"}}))
-        db (reify int/DB (save-email [_ _] true))
-        client (reify int/EmailClient (move-email-to-category [_ _ _ _ _] (throw (ex-info "test exception" {}))))
-        test-result (app/handle-incoming-imap-email {} {:move? false} {:analyzer analyzer :db db :client client})]
-    (is (= :ok (:result test-result))))
-  "Client is not called if move=false")
-
-(deftest handle-incoming-email-client-exception-move-true
-  (let [analyzer (reify int/Analyzer (enrich-email [_ _] {:metadata {:category nil}}))
-        db (reify int/DB (save-email [_ _] true))
-        client (reify int/EmailClient (move-email-to-category [_ _ _ _ _] (throw (ex-info "test exception" {}))))
-        test-result (app/handle-incoming-imap-email {} {:move? true} {:analyzer analyzer :db db :client client})]
-    (is (= :ok (:result test-result))))
-  "Client is not called if move=true but not category")
-
-(deftest handle-incoming-email-happy-path
-  (let [analyzer (reify int/Analyzer (enrich-email [_ _] {:metadata {:category "test"}}))
-        db (reify int/DB (save-email [_ _] true))
-        client (reify int/EmailClient (move-email-to-category [_ _ _ _ _] true))
-        test-result (app/handle-incoming-imap-email {} {:move? true} {:analyzer analyzer :db db :client client})]
-    (is (= :ok (:result test-result))))
-  "Happy path. All underlying functions are called normally. Return an :ok result.")

@@ -9,10 +9,14 @@
    [react-router-dom :as rr]
    [reagent.core :as r]
    [ui.backend :as backend]
+   [ui.components :as comps]
    [ui.inputs :as inputs]
-   [ui.utils :as utils]))
+   [ui.utils :as utils]
+   [ui.macros :refer-macros [backend-call]]))
 
 (def email-data (r/atom {}))
+
+(def connections (r/atom []))
 
 (def move-email (r/atom true))
 
@@ -22,6 +26,8 @@
   ([id loading?] (backend/fetch-email-data id (fn [response] (reset! email-data (:body response)) (reset! loading? false))))
   ([id] (backend/fetch-email-data (js/btoa id) (fn [response] (reset! email-data (:body response))))))
 
+(defn fetch-connections [] (backend/fetch-connections (fn [res] (reset! connections (:body res)))))
+
 (defn update-key [keys-val-pairs]
   (swap! email-data
          (fn [old-data]
@@ -29,14 +35,20 @@
              (assoc old-data :data result))))
   (:data @email-data))
 
-(defn save-metadata [email move?] (backend/save-metadata-for-email email move?))
+(defn save-metadata [email move? on-success]
+  (backend-call
+   {:backend (backend/save-metadata-for-email email move?)
+    :on-success on-success
+    :on-error (fn [body]
+                (comps/show-snackbar (:message body) :warning nil)
+                (fetch-email (ce/message-id email)))}))
 
 (defn category-update-handler [_]
   (fn [event] (update-key [[[:metadata :category-id] (event-val event)]
                            [[:metadata :category] (->> (:categories (:optional @email-data)) (filter #(= (event-val event) (:id %))) first :name)]
                            [[:metadata :category-confidence] 1]])))
 
-(defn category-debouncer [] (fn [email] (take! (save-metadata email @move-email) (fn [_] (fetch-email (ce/message-id email))))))
+(defn category-debouncer [] (fn [email] (save-metadata email @move-email (fn [_] (fetch-email (ce/message-id email))))))
 
 (defn body-part->html [body-part]
   (let [value (r/atom "0")
@@ -103,6 +115,7 @@
         id (get (js->clj params) "id")]
     (r/with-let [loading? (r/atom true)]
       (when @loading?
+        (fetch-connections)
         (fetch-email id loading?))
       (if @loading?
         [:> material/LinearProgress {:aria-label "Loading…"}]
@@ -137,10 +150,18 @@
              [:> material/Paper
               [:> material/List
                [:> material/ListItem
+                (inputs/select-input email
+                                     "Connection"
+                                     (filter (fn [x] (= (-> email :metadata :connection-id) (:id x))))
+                                     [(fn [x] (:id x)) (fn [x] (str (:user x) "@" (:host x)))]
+                                     @connections
+                                     (fn [email] (save-metadata email false (fn [_] (fetch-email (ce/message-id email)))))
+                                     (fn [event] (update-key [[[:metadata :connection-id] (event-val event)]])))]
+               [:> material/ListItem
                 [:f> inputs/debounced-input
                  (get-in email [:metadata :language])
                  "Language"
-                 (fn [mail] (save-metadata (:data mail) false))
+                 (fn [mail] (save-metadata (:data mail) false (fn [_])))
                  (fn [new-value]
                    (swap! email-data assoc-in [:data :metadata :language] new-value)
                    (swap! email-data assoc-in [:data :metadata :language-confidence] 1))]]
@@ -162,8 +183,8 @@
                 [:> material/FormControlLabel {:label "Move this email after update"
                                                :control (r/create-element material/Checkbox
                                                                           #js
-                                                                           {:checked @move-email
-                                                                            :onChange (fn [_ new] (reset! move-email new))
-                                                                            :label "Test"})}]]]]]]
+                                                                          {:checked @move-email
+                                                                           :onChange (fn [_ new] (reset! move-email new))
+                                                                           :label "Test"})}]]]]]]
            [:h3 "Content(s)"]
            (into [:<>] (contents (:body email)))])))))

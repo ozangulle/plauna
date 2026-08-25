@@ -1,7 +1,8 @@
 (ns ui.backend
   (:require
    [cljs-http.client :as http]
-   [cljs.core.async :refer [take!]]))
+   [cljs.core.async :refer [take!]]
+   [ui.components :as comps]))
 
 (defn serialize [val] (js/JSON.stringify (clj->js val)))
 
