@@ -83,7 +83,7 @@
                              {:disconnect-fn (fn [] (reset! called-disconnect true))
                               :connected-fn (fn [] (reset! called-connected true) true)
                               :get-folder-fn (fn [_] folder)}))]
-        (let [config {:id "test-id" :auth-type "oauth2" :host "test-host.com" :user "test-user" :secret "test-secret"}
+        (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
               context {}
               connection (sut/create-connection config context)]
           (.connect connection)
@@ -292,5 +292,6 @@
           (.connect connection)
           (.monitor-folders connection)
           (Thread/sleep 70)
-          (t/is (= 2 @get-folder-called))
+          (t/is (= 2 @folder-open-calls))
+          (t/is (= 1 @get-folder-called))
           (.disconnect-and-stop-monitoring connection))))))

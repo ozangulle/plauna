@@ -215,7 +215,7 @@
             (do (t/log! :debug [(.getName folder) "is open"])
                 (watch-folder connection folder))
             (try
-              (open-folder-in-store store (.getName folder))
+              (.open folder Folder/READ_WRITE)
               (watch-folder connection folder)
               (catch java.lang.Exception ex
                 (t/log! :error ex)
