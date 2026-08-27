@@ -26,12 +26,12 @@
 
 (defonce parent-folder-name "Categories")
 
+(def health-check-interval 60000)
+
 (defn folder-separator [^Store store] (.getSeparator (.getDefaultFolder store)))
 
 (defn structured-folder-name [store lower-case-folder-name]
   (str parent-folder-name (folder-separator store) (s/capitalize lower-case-folder-name)))
-
-(defn- notify-listeners [connection message] (async/put! (:notification-channel connection) message))
 
 (defn- connection-config->store [connection-config]
   (let [session ^Session (session/config->session connection-config)]
@@ -72,6 +72,16 @@
       (do (t/log! :info ["Data for new access token was nil. Deleting the access token data in the database. The user will need to log in manually again."])
           (db/delete-access-token (:id connection-config))))))
 
+(defonce state-types {:store Store})
+
+(defmacro get-state
+  [connection key]
+  (let [tag (get state-types key)
+        form `(get (deref (get ~connection :state)) ~key)]
+    (with-meta form
+      (merge (meta form)
+             {:tag tag}))))
+
 (defmulti connect-imap (fn [connection] (-> connection :config :auth-type)))
 
 (defmethod connect-imap "oauth2" [connection]
@@ -80,22 +90,20 @@
     (let [{:keys [db]} (:context connection)
           connection-config (:config connection)
           tokens (int/fetch-oauth-token-data db (:id connection-config))]
-      (.connect (:store connection) (:host connection-config) (:user connection-config) (:access-token tokens)))
+      (.connect (get-state connection :store) (:host connection-config) (:user connection-config) (:access-token tokens)))
        (catch AuthenticationFailedException e
          (t/log! :error e))
        (catch Exception e
-         (t/log! :error e)
-         (async/put! (:notification-channel connection) :timeout))))
+         (t/log! :error e))))
 
 (defmethod connect-imap :default [connection]
   (try
     (let [connection-config (:config connection)]
-      (.connect (:store connection) (:host connection-config) (:user connection-config) (:secret connection-config)))
+      (.connect (get-state connection :store) (:host connection-config) (:user connection-config) (:secret connection-config)))
     (catch AuthenticationFailedException e
       (t/log! :error e))
     (catch Exception e
-      (t/log! :error e)
-      (async/put! (:notification-channel connection) :timeout))))
+      (t/log! :error e))))
 
 (defn copy-message [^Message message ^Folder source-folder ^Folder target-folder]
   (try
@@ -115,8 +123,8 @@
 (defn move-message-from-folder-to-folder-name
   "Find the proper location for the email and move it there. Returns the name of the folder to which the email was moved."
   [connection ^Message message ^Folder source-folder ^String target-name]
-  (let [store (:store connection)
-        capabilities ^PersistentVector (capabilities (:store connection))
+  (let [store (get-state connection :store)
+        capabilities ^PersistentVector (capabilities store)
         structured-folder (inbox-or-category-folder-name store target-name "")
         target-folder ^IMAPFolder (.getFolder ^Store store ^String structured-folder)]
     (if (.contains capabilities :move)
@@ -161,11 +169,25 @@
                   (t/log! :debug ["Email" (core-email/message-id parsed-email) "was not categorized. Not moving the message."])))))
           (finally (watch-folder connection imap-folder)))))))
 
-(defn- store-disconnect-handler [message-chan]
-  (proxy [ConnectionAdapter] []
-    (disconnected [_]
-      (t/log! :info "Store disconnected event received")
-      (async/put! message-chan :store-disconnect))))
+(defn- remove-all-folder-listeners [folder-listener-pairs]
+  (doseq [pair folder-listener-pairs]
+    (let [folder ^IMAPFolder (first pair)
+          listener ^MessageCountAdapter (second pair)]
+      (.removeFolderListener folder listener))))
+
+(defn stop-health-checks [connection]
+  (when-let [health-chan (get-state connection :health-chan)]
+    (async/close! health-chan)))
+
+(defn- close-and-clean-up [connection]
+  (stop-health-checks connection)
+  (remove-all-folder-listeners (get-state connection :folder-listener-pairs))
+  (.close (get-state connection :store)))
+
+(defn- restart-monitoring [connection]
+  (close-and-clean-up connection)
+  (.connect connection)
+  (.monitor-folders connection))
 
 (defn- folders->folder-message-count-listeners
   "Registers a MessageCountListener on the folder.
@@ -174,47 +196,39 @@
   (doall
    (try
      (for [folder (:folders connection)]
-       (let [imap-folder ^IMAPFolder (open-folder-in-store (:store connection) (:name folder))
+       (let [imap-folder ^IMAPFolder (open-folder-in-store (get-state connection :store) (:name folder))
              folder-listener (.addMessageCountListener ^IMAPFolder imap-folder (message-count-listener imap-folder connection))]
-         (t/log! :info ["Started monitoring for" (:name folder) "in" (.getURLName ^Store (:store connection))])
+         (t/log! :info ["Started monitoring for" (:name folder) "in" (.getURLName (get-state connection :store))])
          (watch-folder connection imap-folder)
          [imap-folder folder-listener]))
-     (catch jakarta.mail.MessagingException e
-       (t/log! :error e)
-       (notify-listeners connection :disconnected))
      (catch Exception e
        (t/log! :error e)
-       (notify-listeners connection :timeout)))))
+       (restart-monitoring connection)))))
 
-(defn- health-check-imap-folder-pairs [folder-listener-pairs connection]
-  (doseq [pair folder-listener-pairs]
-    (let [folder ^IMAPFolder (first pair)
-          store (:store connection)]
-      (if (.isConnected ^Store store)
-        (if (.isOpen folder)
-          (do (t/log! :debug [(.getName folder) "is open"])
-              (watch-folder connection folder))
-          (try
-            (open-folder-in-store (:store connection) (.getName folder))
-            (watch-folder connection folder)
-            (catch java.lang.Exception ex
-              (t/log! :error ex)
-              (async/put! (:event-chan connection) :store-disconnect))))
-        (do
-          (t/log! :info ["Store" (.getURLName ^Store store) "is closed."])
-          (async/put! (:event-chan connection) :store-disconnect))))))
-
-(defn- remove-all-folder-listeners [folder-listener-pairs]
-  (doseq [pair folder-listener-pairs]
-    (let [folder ^IMAPFolder (first pair)
-          listener ^MessageCountAdapter (second pair)]
-      (.removeFolderListener folder listener))))
+(defn health-check-imap-folder-pairs [connection]
+  (let [folder-listener-pairs (:folder-listener-pairs (deref (:state connection)))]
+    (doseq [pair folder-listener-pairs]
+      (let [folder ^IMAPFolder (first pair)
+            store (get-state connection :store)]
+        (if (.isConnected ^Store store)
+          (if (.isOpen folder)
+            (do (t/log! :debug [(.getName folder) "is open"])
+                (watch-folder connection folder))
+            (try
+              (open-folder-in-store store (.getName folder))
+              (watch-folder connection folder)
+              (catch java.lang.Exception ex
+                (t/log! :error ex)
+                (restart-monitoring connection))))
+          (do
+            (t/log! :info ["Store" (.getURLName ^Store store) "is closed. Plauna will try to clean up the connection, reconnect and start monitoring the necessary folders."])
+            (restart-monitoring connection)))))))
 
 (defn- move-messages-by-id-between-category-folders
   "Return true if the message could be moved. False if not."
   [^IMAPConnection connection  ^String message-id ^String source-name ^String target-name]
   (if (.connected? connection)
-    (let [^Store store (:store connection)
+    (let [^Store store (get-state connection :store)
           ^String source-folder-name (inbox-or-category-folder-name store source-name (-> connection :config :folder))
           ^String target-folder-name (inbox-or-category-folder-name store target-name (-> connection :config :folder))]
       (if (= (:folder (:config connection)) target-folder-name)
@@ -236,58 +250,64 @@
       (t/log! :info ["IMAP store in connection" (:id (:config connection)) "is not connected. Cancelling the move attempt."])
       false)))
 
-(defrecord Connection [id config ^Store store folders ^IdleManager idle-manager context event-chan notification-channel]
+(defrecord Connection [id config folders ^IdleManager idle-manager context state]
   int/IMAPConnection
+
   (connect [this] (connect-imap this))
-  (connected? [_] (.isConnected ^Store store))
-  (list-folders [_] (.list (.getDefaultFolder store) "*"))
-  (no-of-messages-in-folder [_ folder-name]
-    (let [folder ^Folder (open-folder-in-store store folder-name)]
+
+  (connected? [this] (.isConnected (get-state this :store)))
+
+  (list-folders [this] (.list (.getDefaultFolder (get-state this :store)) "*"))
+
+  (no-of-messages-in-folder [this folder-name]
+    (let [folder ^Folder (open-folder-in-store (get-state this :store) folder-name)]
       {:message-count (.getMessageCount folder)
        :connection-id id
        :folder folder}))
-  (nth-message-in-folder [_ folder-name n]
-    (let [folder (open-folder-in-store store folder-name)
+
+  (nth-message-in-folder [this folder-name n]
+    (let [folder (open-folder-in-store (get-state this :store) folder-name)
           message (.getMessage ^IMAPFolder folder n)]
       (set-message-as-peek message)
       (t/log! :debug ["Reading message number" n "from" (.getName ^IMAPFolder folder)])
       {:email (parser/message->email message)
        :message message}))
+
   (move-message [this message source-folder-name target-folder-name]
     (handle-move-email this message source-folder-name target-folder-name))
+
   (move-email-by-id [this message-id source-name target-name] (move-messages-by-id-between-category-folders this message-id source-name target-name))
-  (monitor-folders [this] (let [connection-listener (.addConnectionListener ^IMAPStore store (store-disconnect-handler event-chan))
-                                folder-listener-pairs (folders->folder-message-count-listeners this)]
-                            (async/go-loop [health-check-interval (async/timeout 60000)]
-                              (async/alt!
-                                event-chan ([event]
-                                            (t/log! :debug ["imap connection with id" (:id config) "received event:" event])
-                                            (cond (= :store-disconnect event)
-                                                  (do (remove-all-folder-listeners folder-listener-pairs)
-                                                      (.removeConnectionListener store connection-listener)
-                                                      (.close store)
-                                                      (async/put! notification-channel :disconnected))
-                                                  (= :user-disconnect event)
-                                                  (do (remove-all-folder-listeners folder-listener-pairs)
-                                                      (.removeConnectionListener store connection-listener)
-                                                      (.close store)
-                                                      (async/put! notification-channel :disconnected-by-user))))
-                                health-check-interval (do (health-check-imap-folder-pairs folder-listener-pairs this)
-                                                          (recur (async/timeout 60000)))))))
-  (disconnect-and-stop-monitoring [_] (async/put! event-chan :user-disconnect)))
+
+  (monitor-folders [this] (let [stop-chan (async/chan)]
+                            (swap! state conj {:health-chan stop-chan
+                                               :folder-listener-pairs (folders->folder-message-count-listeners this)})
+                            (async/go-loop []
+                              (let [[_ ch] (async/alts! [(async/timeout health-check-interval)
+                                                         stop-chan])]
+                                (if-not (= ch stop-chan)
+                                  (do (health-check-imap-folder-pairs this)
+                                      (recur))
+                                  (t/log! :debug ["Stopping the health checks"])))))
+    (if (.connected? this) true false))
+
+  (disconnect-and-stop-monitoring [this]
+    (if (.connected? this)
+      (close-and-clean-up this)
+      (do (stop-health-checks this)
+          (t/log! :info ["You are trying to disconnect from the connection with id" (:id this) "but it is not connected."])))))
 
 (defn inbox-folder-name [name]
   (if (or (nil? name) (s/blank? name)) "INBOX" name))
 
+(defn- create-idle-manager [config]
+  (IdleManager. (session/config->session config) executor-service))
+
 (defn create-connection
   "Creates the connection record.
   Requires a notification channel as input. Informs its caller via this channel about critical changes (such as disconnections)"
-  [config context notification-channel]
+  [config context]
   (let [id (:id config)
         db (:db context)
-        idle-manager (IdleManager. (session/config->session config) executor-service)
-        store (connection-config->store config)
-        event-chan (async/chan 3)]
-    (->Connection id config store [(->FolderConfig (inbox-folder-name (:folder config)) :inbox nil)] idle-manager context event-chan notification-channel)))
-
-
+        idle-manager (create-idle-manager config)
+        store (connection-config->store config)]
+    (->Connection id config [(->FolderConfig (inbox-folder-name (:folder config)) :inbox nil)] idle-manager context (atom {:store store}))))

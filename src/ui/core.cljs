@@ -28,17 +28,17 @@
          :flexShrink 0
          "& .MuiDrawer-paper" {:width 240
                                :boxSizing "border-box"
-                               :backgroundColor (.. @theme-atom -palette -background -default)
-                               :borderRight (str "1px solid " (.. @theme-atom -palette -divider))
+                               :backgroundColor (get-in @theme-atom [:palette :background :default])
+                               :borderRight (str "1px solid " (get-in @theme-atom [:palette :divider]))
                                :display "flex"
                                :flexDirection "column"}}}
-
+   
    [:> material/Box
     {:sx {:p 3
           :display "flex"
           :alignItems "center"
           :justifyContent "center"
-          :borderBottom (str "1px solid " (.. @theme-atom -palette -divider))}}
+          :borderBottom (str "1px solid " (get-in @theme-atom [:palette :divider]))}}
     [:img {:src "/plauna-banner.png" :width 150 :style {:objectFit "contain"}}]]
 
    [:> material/List
@@ -51,18 +51,18 @@
        ^{:key (:path item)}
        [:> material/ListItem
         {:disablePadding true
-         :sx {"&:hover" {:backgroundColor (.. @theme-atom -palette -action -hover)}}}
+         :sx {"&:hover" {:backgroundColor (get-in @theme-atom [:palette :action :hover])}}}
         [:> material/ListItemButton
          {:component rr/Link
           :to (:path item)
           :sx {:pl 2
                :py 1.5
-               :color (.. @theme-atom -palette -text -primary)
+               :color (get-in @theme-atom [:palette :text :primary])
                :textDecoration "none"
-               "&:hover" {:backgroundColor (.. @theme-atom -palette -action -hover)
-                          :color (.. @theme-atom -palette -primary -main)}
-               "&.active" {:backgroundColor (.. @theme-atom -palette -primary -lighter)
-                           :color (.. @theme-atom -palette -primary -main)
+               "&:hover" {:backgroundColor (get-in @theme-atom [:palette :action :hover])
+                          :color (get-in @theme-atom [:palette :primary :main])}
+               "&.active" {:backgroundColor (get-in @theme-atom [:palette :primary :lighter])
+                           :color (get-in @theme-atom [:palette :primary :main])
                            :fontWeight 600}}}
          [:> material/ListItemIcon
           {:sx {:minWidth 40

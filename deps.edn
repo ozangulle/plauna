@@ -22,6 +22,15 @@
                                org.mockito/mockito-core {:mvn/version "5.19.0"}}
                   :main-opts ["-m" "cognitect.test-runner"]
                   :exec-fn cognitect.test-runner.api/test}
+           :test-repl {:extra-paths ["test"]
+                       :extra-deps {org.mockito/mockito-core {:mvn/version "5.19.0"}
+                                    nrepl/nrepl {:mvn/version "1.7.0"}
+                                    cider/cider-nrepl {:mvn/version "0.62.2"}}
+                       :main-opts
+                       ["-m" "nrepl.cmdline"
+                        "--bind" "127.0.0.1"
+                        "--port" "7888"
+                        "--middleware" "[cider.nrepl/cider-middleware]"]}
            :clj-watson {:replace-deps
                         {io.github.clj-holmes/clj-watson
                          {:git/tag "v6.0.1" :git/sha "b520351"}}

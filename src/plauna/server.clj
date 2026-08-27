@@ -281,11 +281,15 @@
      (let [id (:id (:route-params request))
            operation (:operation (:body request))]
        (cond (= "reconnect" operation)
-             (if (client/restart-connection id)
-               (success-json-with-body {})
-               (error-json-with-body 408 {:message "Operation timed out"}))
-             (= "disconnect" operation) (let [connection ^plauna.interfaces.IMAPConnection (client/get-connection id)]
+             (let [connection ^plauna.interfaces.IMAPConnection (client/get-connection id)]
                                           (if (int/connected? connection)
+                                            (do (.disconnect-and-stop-monitoring connection)
+                                                (.connect connection)
+                                                (.monitor-folders connection)
+                                                (success-json-with-body {}))
+                                            (error-json-with-body 400 {:message "The connection is not active."})))
+             (= "disconnect" operation) (let [connection ^plauna.interfaces.IMAPConnection (client/get-connection id)]
+                                          (if (.connected? connection)
                                             (do (.disconnect-and-stop-monitoring connection)
                                                 (success-json-with-body {}))
                                             (error-json-with-body 400 {:message "The connection is not active."})))
