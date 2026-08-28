@@ -24,40 +24,39 @@
   (reify DB
     (fetch-oauth-token-data [_ id] (oauth-token-fn id))))
 
-(t/testing "Authentication Tests"
-  (t/deftest no-auth-type-uses-non-oauth2-login
-    (let [called-connect (atom false)]
-      (with-redefs [sut/connection-config->store
-                    (fn [_]
-                      (mock-store
-                       {:connect-fn
-                        (fn [host user secret]
-                          (t/is (and (= host "test-host.com") (= user "test-user") (= secret "test-secret")))
-                          (reset! called-connect true))}))]
-        (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
-              context {}
-              connection (sut/create-connection config context)]
-          (.connect connection)
-          (t/is (true? @called-connect))))))
+(t/deftest no-auth-type-uses-non-oauth2-login
+  (let [called-connect (atom false)]
+    (with-redefs [sut/connection-config->store
+                  (fn [_]
+                    (mock-store
+                     {:connect-fn
+                      (fn [host user secret]
+                        (t/is (and (= host "test-host.com") (= user "test-user") (= secret "test-secret")))
+                        (reset! called-connect true))}))]
+      (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
+            context {}
+            connection (sut/create-connection config context)]
+        (.connect connection)
+        (t/is (true? @called-connect))))))
 
-  (t/deftest auth-type-oauth2
-    (let [called-connect (atom false)
-          called-refresh-fn (atom false)
-          db (mock-db (fn [_] {:access-token "test-access-token"}))]
-      (with-redefs [sut/connection-config->store
-                    (fn [_]
-                      (mock-store
-                       {:connect-fn
-                        (fn [host user secret]
-                          (t/is (and (= host "test-host.com") (= user "test-user") (= secret "test-access-token")))
-                          (reset! called-connect true))}))
-                    sut/refresh-access-token (fn [_] (reset! called-refresh-fn true))]
-        (let [config {:id "test-id" :auth-type "oauth2" :host "test-host.com" :user "test-user" :secret "test-secret"}
-              context {:db db}
-              connection (sut/create-connection config context)]
-          (.connect connection)
-          (t/is (true? @called-refresh-fn))
-          (t/is (true? @called-connect)))))))
+(t/deftest auth-type-oauth2
+  (let [called-connect (atom false)
+        called-refresh-fn (atom false)
+        db (mock-db (fn [_] {:access-token "test-access-token"}))]
+    (with-redefs [sut/connection-config->store
+                  (fn [_]
+                    (mock-store
+                     {:connect-fn
+                      (fn [host user secret]
+                        (t/is (and (= host "test-host.com") (= user "test-user") (= secret "test-access-token")))
+                        (reset! called-connect true))}))
+                  sut/refresh-access-token (fn [_] (reset! called-refresh-fn true))]
+      (let [config {:imap {:id "test-id" :auth-type "oauth2" :host "test-host.com" :user "test-user" :secret "test-secret"}}
+            context {:db db}
+            connection (sut/create-connection config context)]
+        (.connect connection)
+        (t/is (true? @called-refresh-fn))
+        (t/is (true? @called-connect))))))
 
 (t/testing "Disconnection Tests"
   (t/deftest test-disconnect
@@ -83,7 +82,7 @@
                              {:disconnect-fn (fn [] (reset! called-disconnect true))
                               :connected-fn (fn [] (reset! called-connected true) true)
                               :get-folder-fn (fn [_] folder)}))]
-        (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
               context {}
               connection (sut/create-connection config context)]
           (.connect connection)
@@ -100,7 +99,7 @@
                     (fn [_] (mock-store
                              {:disconnect-fn (fn [_] (reset! called-disconnect true))
                               :connected-fn (fn [] (reset! called-connected true) false)}))]
-        (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
               context {}
               connection (sut/create-connection config context)]
           (.disconnect-and-stop-monitoring connection)
@@ -143,7 +142,7 @@
                     (fn [_] (mock-store
                              {:connected-fn (fn [] true)
                               :get-folder-fn (fn [_] folder)}))]
-        (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
               context {}
               connection (sut/create-connection config context)]
           (.connect connection)
@@ -159,10 +158,10 @@
           (.when folder)
           (.addMessageCountListener (Mockito/any)))
       (-> (Mockito/doAnswer
-             (reify Answer
-               (answer [_ _] (swap! folder-open-calls inc) true)))
-        (.when folder)
-        (.isOpen))
+           (reify Answer
+             (answer [_ _] (swap! folder-open-calls inc) true)))
+          (.when folder)
+          (.isOpen))
       (-> (Mockito/doNothing)
           (.when idle-manager)
           (.watch (Mockito/any)))
@@ -173,7 +172,7 @@
                              {:disconnect-fn (fn [])
                               :connected-fn (fn [] (swap! connected-calls inc) true)
                               :get-folder-fn (fn [_] folder)}))]
-        (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
               context {}
               connection (sut/create-connection config context)]
           (.connect connection)
@@ -211,7 +210,7 @@
                              {:connected-fn (fn [] (swap! connected-calls inc) (not (= @connected-calls 2)))
                               :disconnect-fn (fn [] (swap! disconnected-calls inc) true)
                               :get-folder-fn (fn [_] folder)}))]
-        (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
               context {}
               connection (sut/create-connection config context)]
           (.connect connection)
@@ -250,7 +249,7 @@
                               :connected-fn (fn [] (swap! connected-calls inc) (not (= @connected-calls 2)))
                               :disconnect-fn (fn [] (swap! disconnected-calls inc) true)
                               :get-folder-fn (fn [_] folder)}))]
-        (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
               context {}
               connection (sut/create-connection config context)]
           (.connect connection)
@@ -286,7 +285,7 @@
                               :connected-fn (fn [] true)
                               :disconnect-fn (fn [] true true)
                               :get-folder-fn (fn [_] (swap! get-folder-called inc) folder)}))]
-        (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
               context {}
               connection (sut/create-connection config context)]
           (.connect connection)

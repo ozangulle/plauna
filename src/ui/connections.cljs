@@ -8,8 +8,10 @@
    [reagent.core :as r]
    [ui.backend :as backend]
    [ui.components :as components]
+   [ui.components :as comps]
    [ui.inputs :as inputs]
-   [ui.utils :as utils]))
+   [ui.utils :as utils]
+   [ui.macros :refer-macros [backend-call]]))
 
 (defonce connections-data (r/atom []))
 
@@ -50,14 +52,22 @@
                                        (reset! open false))}
         "Cancel"]]]]))
 
+(defn connection-control [id command]
+  (backend-call
+   {:backend (backend/post-connection-control id command nil)
+    :on-success (fn [_] (fetch-connections-and-refresh))
+    :on-error (fn [body]
+                (comps/show-snackbar (:content (:message body)) :warning nil)
+                (fn [_] (fetch-connections-and-refresh)))}))
+
 (defn reconnect-button [id connected]
   (if connected
-    [:> material/Button {:color "secondary" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :reconnect nil (fn [_] (fetch-connections-and-refresh))))} "Reconnect"]
-    [:> material/Button {:variant :contained :color "secondary" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :connect nil (fn [_] (fetch-connections-and-refresh))))} "Connect"]))
+    [:> material/Button {:color "secondary" :on-click (fn [event] (.stopPropagation event) (connection-control id :reconnect))} "Reconnect"]
+    [:> material/Button {:variant :contained :color "secondary" :on-click (fn [event] (.stopPropagation event) (connection-control id :connect))} "Connect"]))
 
 (defn disconnect-button [id connected]
   (if connected
-    [:> material/Button {:variant :outlined :color "error" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :disconnect nil (fn [_] (fetch-connections-and-refresh))))} "Disconnect"]
+    [:> material/Button {:variant :outlined :color "error" :on-click (fn [event] (.stopPropagation event) (connection-control id :disconnect))} "Disconnect"]
     [:> material/Button {:variant :outlined :color "error" :disabled true :on-click (fn [event] (.stopPropagation event))} "Disconnect"]))
 
 (defn connections-page []
@@ -78,7 +88,6 @@
                [:> material/TableCell "Account"]
                [:> material/TableCell "Host"]
                [:> material/TableCell "Connected"]
-               [:> material/TableCell "Folder Open"]
                [:> material/TableCell ""]]]
              [:> material/TableBody
               (for [connection @connections-data]
@@ -86,7 +95,6 @@
                  [:> material/TableCell (:user connection)]
                  [:> material/TableCell (:host connection)]
                  [:> material/TableCell (str (:connected connection))]
-                 [:> material/TableCell (str (:folder-open connection))]
                  [:> material/TableCell
                   [reconnect-button (:id connection) (:connected connection)]
                   [disconnect-button (:id connection) (:connected connection)]
@@ -146,7 +154,7 @@
                                            (reset! loading? false))))
         (if @loading?
           [:> material/LinearProgress {:aria-label "Loading"}]
-          (let [config (:config @connection-data)]
+          (let [config (:imap @connection-data)]
             [:<>
              [:h2 "IMAP Connection for " (:host config) " - " (:user config)]
              [:> material/Grid {:container true :spacing 2}
@@ -227,11 +235,13 @@
                         ^{:key (:id category)}
                         [:> material/MenuItem {:value (str (:id category) "-" (:name category))} (:name category)])]]]
                    [:> material/Button {:variant :contained
-                                        :on-click (fn [_] (backend/post-connection-control
-                                                           (get (js->clj params) "id")
-                                                           :parse
-                                                           @parse-settings
-                                                           (fn [res] (components/show-snackbar (-> res :body :message) (-> res :body :type)))))} "Parse E-Mails"]]])]
+                                        :on-click (fn [_] (backend-call
+                                                           {:backend (backend/post-connection-control
+                                                                      (get (js->clj params) "id")
+                                                                      :parse
+                                                                      @parse-settings)
+                                                            :on-success
+                                                            (fn [res] (components/show-snackbar (-> res :body :message) (-> res :body :type)))}))} "Parse E-Mails"]]])]
               (when (= "oauth2" (:auth-type (:config @connection-data)))
                 [:> material/Grid {:size 12}
                  [:h3 "Authentication Providers"]

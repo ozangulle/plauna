@@ -65,7 +65,7 @@
     folder))
 
 (defn- refresh-access-token [connection]
-  (let [connection-config (:config connection)
+  (let [connection-config (:imap (:config connection))
         provider (db/get-auth-provider (:auth-provider connection-config))
         token-data (db/get-oauth-tokens (:id connection-config))
         new-access-token (try (oauth/exchange-refresh-token-for-access-token provider (:refresh-token token-data)) (catch Exception e (t/log! :error e)))]
@@ -84,13 +84,13 @@
       (merge (meta form)
              {:tag tag}))))
 
-(defmulti connect-imap (fn [connection] (-> connection :config :auth-type)))
+(defmulti connect-imap (fn [connection] (-> connection :config :imap :auth-type)))
 
 (defmethod connect-imap "oauth2" [connection]
   (refresh-access-token connection)
   (try
     (let [{:keys [db]} (:context connection)
-          connection-config (:config connection)
+          connection-config (:imap (:config connection))
           tokens (int/fetch-oauth-token-data db (:id connection-config))]
       (.connect (get-state connection :store) (:host connection-config) (:user connection-config) (:access-token tokens)))
        (catch AuthenticationFailedException e
@@ -100,7 +100,7 @@
 
 (defmethod connect-imap :default [connection]
   (try
-    (let [connection-config (:config connection)]
+    (let [connection-config (:imap (:config connection))]
       (.connect (get-state connection :store) (:host connection-config) (:user connection-config) (:secret connection-config)))
     (catch AuthenticationFailedException e
       (t/log! :error e))
@@ -236,8 +236,8 @@
     (let [^Store store (get-state connection :store)
           ^String source-folder-name (inbox-or-category-folder-name store source-name (-> connection :config :folder))
           ^String target-folder-name (inbox-or-category-folder-name store target-name (-> connection :config :folder))]
-      (if (= (:folder (:config connection)) target-folder-name)
-        (do (t/log! :error ["Moving emails to" (:folder (:config connection)) "is not supported because this is the main Inbox folder."])
+      (if (= (:folder (:imap (:config connection))) target-folder-name)
+        (do (t/log! :error ["Moving emails to" (:folder (:imap (:config connection))) "is not supported because this is the main Inbox folder."])
             false)
         (with-open [^IMAPFolder target-folder (open-folder-in-store store target-folder-name)
                     ^IMAPFolder source-folder (open-folder-in-store store source-folder-name)]
@@ -252,7 +252,7 @@
               (do (t/log! :info ["No messages found in" source-folder-name "in store" (.getURLName store)])
                   false))))))
     (do
-      (t/log! :info ["IMAP store in connection" (:id (:config connection)) "is not connected. Cancelling the move attempt."])
+      (t/log! :info ["IMAP store in connection" (:id (:imap (:config connection))) "is not connected. Cancelling the move attempt."])
       false)))
 
 (defrecord Connection [id config folders ^IdleManager idle-manager context state]
@@ -311,7 +311,7 @@
   "Creates the connection record.
   Requires a notification channel as input. Informs its caller via this channel about critical changes (such as disconnections)"
   [config context]
-  (let [id (:id config)
+  (let [id (:id (:imap config))
         db (:db context)
         idle-manager (create-idle-manager config)
         store (connection-config->store config)]

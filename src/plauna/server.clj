@@ -236,7 +236,8 @@
      {:status  200})
 
    (comp/GET "/api/admin/connections" _
-     (success-json-with-body (generate-string (mapv (fn [connection-config] (merge connection-config {:connected (int/connected? (client/get-connection (:id connection-config)))})) (db/get-connections)))))
+     (success-json-with-body (generate-string (mapv (fn [connection-config]
+                                                      (merge connection-config {:connected (if-let [conn (client/get-connection (:id connection-config))] (int/connected? conn) false)})) (db/get-connections)))))
 
    (comp/POST "/api/admin/connections" request
      (let [params (:body request)
@@ -302,8 +303,7 @@
                  (= :ok (:result action))
                  (success-json-with-body {})
                  (= :error (:result action))
-                 (success-json-with-body {}))
-               (success-json-with-body (generate-string (make-server-response :success nil nil))))
+                 (error-json-with-body 500 {:message (:message action)})))
              (= "parse" operation) (let [settings (:parse-settings (:body request))
                                          folder (:folder settings)
                                          move (:move settings)

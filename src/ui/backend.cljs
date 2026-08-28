@@ -34,7 +34,7 @@
 
 (defn fetch-connections [callback] (take! (http/get "/api/admin/connections") callback))
 
-(defn post-connection-control [id control parse-settings callback] (take! (http/post (str "/api/admin/connections/" id "/controls") {:content-type "application/json" :body (serialize {:operation control :parse-settings parse-settings})}) callback))
+(defn post-connection-control [id control parse-settings] (http/post (str "/api/admin/connections/" id "/controls") {:content-type "application/json" :body (serialize {:operation control :parse-settings parse-settings})}))
 
 (defn fetch-connection [id callback] (take! (http/get (str "/api/admin/connections/" id)) callback))
 

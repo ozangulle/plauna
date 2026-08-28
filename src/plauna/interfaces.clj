@@ -6,6 +6,7 @@
   (fetch-auth-providers [this])
   (fetch-categories [this] "Get a list of all categories")
   (fetch-connection [this id] "Get connection for id.")
+  (fetch-connections [this] "Get all connections")
   (fetch-emails [this entity customization] "Get a list of emails")
   (fetch-folder-category-maps [this id] "Get the folder-category pairs for a connection by id")
   (fetch-oauth-token-data [this id] "Get oauth token data for a connection")

@@ -2,11 +2,16 @@
   (:require
    [plauna.client.connection :as imap-conn]
    [plauna.core.common-records :as records]
-   [plauna.interfaces :as int]))
+   [plauna.interfaces :as int]
+   [taoensso.telemere :as t])
+  (:import
+   [plauna.interfaces IMAPConnection]))
 
 (set! *warn-on-reflection* true)
 
 (defonce connections (atom {}))
+
+(comment @connections)
 
 (defn get-connection [id] (get @connections id))
 
@@ -30,15 +35,19 @@
     (int/connect imap-connection)
     (int/monitor-folders imap-connection)))
 
-(defn- connection-information [id context]
+(defn connection-information [id context]
   (let [conn (int/fetch-connection (:db context) id)]
-    (merge conn {:connected (int/connected? (get-connection id))})))
+    (if-let [connection (get-connection id)]
+      (merge conn {:connected (int/connected? connection)})
+      (merge conn {:connected false}))))
 
-(defn- connection-folders [connection-config]
+(defn connection-folders [connection-config]
   (let [conn (get-connection (:id connection-config))]
-    (if (true? (int/connected? conn))
-      (int/list-folders conn)
-      [])))
+    (if (nil? conn)
+      []
+      (if (true? (int/connected? conn))
+        (int/list-folders conn)
+        []))))
 
 (defn connection-config [id context]
   (let [db (:db context)
@@ -47,3 +56,14 @@
         categories (int/fetch-categories db)
         folder-category-map (int/fetch-folder-category-maps db id)]
     {:imap (assoc conn-info :auth-providers providers) :folders (mapv str (connection-folders conn-info)) :categories categories :folder-category-map folder-category-map}))
+
+(defn start-imap-connections
+  [context]
+  (let [connections-in-db (int/fetch-connections (:db context))]
+    (doseq [raw-connection connections-in-db]
+      (let [full-config (connection-config (:id raw-connection) context)
+            connection ^IMAPConnection (imap-conn/create-connection full-config context)]
+        (swap! connections assoc (-> full-config :imap :id) connection)
+        (.connect connection)
+        (.monitor-folders connection))))
+  (t/log! :debug "Listening to new emails from listen-channel"))
