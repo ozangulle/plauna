@@ -29,13 +29,16 @@
   (.load (doto (Flyway/configure)
            (.dataSource (ds)))))
 
-(def my-addresses (atom #{}))
-
 (defn create-db []
   (.migrate ^Flyway (flyway))
   (jdbc/execute! (ds) ["PRAGMA foreign_keys = ON;"])
   (jdbc/execute! (ds) ["PRAGMA journal_mode = WAL;"])
   (jdbc/execute! (ds) ["PRAGMA foreign_keys=on;"]))
+
+(defmacro with-foreign-keys [form]
+  `(let [conn# (jdbc/get-connection (ds))]
+       (jdbc/execute! conn# ["PRAGMA foreign_keys = ON"])
+       (jdbc/execute! conn# ~@(rest (rest form)))))
 
 (def builder-function {:builder-fn as-unqualified-lower-maps})
 
@@ -414,10 +417,24 @@
   (fetch-auth-provider [_ id] (get-auth-provider id))
   (fetch-categories [_] (get-categories))
   (fetch-emails [_ entity customization] (fetch-data entity customization))
+  (fetch-folder-category-maps [_ connection-id] (jdbc/execute! (ds) (honey/format {:select [:*] :from [:folder_category_maps] :where [:= :connection_id connection-id]}) builder-function-kebab))
+  (fetch-auth-providers [_] (jdbc/execute! (ds) (honey/format {:select [:*] :from [:auth_providers]}) builder-function-kebab))
   (save-category [_ category-name] (create-category category-name))
   (save-email [_ email]
     (save-headers [(:header email)])
     (save-bodies (:body email))
     (save-contacts (:participants email))
     (save-communications (:participants email))
-    (when (not (empty? (:metadata email))) (update-metadata-batch [(:metadata email)]))))
+    (when (not (empty? (:metadata email))) (update-metadata-batch [(:metadata email)])))
+  (save-folder-category-map [_ fcmap]
+    (with-foreign-keys (jdbc/execute! (ds) (honey/format {:insert-into [:folder_category_maps] :values [fcmap]}) builder-function))))
+
+
+(comment (let [conn (jdbc/get-connection (ds))]
+       (jdbc/execute! conn ["PRAGMA foreign_keys = ON"])
+       (jdbc/execute! conn (honey/format {:insert-into [:folder_category_maps] :values [fcmap]}))))
+
+
+
+
+

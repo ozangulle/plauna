@@ -15,6 +15,7 @@
    [plauna.database :as db]
    [plauna.files :as files]
    [plauna.messaging :as messaging]
+   [plauna.interfaces :as int]
    [plauna.preferences :as p]
    [ring.adapter.jetty :as jetty]
    [ring.middleware.defaults :refer [wrap-defaults]]
@@ -142,7 +143,9 @@
                                               (conj acc {k (:default v)})))
                             {} template)))
 
-(defn connection-information [id] (let [conn (db/get-connection id)] (merge conn {:connected (int/connected? (client/get-connection id))})))
+(defn connection-information [id context]
+  (let [conn (int/fetch-connection (:db context) id)]
+    (merge conn {:connected (int/connected? (client/get-connection id))})))
 
 (defn connection-folders [connection-config]
   (let [conn (client/get-connection (:id connection-config))]
@@ -266,10 +269,7 @@
        (success-json-with-body {})))
 
    (comp/GET "/api/admin/connections/:id" [id]
-     (let [conn-info (connection-information id)
-           providers (db/get-auth-providers)
-           categories (db/get-categories)]
-       (success-json-with-body (generate-string {:config (assoc conn-info :auth-providers providers) :folders (mapv str (connection-folders conn-info)) :categories categories}))))
+     (success-json-with-body (generate-string (client/connection-config id context))))
 
    (comp/PUT "/api/admin/connections/:id" request
      (let [config (:config (:body request))

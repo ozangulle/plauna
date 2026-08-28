@@ -208,7 +208,7 @@
                     sut/health-check-interval 50
                     sut/connection-config->store
                     (fn [_] (mock-store
-                             {:connected-fn (fn [] (swap! connected-calls inc) (< @connected-calls 2))
+                             {:connected-fn (fn [] (swap! connected-calls inc) (not (= @connected-calls 2)))
                               :disconnect-fn (fn [] (swap! disconnected-calls inc) true)
                               :get-folder-fn (fn [_] folder)}))]
         (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
@@ -247,7 +247,7 @@
                     sut/connection-config->store
                     (fn [_] (mock-store
                              {:connect-fn (fn [_ _ _] (swap! connect-calls inc) true)
-                              :connected-fn (fn [] (swap! connected-calls inc) (< @connected-calls 2))
+                              :connected-fn (fn [] (swap! connected-calls inc) (not (= @connected-calls 2)))
                               :disconnect-fn (fn [] (swap! disconnected-calls inc) true)
                               :get-folder-fn (fn [_] folder)}))]
         (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}

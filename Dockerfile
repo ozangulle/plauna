@@ -7,7 +7,7 @@ COPY package.json ./
 COPY package-lock.json* ./
 RUN npm ci
 COPY . .
-#RUN clojure -M:test
+RUN clojure -M:test
 RUN clojure -M:cljs release app
 RUN clojure -T:build uber
 

@@ -28,6 +28,8 @@
 
 (def health-check-interval 60000)
 
+(def reconnection-wait-time 60000)
+
 (defn folder-separator [^Store store] (.getSeparator (.getDefaultFolder store)))
 
 (defn structured-folder-name [store lower-case-folder-name]
@@ -187,7 +189,10 @@
 (defn- restart-monitoring [connection]
   (close-and-clean-up connection)
   (.connect connection)
-  (.monitor-folders connection))
+  (if (.connected? connection)
+    (.monitor-folders connection)
+    (do (t/log! :error ["Reconnection failed. Waiting" reconnection-wait-time "milliseconds before retrying"])
+        (recur connection))))
 
 (defn- folders->folder-message-count-listeners
   "Registers a MessageCountListener on the folder.
