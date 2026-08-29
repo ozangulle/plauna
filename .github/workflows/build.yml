@@ -4,23 +4,63 @@ permissions:
 
 on:
   push:
-    branches: [ master ]
     tags:
       - '*'
   workflow_dispatch:
 
 jobs:
-  docker:
+  build:
+    name: Test and build
     runs-on: ubuntu-latest
+    container:
+      image: clojure:temurin-25-tools-deps-bookworm-slim
+
     steps:
-      -
-        name: Set up QEMU
+      - name: Install Node.js and npm
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends nodejs npm
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: clojure -M:test
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build ClojureScript
+        run: clojure -M:cljs release app
+
+      - name: Build uberjar
+        run: clojure -T:build uber
+
+      - name: Upload uberjar
+        uses: actions/upload-artifact@v4
+        with:
+          name: plauna-standalone
+          path: target/plauna-standalone.jar
+
+  image:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    needs: jar, cljs
+    steps:
+      - name: Download uberjar
+        uses: actions/download-artifact@v4
+        with:
+          name: plauna-standalone
+          path: target
+
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@4574d27a4764455b42196d70a065bc6853246a25 # v3.4.0
-      -
-        name: Set up Docker Buildx
+        
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca  # v3.9.0
-      -
-        name: Docker meta
+        
+      - name: Docker meta
         id: meta
         uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96   #v 5.6.1
         with:
@@ -31,14 +71,14 @@ jobs:
             # do not make a tag for 'master' branch
             type=ref,event=branch,enable=${{ github.ref != format('refs/heads/{0}', 'master') }}
             type=ref,event=tag
-      -
-        name: Login to DockerHub
+            
+      - name: Login to DockerHub
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567   #v 3.3.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      -
-        name: Build and push
+          
+      - name: Build and push
         uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497   # v6.14.0
         with:
           push: true
