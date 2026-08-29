@@ -46,7 +46,7 @@ jobs:
   image:
     name: Build Docker image
     runs-on: ubuntu-latest
-    needs: jar, cljs
+    needs: build
     steps:
       - name: Download uberjar
         uses: actions/download-artifact@v4
