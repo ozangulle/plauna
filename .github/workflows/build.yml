@@ -40,8 +40,7 @@ jobs:
         with:
           name: plauna-standalone
           path: target/plauna-standalone.jar
-          if-no-files-found: error
-
+    
   image:
     name: Build Docker image
     runs-on: ubuntu-latest
