@@ -55,13 +55,6 @@ jobs:
           name: plauna-standalone
           path: target
 
-      - name: Verify build context
-        run: |
-          pwd
-          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
-          find . -maxdepth 3 -type f -print
-          test -f target/plauna-standalone.jar
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@4574d27a4764455b42196d70a065bc6853246a25 # v3.4.0
         
