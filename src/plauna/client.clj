@@ -49,13 +49,17 @@
         (int/list-folders conn)
         []))))
 
-(defn connection-config [id context]
+(defn connection-config
+  "Returns nil if the connection is not found."
+  [id context]
   (let [db (:db context)
         conn-info (connection-information id context)
         providers (int/fetch-auth-providers db)
         categories (int/fetch-categories db)
         folder-category-map (int/fetch-folder-category-maps db id)]
-    {:imap (assoc conn-info :auth-providers providers) :folders (mapv str (connection-folders conn-info)) :categories categories :folder-category-map folder-category-map}))
+    (if (nil? (:host conn-info))
+      nil
+      {:imap (assoc conn-info :auth-providers providers) :folders (mapv str (connection-folders conn-info)) :categories categories :folder-category-map folder-category-map})))
 
 (defn start-imap-connections
   [context]
@@ -67,3 +71,22 @@
         (.connect connection)
         (.monitor-folders connection))))
   (t/log! :debug "Listening to new emails from listen-channel"))
+
+(defn edit-fcmap-in-connection
+  "Error means an entity could not be found."
+  [connection-id fcmap context]
+  (let [fcmaps (int/fetch-folder-category-maps (:db context) connection-id)
+        categories (int/fetch-categories (:db context))
+        folders (.list-folders ^IMAPConnection (get-connection connection-id))]
+    (cond
+      (nil? (seq (filter #(= (:category-id fcmap) (:id %)) categories)))
+      {:result :error :message "Category could not be found"}
+      (not (seq fcmaps))
+      {:result :error :message "No folder category map for this connection-id"}
+      (nil? (seq (filter #(= (:folder fcmap) %) folders)))
+      {:result :error :message "No such folder in this connection"}
+      (seq (filter #(= (:id fcmap) (:id %)) fcmaps))
+      (do (int/save-folder-category-map (:db context) (assoc fcmap :connection-id connection-id))
+          {:result :success})
+      :else
+      {:result :error :message "id could not be found"})))

@@ -2,6 +2,7 @@
 
 (defprotocol DB
   "Database protocol"
+  (delete-folder-category-map [this id])
   (fetch-auth-provider [this id])
   (fetch-auth-providers [this])
   (fetch-categories [this] "Get a list of all categories")
@@ -11,6 +12,7 @@
   (fetch-folder-category-maps [this id] "Get the folder-category pairs for a connection by id")
   (fetch-oauth-token-data [this id] "Get oauth token data for a connection")
   (save-category [this category-name])
+  (save-connection [this connection])
   (save-email [this email])
   (save-folder-category-map [this fcmap]))
 

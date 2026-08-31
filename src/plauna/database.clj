@@ -32,8 +32,7 @@
 (defn create-db []
   (.migrate ^Flyway (flyway))
   (jdbc/execute! (ds) ["PRAGMA foreign_keys = ON;"])
-  (jdbc/execute! (ds) ["PRAGMA journal_mode = WAL;"])
-  (jdbc/execute! (ds) ["PRAGMA foreign_keys=on;"]))
+  (jdbc/execute! (ds) ["PRAGMA journal_mode = WAL;"]))
 
 (defmacro with-foreign-keys [form]
   `(let [conn# (jdbc/get-connection (ds))]
@@ -372,9 +371,9 @@
 (defn add-connection [connection]
   (jdbc/execute! (ds)
                  (honey/format {:insert-into [:connections]
-                                :columns [:id :host :user :secret :folder :debug :security :port :check-ssl-certs]
+                                :columns [:id :host :user :secret :folder :debug :security :port :check-ssl-certs :auth-type]
                                 :values [[(:id connection) (:host connection) (:user connection)
-                                          (:secret connection) (:folder connection) (:debug connection) (:security connection) (:port connection) (:check-ssl-certs connection)]]})
+                                          (:secret connection) (:folder connection) (:debug connection) (:security connection) (:port connection) (:check-ssl-certs connection) (:auth-type connection)]]})
                  builder-function))
 
 (defn update-connection [connection]
@@ -412,6 +411,8 @@
 
 (deftype SqliteDB []
   int/DB
+  (delete-folder-category-map [_ id]
+    (with-foreign-keys (jdbc/execute! (ds) (honey/format {:delete-from [:folder_category_maps] :where [:= :id id]}) builder-function)))
   (fetch-connection [_ id] (get-connection id))
   (fetch-connections [_] (get-connections))
   (fetch-oauth-token-data [_ connection-id] (get-oauth-tokens connection-id))
@@ -421,6 +422,7 @@
   (fetch-folder-category-maps [_ connection-id] (jdbc/execute! (ds) (honey/format {:select [:*] :from [:folder_category_maps] :where [:= :connection_id connection-id]}) builder-function-kebab))
   (fetch-auth-providers [_] (jdbc/execute! (ds) (honey/format {:select [:*] :from [:auth_providers]}) builder-function-kebab))
   (save-category [_ category-name] (create-category category-name))
+  (save-connection [_ connection] (add-connection connection))
   (save-email [_ email]
     (save-headers [(:header email)])
     (save-bodies (:body email))
@@ -428,14 +430,7 @@
     (save-communications (:participants email))
     (when (not (empty? (:metadata email))) (update-metadata-batch [(:metadata email)])))
   (save-folder-category-map [_ fcmap]
-    (with-foreign-keys (jdbc/execute! (ds) (honey/format {:insert-into [:folder_category_maps] :values [fcmap]}) builder-function))))
-
-
-(comment (let [conn (jdbc/get-connection (ds))]
-       (jdbc/execute! conn ["PRAGMA foreign_keys = ON"])
-       (jdbc/execute! conn (honey/format {:insert-into [:folder_category_maps] :values [fcmap]}))))
-
-
-
-
+    (with-foreign-keys (jdbc/execute! (ds) (-> {:insert-into [:folder_category_maps] :values [fcmap]}
+                                               honey/format
+                                               (insert->insert-update)) builder-function))))
 

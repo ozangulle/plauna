@@ -270,7 +270,10 @@
        (success-json-with-body {})))
 
    (comp/GET "/api/admin/connections/:id" [id]
-     (success-json-with-body (generate-string (client/connection-config id context))))
+     (let [result (client/connection-config id context)]
+       (if (nil? result)
+         (error-json-with-body 404 {})
+         (success-json-with-body (generate-string (client/connection-config id context))))))
 
    (comp/PUT "/api/admin/connections/:id" request
      (let [config (:config (:body request))
@@ -278,17 +281,38 @@
        (db/update-connection {:id id :host (get config :host) :user (get config :user) :secret (get config :secret) :folder (get config :folder) :debug (get config :debug) :security (get config :security) :port (get config :port) :check-ssl-certs (get config :check-ssl-certs) :auth-type (get config :auth-type) :auth-provider (get config :auth-provider)})
        (success-json-with-body {})))
 
+   (comp/DELETE "/api/admin/connections/:id/categories" request
+     (let [fcmap (:body request)]
+       (int/delete-folder-category-map (:db context) (:id fcmap))
+       (success-json-with-body (generate-string {}))))
+   
+   (comp/POST "/api/admin/connections/:id/categories" request
+              (let [id (:id (:route-params request))
+                    fcmap (:body request)]
+                (int/save-folder-category-map (:db context) (assoc fcmap :connection-id id))
+                (success-json-with-body (generate-string {}))))
+
+   (comp/PUT "/api/admin/connections/:id/categories" request
+     (let [connection-id (:id (:route-params request))
+           fcmap (:body request)]
+       (if (nil? (:id fcmap))
+         (error-json-with-body 400 {:message "id cannot be empty"})
+         (let [operation (client/edit-fcmap-in-connection connection-id fcmap context)]
+           (if (= :success (:result operation))
+             (success-json-with-body {})
+             (error-json-with-body 404 (:message operation)))))))
+
    (comp/POST "/api/admin/connections/:id/controls" request
      (let [id (:id (:route-params request))
            operation (:operation (:body request))]
        (cond (= "reconnect" operation)
              (let [connection ^plauna.interfaces.IMAPConnection (client/get-connection id)]
-                                          (if (int/connected? connection)
-                                            (do (.disconnect-and-stop-monitoring connection)
-                                                (.connect connection)
-                                                (.monitor-folders connection)
-                                                (success-json-with-body {}))
-                                            (error-json-with-body 400 {:message "The connection is not active."})))
+               (if (int/connected? connection)
+                 (do (.disconnect-and-stop-monitoring connection)
+                     (.connect connection)
+                     (.monitor-folders connection)
+                     (success-json-with-body {}))
+                 (error-json-with-body 400 {:message "The connection is not active."})))
              (= "disconnect" operation) (let [connection ^plauna.interfaces.IMAPConnection (client/get-connection id)]
                                           (if (.connected? connection)
                                             (do (.disconnect-and-stop-monitoring connection)
