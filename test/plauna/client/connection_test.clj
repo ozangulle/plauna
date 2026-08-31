@@ -294,3 +294,40 @@
           (t/is (= 2 @folder-open-calls))
           (t/is (= 1 @get-folder-called))
           (.disconnect-and-stop-monitoring connection))))))
+
+(t/testing "watch-folder throwing an exception even when folder .isOpen is true during health checks causes an attempt to reopen the folder"
+  (t/deftest close-connection-during-health-check-reopens
+    (let [watch-folder-called (atom 0)
+          restart-monitoring-called (atom 0)
+          folder (Mockito/mock IMAPFolder)
+          idle-manager (Mockito/mock IdleManager)]
+      (-> (Mockito/doNothing)
+          (.when folder)
+          (.addMessageCountListener (Mockito/any)))
+      (-> (Mockito/doAnswer
+           (reify Answer
+             (answer [_ _] true)))
+          (.when folder)
+          (.isOpen))
+      (-> (Mockito/doAnswer
+           (reify Answer
+             (answer [_ _] (swap! watch-folder-called inc) (if (not (= 2 @watch-folder-called)) true (throw (ex-info "Nasty Runtime Exception" {}))))))
+          (.when idle-manager)
+          (.watch (Mockito/any)))
+      (with-redefs [sut/create-idle-manager (fn [_] idle-manager)
+                    sut/restart-monitoring (fn [_] (swap! restart-monitoring-called inc))
+                    sut/health-check-interval 50
+                    sut/connection-config->store
+                    (fn [_] (mock-store
+                             {:connect-fn (fn [_ _ _] true)
+                              :connected-fn (fn [] true)
+                              :disconnect-fn (fn [] true true)
+                              :get-folder-fn (fn [_]  folder)}))]
+        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
+              context {}
+              connection (sut/create-connection config context)]
+          (.connect connection)
+          (.monitor-folders connection)
+          (Thread/sleep 70)
+          (t/is (= 1 @restart-monitoring-called))
+          (.disconnect-and-stop-monitoring connection))))))

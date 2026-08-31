@@ -118,6 +118,12 @@
     (t/log! :debug ["Expunged source folder"])
     (catch Exception e (t/log! {:level :error :error e} ["There was an error copying and deleting the message" message]))))
 
+(defmacro try-log-restart [connection & form]
+  `(try ~@form
+        (catch java.lang.Exception ex#
+          (t/log! :error ex#)
+          (restart-monitoring ~connection))))
+
 (defn inbox-or-category-folder-name [^Store store ^String folder-name default]
   (let [real-default (if (s/blank? default) "INBOX" default)]
     (if (nil? folder-name) real-default (structured-folder-name store folder-name))))
@@ -199,16 +205,14 @@
   Returns a vector with the imap folder at first position and the listener at the second"
   [connection]
   (doall
-   (try
-     (for [folder (:folders connection)]
-       (let [imap-folder ^IMAPFolder (open-folder-in-store (get-state connection :store) (:name folder))
-             folder-listener (.addMessageCountListener ^IMAPFolder imap-folder (message-count-listener imap-folder connection))]
-         (t/log! :info ["Started monitoring for" (:name folder) "in" (.getURLName (get-state connection :store))])
-         (watch-folder connection imap-folder)
-         [imap-folder folder-listener]))
-     (catch Exception e
-       (t/log! :error e)
-       (restart-monitoring connection)))))
+   (try-log-restart
+       connection
+       (for [folder (:folders connection)]
+         (let [imap-folder ^IMAPFolder (open-folder-in-store (get-state connection :store) (:name folder))
+               folder-listener (.addMessageCountListener ^IMAPFolder imap-folder (message-count-listener imap-folder connection))]
+           (t/log! :info ["Started monitoring for" (:name folder) "in" (.getURLName (get-state connection :store))])
+           (watch-folder connection imap-folder)
+           [imap-folder folder-listener])))))
 
 (defn health-check-imap-folder-pairs [connection]
   (let [folder-listener-pairs (:folder-listener-pairs (deref (:state connection)))]
@@ -216,15 +220,16 @@
       (let [folder ^IMAPFolder (first pair)
             store (get-state connection :store)]
         (if (.isConnected ^Store store)
-          (if (.isOpen folder)
-            (do (t/log! :debug [(.getName folder) "is open"])
-                (watch-folder connection folder))
-            (try
-              (.open folder Folder/READ_WRITE)
-              (watch-folder connection folder)
-              (catch java.lang.Exception ex
-                (t/log! :error ex)
-                (restart-monitoring connection))))
+          (try-log-restart
+           connection
+           (if (.isOpen folder)
+             (do
+               (t/log! :debug [(.getName folder) "is open"])
+               (watch-folder connection folder))
+             (do
+               (t/log! :debug [(.getName folder) "is closed. Trying to open."])
+               (.open folder Folder/READ_WRITE)
+               (watch-folder connection folder))))
           (do
             (t/log! :info ["Store" (.getURLName ^Store store) "is closed. Plauna will try to clean up the connection, reconnect and start monitoring the necessary folders."])
             (restart-monitoring connection)))))))
