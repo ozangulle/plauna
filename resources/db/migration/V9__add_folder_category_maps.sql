@@ -4,5 +4,6 @@ CREATE TABLE folder_category_maps(
        folder TEXT,
        category_id INTEGER REFERENCES categories(id) ON DELETE CASCADE,
 
-       UNIQUE (connection_id, folder, category_id)
+       UNIQUE (connection_id, category_id)
+       UNIQUE (connection_id, folder)
 );

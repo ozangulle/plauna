@@ -300,7 +300,7 @@
          (let [operation (client/edit-fcmap-in-connection connection-id fcmap context)]
            (if (= :success (:result operation))
              (success-json-with-body {})
-             (error-json-with-body 404 (:message operation)))))))
+             (error-json-with-body 404 operation))))))
 
    (comp/POST "/api/admin/connections/:id/controls" request
      (let [id (:id (:route-params request))

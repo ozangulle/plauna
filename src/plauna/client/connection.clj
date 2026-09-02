@@ -26,7 +26,7 @@
 
 (defonce parent-folder-name "Categories")
 
-(def health-check-interval 60000)
+(def health-check-interval 120000)
 
 (def reconnection-wait-time 60000)
 
@@ -158,7 +158,11 @@
   (t/log! :debug ["Starting to watch" (.getName folder)])
   (.watch ^IdleManager (:idle-manager connection) folder))
 
-(defn- message-count-listener [imap-folder connection]
+(defmulti message-count-listener (fn [folder-config _ _ ] (nil? (:category folder-config))))
+
+(defmethod message-count-listener
+  true
+  [_ imap-folder connection]
   (proxy [MessageCountAdapter] []
     (messagesAdded [^MessageCountEvent event]
       (t/log! :debug "Received new message event.")
@@ -175,6 +179,20 @@
                 (if (some? category)
                   (move-message-from-folder-to-folder-name connection message imap-folder category)
                   (t/log! :debug ["Email" (core-email/message-id parsed-email) "was not categorized. Not moving the message."])))))
+          (finally (watch-folder connection imap-folder)))))))
+
+(defmethod message-count-listener
+  false
+  [folder-config imap-folder connection]
+  (proxy [MessageCountAdapter] []
+    (messagesAdded [^MessageCountEvent event]
+      (t/log! :debug "Received new message event.")
+      (doseq [message ^IMAPMessage (.getMessages event)]
+        (t/log! :debug ["Processing message:" message])
+        (.setPeek ^IMAPMessage message true)
+        (try
+          (let [parsed-email (parser/message->email message)]
+            (app/recategorize-email parsed-email (.category folder-config) (:context connection)))
           (finally (watch-folder connection imap-folder)))))))
 
 (defn- remove-all-folder-listeners [folder-listener-pairs]
@@ -207,10 +225,11 @@
   (doall
    (try-log-restart
        connection
-       (for [folder (:folders connection)]
-         (let [imap-folder ^IMAPFolder (open-folder-in-store (get-state connection :store) (:name folder))
-               folder-listener (.addMessageCountListener ^IMAPFolder imap-folder (message-count-listener imap-folder connection))]
-           (t/log! :info ["Started monitoring for" (:name folder) "in" (.getURLName (get-state connection :store))])
+       (for [folder-config (:folders connection)]
+         (let [imap-folder ^IMAPFolder (open-folder-in-store (get-state connection :store) (:name folder-config))
+               listener (message-count-listener folder-config imap-folder connection)
+               folder-listener (.addMessageCountListener ^IMAPFolder imap-folder listener)]
+           (t/log! :info ["Started monitoring for" (:name folder-config) "in" (.getURLName (get-state connection :store))])
            (watch-folder connection imap-folder)
            [imap-folder folder-listener])))))
 
@@ -312,6 +331,13 @@
 (defn- create-idle-manager [config]
   (IdleManager. (session/config->session config) executor-service))
 
+(defn- inbox-folder-config [config]
+  (->FolderConfig (inbox-folder-name (:folder (:imap config))) :inbox nil))
+
+(defn fcmap->folder-config [config]
+  (-> (mapv (fn [[_ fcmap]] (->FolderConfig (:folder fcmap) :category (:id (first (filterv #(= (:category-id fcmap) (:id %)) (:categories config)))))) (:folder-category-map config))
+      (conj (inbox-folder-config config))))
+
 (defn create-connection
   "Creates the connection record.
   Requires a notification channel as input. Informs its caller via this channel about critical changes (such as disconnections)"
@@ -320,4 +346,4 @@
         db (:db context)
         idle-manager (create-idle-manager config)
         store (connection-config->store config)]
-    (->Connection id config [(->FolderConfig (inbox-folder-name (:folder config)) :inbox nil)] idle-manager context (atom {:store store}))))
+    (->Connection id config (fcmap->folder-config config) idle-manager context (atom {:store store}))))

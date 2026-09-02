@@ -53,3 +53,9 @@
 (defn fetch-auth-providers [callback] (take! (http/get "/api/admin/auth-providers" {:content-type "application/json"}) callback))
 
 (defn train-data [callback] (take! (http/post "/api/training") callback))
+
+(defn add-new-fcm [connection-id fcm] (http/post (str "/api/admin/connections/" connection-id "/categories") {:content-type "application/json" :body (serialize fcm)}))
+
+(defn edit-fcm [connection-id fcm] (http/put (str "/api/admin/connections/" connection-id "/categories") {:content-type "application/json" :body (serialize fcm)}))
+
+(defn delete-fcm [connection-id fcm] (http/delete (str "/api/admin/connections/" connection-id "/categories") {:content-type "application/json" :body (serialize fcm)}))

@@ -331,3 +331,80 @@
           (Thread/sleep 70)
           (t/is (= 1 @restart-monitoring-called))
           (.disconnect-and-stop-monitoring connection))))))
+
+(t/deftest fcmap->folder-configuration-correct
+  (let [idle-manager (Mockito/mock IdleManager)]
+    (with-redefs [sut/create-idle-manager (fn [_] idle-manager)
+                  sut/connection-config->store
+                  (fn [_] (mock-store
+                           {:connect-fn (fn [_ _ _] true)
+                            :connected-fn (fn [] true)
+                            :disconnect-fn (fn [] true)}))]
+      (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+                    :categories []
+                    :folder-category-map {}}
+            context {}
+            connection (sut/create-connection config context)]
+        (t/testing "Inbox is always attached even if fcmap is empty"
+          (t/is (= 1 (count (:folders connection))))
+          (t/is (= :inbox (:type (first (:folders connection))))))))))
+
+(t/deftest fcmap->folder-configuration-correct-2
+  (let [idle-manager (Mockito/mock IdleManager)]
+    (with-redefs [sut/create-idle-manager (fn [_] idle-manager)
+                  sut/connection-config->store
+                  (fn [_] (mock-store
+                           {:connect-fn (fn [_ _ _] true)
+                            :connected-fn (fn [] true)
+                            :disconnect-fn (fn [] true)}))]
+      (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+                    :categories [{:id 1 :name "news"}]
+                    :folder-category-map {"Newsletters" {:id 1 :folder "Newsletters" :category-id 1}}}
+            context {}
+            connection (sut/create-connection config context)]
+        (t/testing "fcmap is converted correctly to FolderConfig"
+          (t/is (= 2 (count (:folders connection))))
+          (t/is (= "Newsletters" (:name (first (filterv #(not (= :inbox (:type %))) (:folders connection))))))
+          (t/is (= 1 (:category (first (filterv #(not (= :inbox (:type %))) (:folders connection)))))))))))
+
+(comment
+  ;; TODO find a way to make this test work
+  (t/deftest correct-number-of-folder-listener-pairs
+    (let [ listeners (atom [])
+          folder (Mockito/mock IMAPFolder)
+          message-count-event
+          (proxy [jakarta.mail.event.MessageCountEvent] [folder 0 false []]
+            (getMessages [] []))
+          idle-manager (Mockito/mock IdleManager)]
+      (-> (Mockito/doAnswer
+           (reify Answer
+             (answer [_ invocation]
+               (let [adapter (aget (.getArguments invocation) 0)]
+                 (swap! listeners conj adapter)
+                 nil))))
+          (.when folder)
+          (.addMessageCountListener (Mockito/any)))
+      (-> (Mockito/doReturn true)
+          (.when folder)
+          (.isOpen))
+      (-> (Mockito/doNothing)
+          (.when idle-manager)
+          (.watch (Mockito/any)))
+      (with-redefs [sut/create-idle-manager (fn [_] idle-manager)
+                    sut/health-check-interval 50
+                    sut/connection-config->store
+                    (fn [_] (mock-store
+                             {:disconnect-fn (fn [])
+                              :connected-fn (fn [] true)
+                              :get-folder-fn (fn [_] folder)}))]
+        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+                      :categories [{:id 1 :name "news"}]
+                      :folder-category-map {"Newsletters "{:id 1 :folder "Newsletters" :category-id 1}}}
+              context {}
+              connection (sut/create-connection config context)]
+          (.connect connection)
+          (.monitor-folders connection)
+          (println (first @listeners))
+          (.messagesAdded (first @listeners) message-count-event)
+          (t/is (= 2 (count (:folder-listener-pairs (deref(:state connection))))))
+          (.disconnect-and-stop-monitoring connection))))))

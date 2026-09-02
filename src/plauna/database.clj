@@ -419,7 +419,8 @@
   (fetch-auth-provider [_ id] (get-auth-provider id))
   (fetch-categories [_] (get-categories))
   (fetch-emails [_ entity customization] (fetch-data entity customization))
-  (fetch-folder-category-maps [_ connection-id] (jdbc/execute! (ds) (honey/format {:select [:*] :from [:folder_category_maps] :where [:= :connection_id connection-id]}) builder-function-kebab))
+  (fetch-folder-category-maps [_ connection-id]
+    (jdbc/execute! (ds) (honey/format {:select [:*] :from [:folder_category_maps] :where [:= :connection_id connection-id]}) builder-function-kebab))
   (fetch-auth-providers [_] (jdbc/execute! (ds) (honey/format {:select [:*] :from [:auth_providers]}) builder-function-kebab))
   (save-category [_ category-name] (create-category category-name))
   (save-connection [_ connection] (add-connection connection))

@@ -165,3 +165,14 @@
             (incoming-email-workflow (:email email-message) (:message email-message) folder connection options))))
       (t/log! :info ["There are no emails in the folder. Doing nothing."]))
     (:message-count messages-result)))
+
+(defn recategorize-email [email category-id connection]
+  (let [context (:context connection)
+        language-result (int/detect-language (:analyzer context) email)
+        enriched-email (-> email
+                           (assoc-in [:metadata :connection-id] (:id connection))
+                           (assoc-in [:metadata :language] (:code language-result))
+                           (assoc-in [:metadata :language-confidence] (:confidence language-result))
+                           (assoc-in [:metadata :category] category-id)
+                           (assoc-in [:metadata :category-confidence] 1))]
+    (int/save-email (:db context) enriched-email)))

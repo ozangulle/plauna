@@ -11,8 +11,6 @@
 
 (defonce connections (atom {}))
 
-(comment @connections)
-
 (defn get-connection [id] (get @connections id))
 
 (def type-check-imap-connection
@@ -49,6 +47,9 @@
         (int/list-folders conn)
         []))))
 
+(defn restructure-fcmaps [fcmaps]
+  (reduce (fn [acc fcmp] (assoc acc (:folder fcmp) fcmp)) {} fcmaps))
+
 (defn connection-config
   "Returns nil if the connection is not found."
   [id context]
@@ -56,7 +57,7 @@
         conn-info (connection-information id context)
         providers (int/fetch-auth-providers db)
         categories (int/fetch-categories db)
-        folder-category-map (int/fetch-folder-category-maps db id)]
+        folder-category-map (restructure-fcmaps (int/fetch-folder-category-maps db id))]
     (if (nil? (:host conn-info))
       nil
       {:imap (assoc conn-info :auth-providers providers) :folders (mapv str (connection-folders conn-info)) :categories categories :folder-category-map folder-category-map})))
@@ -75,17 +76,18 @@
 (defn edit-fcmap-in-connection
   "Error means an entity could not be found."
   [connection-id fcmap context]
-  (let [fcmaps (int/fetch-folder-category-maps (:db context) connection-id)
+  (let [fcmaps (restructure-fcmaps (int/fetch-folder-category-maps (:db context) connection-id))
         categories (int/fetch-categories (:db context))
-        folders (.list-folders ^IMAPConnection (get-connection connection-id))]
+        folders (.list-folders ^IMAPConnection (get-connection connection-id))
+        found-fcmap (get fcmaps (:folder fcmap))]
     (cond
       (nil? (seq (filter #(= (:category-id fcmap) (:id %)) categories)))
       {:result :error :message "Category could not be found"}
       (not (seq fcmaps))
       {:result :error :message "No folder category map for this connection-id"}
-      (nil? (seq (filter #(= (:folder fcmap) %) folders)))
-      {:result :error :message "No such folder in this connection"}
-      (seq (filter #(= (:id fcmap) (:id %)) fcmaps))
+      (nil? found-fcmap)
+      {:result :error :message "No folder category map for this folder"}
+      (= (:id found-fcmap) (:id fcmap))
       (do (int/save-folder-category-map (:db context) (assoc fcmap :connection-id connection-id))
           {:result :success})
       :else

@@ -53,8 +53,8 @@
       "auth-providers" []}
      "folders" ["INBOX" "newsletter" "spam"]
      "categories" [{"id" 1 "name" "news"} {"id" 2 "name" "misc"}]
-     "folder-category-map" []})
-  
+     "folder-category-map" {}})
+
   (let [mock-conn (Mockito/mock IMAPConnection)
         db ^DB (:db *context*)]
     (-> (Mockito/doReturn true)
@@ -80,7 +80,6 @@
     (int/save-category db "misc")
     (with-redefs [client/get-connection (fn [_] mock-conn)]
       (let [handler (sut/app {:db db})]
-
         (t/testing "/connections/:id - Happy path"
           (t/is (= base-connection-data
                    (parse-string (:body (handler (mock/request :get (connections-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))))))))
@@ -109,10 +108,10 @@
                    (:status (handler
                              (-> (mock/request :post (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
                                  (mock/json-body {:folder "newsletter" :category-id 1}))))))
-          (t/is (= [{"id" 1
-                     "connection-id" "c4aaaf19-c259-3694-9d50-31ecbdcea869"
-                     "folder" "newsletter"
-                     "category-id" 1}]
+          (t/is (= {"newsletter" {"id" 1
+                                  "connection-id" "c4aaaf19-c259-3694-9d50-31ecbdcea869"
+                                  "folder" "newsletter"
+                                  "category-id" 1}}
                    (get (parse-string (:body (handler (mock/request :get (connections-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))))) "folder-category-map"))))
 
         (t/testing "/connections/:id/categories - change mapping by using different category-id on folder"
@@ -120,10 +119,11 @@
                    (:status (handler
                              (-> (mock/request :put (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
                                  (mock/json-body {:folder "newsletter" :category-id 2 :id 1}))))))
-          (t/is (= [{"id" 1
+          (t/is (= {"newsletter"
+                    {"id" 1
                      "connection-id" "c4aaaf19-c259-3694-9d50-31ecbdcea869"
                      "folder" "newsletter"
-                     "category-id" 2}]
+                     "category-id" 2}}
                    (get (parse-string (:body (handler (mock/request :get (connections-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))))) "folder-category-map"))))
 
         (t/testing "/connections/:id/categories - put fails if id is not passed"
@@ -161,6 +161,6 @@
                    (:status (handler
                              (-> (mock/request :delete (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
                                  (mock/json-body {:id 1}))))))
-          (t/is (= []
+          (t/is (= {}
                    (get (parse-string (:body (handler (mock/request :get (connections-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))))) "folder-category-map"))))))))
 
