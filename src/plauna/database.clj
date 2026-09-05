@@ -14,7 +14,8 @@
             [plauna.util.page :as page]
             [taoensso.telemere :as t]
             [plauna.interfaces :as int]
-            [clojure.core.async :as async])
+            [clojure.core.async :as async]
+            [plauna.core.email :as core-email])
   (:import (org.flywaydb.core Flyway)))
 
 (set! *warn-on-reflection* true)
@@ -39,9 +40,9 @@
        (jdbc/execute! conn# ["PRAGMA foreign_keys = ON"])
        (jdbc/execute! conn# ~@(rest (rest form)))))
 
-(def builder-function {:builder-fn as-unqualified-lower-maps})
+(def builder-function {:builder-fn as-unqualified-lower-maps :keywordize? true})
 
-(def builder-function-kebab {:builder-fn as-unqualified-kebab-maps})
+(def builder-function-kebab {:builder-fn as-unqualified-kebab-maps :keywordize? true})
 
 ;; Insert Clauses
 
@@ -191,6 +192,9 @@
 (defn delete-email-by-message-id [message-id]
   (let [conn (jdbc/get-connection (ds))]
     (jdbc/execute! conn ["PRAGMA foreign_keys = ON"])
+    (jdbc/execute! conn ["DELETE FROM communications WHERE message_id = ?" message-id])
+    (jdbc/execute! conn ["DELETE FROM bodies WHERE message_id = ?" message-id])
+    (jdbc/execute! conn ["DELETE FROM metadata WHERE message_id = ?" message-id])
     (jdbc/execute! conn ["DELETE FROM headers WHERE message_id = ?" message-id])))
 
 (defn category-by-name [category-name]
@@ -409,6 +413,8 @@
                                   :where  [:= :id (:id provider)]})
                    builder-function)))
 
+(defn get-and-construct-email [])
+
 (deftype SqliteDB []
   int/DB
   (delete-folder-category-map [_ id]
@@ -418,6 +424,17 @@
   (fetch-oauth-token-data [_ connection-id] (get-oauth-tokens connection-id))
   (fetch-auth-provider [_ id] (get-auth-provider id))
   (fetch-categories [_] (get-categories))
+  (fetch-email [_ id] (let [headers (jdbc/execute-one! (ds) ["SELECT DISTINCT * FROM headers WHERE message_id = ?" id] builder-function-kebab)
+                            body (jdbc/execute! (ds) ["SELECT * from bodies WHERE message_id = ?" id] builder-function-kebab)
+                            participants (jdbc/execute! (ds) ["SELECT contacts.contact_key, name, address, communications.type from contacts LEFT JOIN communications ON contacts.contact_key = communications.contact_key WHERE message_id = ?" id] builder-function-kebab)
+                            metadata (jdbc/execute-one! (ds) ["SELECT message_id, language, language_modified, language_confidence, category AS category_id, categories.name AS category, category_confidence, connection_id from metadata LEFT JOIN categories ON categories.id = metadata.category WHERE message_id = ?" id] builder-function-kebab)]
+                        (if (nil? headers)
+                          nil
+                          (core-email/->EnrichedEmail
+                           (core-email/map->Header headers)
+                           body
+                           participants
+                           (core-email/map->Metadata metadata)))))
   (fetch-emails [_ entity customization] (fetch-data entity customization))
   (fetch-folder-category-maps [_ connection-id]
     (jdbc/execute! (ds) (honey/format {:select [:*] :from [:folder_category_maps] :where [:= :connection_id connection-id]}) builder-function-kebab))

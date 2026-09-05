@@ -1,6 +1,7 @@
 (ns plauna.database-test
   (:require [clojure.test :refer :all]
             [clojure.core.async :as async]
+            [plauna.core.email :refer [construct-email construct-enriched-email construct-header construct-body-part construct-participants]]
             [plauna.database :as db]
             [taoensso.telemere :as t]
             [plauna.files :as files]
@@ -69,3 +70,10 @@
             result (.save-folder-category-map db-instance fcp)]
         (is (= [#:next.jdbc{:update-count 1}] result))
         (is (= (dissoc (first (.fetch-folder-category-maps db-instance connection-id)) :id) fcp))))))
+
+(deftest fetch-email
+  (let [test-email (construct-email {:message-id "test" :date 0 :subject "Test" :in-reply-to nil :mime-type "text/plain"}
+                                    [{:message-id "test" :mime-type "text/plain" :charset "fake" :transfer-encoding "fake" :content "Test" :sanitized-content "Test"}]
+                                    [{:type :sender :message-id "test" :name "fake" :address "fake" :contact-key "fake"} {:type :receiver :message-id "test" :name "fake" :address "fake" :contact-key "fake"}])]
+    (.save-email db-instance test-email)
+    (is (= (:header test-email) (:header (.fetch-email db-instance "test"))))))

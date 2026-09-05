@@ -3,7 +3,8 @@
             [taoensso.telemere :as t]
             [clojure.core.async :as async]
             [plauna.core.email :as core-email]
-            [plauna.util.page :as page]))
+            [plauna.util.page :as page]
+            [plauna.database :as db]))
 
 (defn- filter->sql-clause [filter]
   (cond
@@ -168,11 +169,18 @@
 
 (defn recategorize-email [email category-id connection]
   (let [context (:context connection)
-        language-result (int/detect-language (:analyzer context) email)
-        enriched-email (-> email
-                           (assoc-in [:metadata :connection-id] (:id connection))
-                           (assoc-in [:metadata :language] (:code language-result))
-                           (assoc-in [:metadata :language-confidence] (:confidence language-result))
-                           (assoc-in [:metadata :category] category-id)
-                           (assoc-in [:metadata :category-confidence] 1))]
-    (int/save-email (:db context) enriched-email)))
+        db (:db context)
+        message-id (core-email/message-id email)
+        email-in-db (int/fetch-email db message-id)]
+    (if (nil? email-in-db)
+      (let [language-result (int/detect-language (:analyzer context) email)
+            enriched-raw-email (-> email
+                               (assoc-in [:metadata :connection-id] (:id connection))
+                               (assoc-in [:metadata :language] (:code language-result))
+                               (assoc-in [:metadata :language-confidence] (:confidence language-result))
+                               (assoc-in [:metadata :category-id] category-id)
+                               (assoc-in [:metadata :category-confidence] 1))
+            enriched-email (core-email/->EnrichedEmail (:header enriched-raw-email) (:body enriched-raw-email) (:participants enriched-raw-email) (:metadata enriched-raw-email))]
+        (int/save-email (:db context) enriched-email))
+      (let [metadata (:metadata email-in-db)]
+        (db/update-metadata message-id category-id 1 (:language metadata) (:language-confidence metadata) (:connection-id metadata))))))

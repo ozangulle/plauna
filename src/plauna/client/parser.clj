@@ -2,7 +2,7 @@
   (:require
    [clojure.string :as s])
   (:import
-   (plauna.core.email Header Body-Part Participant Email)
+   (plauna.core.email Header Body-Part Participant EnrichedEmail Metadata)
    (org.eclipse.angus.mail.imap IMAPMessage)
    (jakarta.mail BodyPart Multipart Message$RecipientType)
    (jakarta.mail.internet InternetAddress)))
@@ -57,8 +57,18 @@
         bcc-participants (mapv (fn [address] (create-participant address :cc message-id)) (.getRecipients message Message$RecipientType/BCC))]
     (flatten [sender-participant recipient-participants cc-participants bcc-participants])))
 
-(defn message->email [^IMAPMessage message]
-  (new Email
-       (create-header message)
-       (flatten [(create-body-part (.getContent message) message)])
-       (create-participants message)))
+(defn message->email [^IMAPMessage message connection-id]
+  (let [headers (create-header message)]
+    (new EnrichedEmail
+         headers
+         (flatten [(create-body-part (.getContent message) message)])
+         (create-participants message)
+         (new Metadata (:message-id headers)
+              nil
+              nil
+              nil
+              nil
+              nil
+              nil
+              nil
+              connection-id))))

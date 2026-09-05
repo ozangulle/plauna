@@ -170,7 +170,7 @@
         (t/log! :debug ["Processing message:" message])
         (.setPeek ^IMAPMessage message true)
         (try
-          (let [parsed-email (parser/message->email message)
+          (let [parsed-email (parser/message->email message (:id connection))
                 process (app/handle-incoming-imap-email parsed-email connection)]
             (if (= :error (:result process))
               (t/log! :error ["An error occured while handling incoming message" (:exception process)])
@@ -191,8 +191,8 @@
         (t/log! :debug ["Processing message:" message])
         (.setPeek ^IMAPMessage message true)
         (try
-          (let [parsed-email (parser/message->email message)]
-            (app/recategorize-email parsed-email (.category folder-config) (:context connection)))
+          (let [parsed-email (parser/message->email message (:id connection))]
+            (app/recategorize-email parsed-email (.category folder-config) connection))
           (finally (watch-folder connection imap-folder)))))))
 
 (defn- remove-all-folder-listeners [folder-listener-pairs]
@@ -299,7 +299,7 @@
           message (.getMessage ^IMAPFolder folder n)]
       (set-message-as-peek message)
       (t/log! :debug ["Reading message number" n "from" (.getName ^IMAPFolder folder)])
-      {:email (parser/message->email message)
+      {:email (parser/message->email message (:id this))
        :message message}))
 
   (move-message [this message source-folder-name target-folder-name]

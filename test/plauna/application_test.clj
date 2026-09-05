@@ -1,10 +1,30 @@
 (ns plauna.application-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is use-fixtures testing]]
+            [clojure.java.io :as io]
             [plauna.interfaces :as int]
             [taoensso.telemere :as t]
-            [plauna.application :as app]))
+            [plauna.core.email :refer :all]
+            [plauna.database :as db]
+            [plauna.analysis :an al]
+            [plauna.client.parser :as imap-parser]
+            [plauna.files :as files]
+            [plauna.application :as app])
+  (:import [plauna.database SqliteDB]
+           [plauna.analysis BasicAnalyzer ]))
 
 (t/set-ns-filter! {:disallow "plauna.*"})
+
+(t/set-min-level! :error)
+
+(defn setup-clean-db [f]
+  (swap! files/plauna-config (fn [_] {:data-folder "tmp/"}))
+  (files/check-and-create-database-file)
+  (db/create-db)
+  (alter-var-root #'db/batch-size (fn [_] 2))
+  (f)
+  (files/delete-database-file))
+
+(use-fixtures :each setup-clean-db)
 
 (defn fake-connection-with-config [config]
   (defrecord TestConnection [config] int/IMAPConnection
@@ -116,3 +136,31 @@
     (is (= true @db-called))
     (is (= true @client-called)))
   "Creating a new category makes correct database and client calls")
+
+(def db-instance (SqliteDB.))
+
+(def al-instance (BasicAnalyzer.))
+
+(deftest recategorize-new-email
+  (let [fake-conn {:id "test-conn-id" :context {:db db-instance :analyzer al-instance}}
+        test-email (construct-enriched-email
+                    (construct-email {:message-id "test" :date 0 :subject "Test" :in-reply-to nil :mime-type "text/plain"}
+                                     [{:message-id "test" :mime-type "text/plain" :charset "fake" :transfer-encoding "fake" :content "Test" :sanitized-content "Test"}]
+                                     [{:type :sender :message-id "test" :name "fake" :address "fake" :contact-key "fake"} {:type :receiver :message-id "test" :name "fake" :address "fake" :contact-key "fake"}])
+                    nil nil "test-conn-id")]
+    (.save-category db-instance "test-cat")
+    (.save-category db-instance "another-cat") ;; assuming this one has id 2
+    (testing "When there is no such email in the db"
+      (app/recategorize-email test-email 1 fake-conn)
+      (let [email-in-db (.fetch-email db-instance "test")
+            metadata (:metadata email-in-db)]
+        (is (= "test-conn-id" (:connection-id metadata)))
+        (is (= "test-cat" (:category metadata)))
+        (is (= 1.0 (:category-confidence metadata)))))
+    (testing "When when email already exists in the db"
+      (app/recategorize-email test-email 2 fake-conn)
+      (let [email-in-db (.fetch-email db-instance "test")
+            metadata (:metadata email-in-db)]
+        (is (= "test-conn-id" (:connection-id metadata)))
+        (is (= "another-cat" (:category metadata)))
+        (is (= 1.0 (:category-confidence metadata)))))))
