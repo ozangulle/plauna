@@ -21,6 +21,8 @@
 
 (defonce parse-settings (r/atom {:folder "" :move false :category ""}))
 
+(def connections-backend-call (r/atom false))
+
 (defn fetch-connections-and-refresh [] (backend/fetch-connections (fn [res] (reset! connections-data (:body res)))))
 
 (defn fetch-connection-and-refresh [id loading-atom]
@@ -61,10 +63,13 @@
 (defn connection-control [id command]
   (backend-call
    {:backend (backend/post-connection-control id command nil)
-    :on-success (fn [_] (fetch-connections-and-refresh))
+    :on-success (fn [_]
+                  (reset! connections-backend-call false)
+                  (fetch-connections-and-refresh))
     :on-error (fn [body]
+                (reset! connections-backend-call false)
                 (comps/show-snackbar (:content (:message body)) :warning nil)
-                (fn [_] (fetch-connections-and-refresh)))}))
+                (fetch-connections-and-refresh))}))
 
 (defn add-fcmp [connection-id fcm]
   (backend-call
@@ -92,12 +97,18 @@
 
 (defn reconnect-button [id connected]
   (if connected
-    [:> material/Button {:color "secondary" :on-click (fn [event] (.stopPropagation event) (connection-control id :reconnect))} "Reconnect"]
-    [:> material/Button {:variant :contained :color "secondary" :on-click (fn [event] (.stopPropagation event) (connection-control id :connect))} "Connect"]))
+    [:> material/Button {:color "secondary" :on-click (fn [event] (.stopPropagation event)
+                                                        (reset! connections-backend-call true)
+                                                        (connection-control id :reconnect))} "Reconnect"]
+    [:> material/Button {:variant :contained :color "secondary" :on-click (fn [event] (.stopPropagation event)
+                                                                            (reset! connections-backend-call true)
+                                                                            (connection-control id :connect))} "Connect"]))
 
 (defn disconnect-button [id connected]
   (if connected
-    [:> material/Button {:variant :outlined :color "error" :on-click (fn [event] (.stopPropagation event) (connection-control id :disconnect))} "Disconnect"]
+    [:> material/Button {:variant :outlined :color "error" :on-click (fn [event] (.stopPropagation event)
+                                                                       (reset! connections-backend-call true)
+                                                                       (connection-control id :disconnect))} "Disconnect"]
     [:> material/Button {:variant :outlined :color "error" :disabled true :on-click (fn [event] (.stopPropagation event))} "Disconnect"]))
 
 (defn connections-page []
@@ -107,7 +118,7 @@
         (when @loading? (backend/fetch-connections (fn [response]
                                                      (reset! connections-data (:body response))
                                                      (reset! loading? false))))
-        (if @loading?
+        (if (or @loading? @connections-backend-call)
           [:> material/LinearProgress {:aria-label "Loading"}]
           [:<>
            [:h2 "Connections"]
@@ -182,10 +193,11 @@
         (cond
           (and @loading? (= :edit mode))
           (fetch-connection-and-refresh (get (js->clj params) "id") loading?)
-          (and @loading? (= :new mode)) (backend/fetch-auth-providers
-                                         (fn [response]
-                                           (swap! connection-data assoc-in [:imap :auth-providers] (:body response))
-                                           (reset! loading? false))))
+          (and @loading? (= :new mode))
+          (backend/fetch-auth-providers
+           (fn [response]
+             (swap! connection-data assoc-in [:imap :auth-providers] (:body response))
+             (reset! loading? false))))
         (if @loading?
           [:> material/LinearProgress {:aria-label "Loading"}]
           (let [config (:imap @connection-data)]
