@@ -50,6 +50,8 @@
   (-> (dissoc config :secret)
       (dissoc :debug)))
 
+(defn- get-config [connection] @(:config connection))
+
 ;; TODO not necessary anymore. Assign this id only during creation and then just refer to it. No need for this to be deterministic
 (defn id-from-config [config]
   (str (UUID/nameUUIDFromBytes (.getBytes ^String (str (hash (clean-config config)))))))
@@ -65,7 +67,7 @@
     folder))
 
 (defn- refresh-access-token [connection]
-  (let [connection-config (:imap (:config connection))
+  (let [connection-config (:imap (get-config connection))
         provider (db/get-auth-provider (:auth-provider connection-config))
         token-data (db/get-oauth-tokens (:id connection-config))
         new-access-token (try (oauth/exchange-refresh-token-for-access-token provider (:refresh-token token-data)) (catch Exception e (t/log! :error e)))]
@@ -84,13 +86,13 @@
       (merge (meta form)
              {:tag tag}))))
 
-(defmulti connect-imap (fn [connection] (-> connection :config :imap :auth-type)))
+(defmulti connect-imap (fn [connection] (-> connection get-config :imap :auth-type)))
 
 (defmethod connect-imap "oauth2" [connection]
   (refresh-access-token connection)
   (try
     (let [{:keys [db]} (:context connection)
-          connection-config (:imap (:config connection))
+          connection-config (:imap (get-config connection))
           tokens (int/fetch-oauth-token-data db (:id connection-config))]
       (.connect (get-state connection :store) (:host connection-config) (:user connection-config) (:access-token tokens)))
        (catch AuthenticationFailedException e
@@ -100,7 +102,7 @@
 
 (defmethod connect-imap :default [connection]
   (try
-    (let [connection-config (:imap (:config connection))]
+    (let [connection-config (:imap (get-config connection))]
       (.connect (get-state connection :store) (:host connection-config) (:user connection-config) (:secret connection-config)))
     (catch AuthenticationFailedException e
       (t/log! :error e))
@@ -124,25 +126,28 @@
           (t/log! :error ex#)
           (restart-monitoring ~connection))))
 
+(defn- category-in-folder-configs [connection category]
+  (:name (first (filter #(= category (:category %)) @(:folders connection)))))
+
 (defn inbox-or-category-folder-name [^Store store ^String folder-name default]
   (let [real-default (if (s/blank? default) "INBOX" default)]
     (if (nil? folder-name) real-default (structured-folder-name store folder-name))))
 
 (defn move-message-from-folder-to-folder-name
   "Find the proper location for the email and move it there. Returns the name of the folder to which the email was moved."
-  [connection ^Message message ^Folder source-folder ^String target-name]
+  [connection ^Message message ^Folder source-folder ^String target-category-and-id]
   (let [store (get-state connection :store)
         capabilities ^PersistentVector (capabilities store)
-        structured-folder (inbox-or-category-folder-name store target-name "")
-        target-folder ^IMAPFolder (.getFolder ^Store store ^String structured-folder)]
+        target-folder-name (category-in-folder-configs connection (:category-id target-category-and-id))
+        target-folder ^IMAPFolder (.getFolder ^Store store ^String target-folder-name)]
     (if (.contains capabilities :move)
       (do (t/log! :debug ["Moving message from" source-folder "to" target-folder])
           (.setPeek ^IMAPMessage message true)
           (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder)
-          structured-folder)
+          target-folder-name)
       (do (t/log! :debug "Server does not support the IMAP MOVE command. Using copy and delete as fallback.")
           (copy-message message source-folder target-folder)
-          structured-folder))))
+          target-folder-name))))
 
 (defmulti handle-move-email (fn [_ _ source-folder _] (type source-folder)))
 
@@ -175,9 +180,8 @@
             (if (= :error (:result process))
               (t/log! :error ["An error occured while handling incoming message" (:exception process)])
               (let [category (:category process)]
-                                        ; FIXME correct category name here
                 (if (some? category)
-                  (move-message-from-folder-to-folder-name connection message imap-folder category)
+                  (move-message-from-folder-to-folder-name connection message imap-folder process)
                   (t/log! :debug ["Email" (core-email/message-id parsed-email) "was not categorized. Not moving the message."])))))
           (finally (watch-folder connection imap-folder)))))))
 
@@ -225,7 +229,7 @@
   (doall
    (try-log-restart
        connection
-       (for [folder-config (:folders connection)]
+       (for [folder-config @(:folders connection)]
          (let [imap-folder ^IMAPFolder (open-folder-in-store (get-state connection :store) (:name folder-config))
                listener (message-count-listener folder-config imap-folder connection)
                folder-listener (.addMessageCountListener ^IMAPFolder imap-folder listener)]
@@ -258,10 +262,10 @@
   [^IMAPConnection connection  ^String message-id ^String source-name ^String target-name]
   (if (.connected? connection)
     (let [^Store store (get-state connection :store)
-          ^String source-folder-name (inbox-or-category-folder-name store source-name (-> connection :config :folder))
-          ^String target-folder-name (inbox-or-category-folder-name store target-name (-> connection :config :folder))]
-      (if (= (:folder (:imap (:config connection))) target-folder-name)
-        (do (t/log! :error ["Moving emails to" (:folder (:imap (:config connection))) "is not supported because this is the main Inbox folder."])
+          ^String source-folder-name (inbox-or-category-folder-name store source-name (-> connection get-config :folder))
+          ^String target-folder-name (inbox-or-category-folder-name store target-name (-> connection get-config :folder))]
+      (if (= (:folder (:imap (get-config connection))) target-folder-name)
+        (do (t/log! :error ["Moving emails to" (:folder (:imap (get-config connection))) "is not supported because this is the main Inbox folder."])
             false)
         (with-open [^IMAPFolder target-folder (open-folder-in-store store target-folder-name)
                     ^IMAPFolder source-folder (open-folder-in-store store source-folder-name)]
@@ -276,11 +280,23 @@
               (do (t/log! :info ["No messages found in" source-folder-name "in store" (.getURLName store)])
                   false))))))
     (do
-      (t/log! :info ["IMAP store in connection" (:id (:imap (:config connection))) "is not connected. Cancelling the move attempt."])
+      (t/log! :info ["IMAP store in connection" (:id (:imap (get-config connection))) "is not connected. Cancelling the move attempt."])
       false)))
+
+(defn inbox-folder-name [name]
+  (if (or (nil? name) (s/blank? name)) "INBOX" name))
+
+(defn- inbox-folder-config [config]
+  (->FolderConfig (inbox-folder-name (:folder (:imap config))) :inbox nil))
+
+(defn fcmap->folder-config [config]
+  (-> (mapv (fn [[_ fcmap]] (->FolderConfig (:folder fcmap) :category (:id (first (filterv #(= (:category-id fcmap) (:id %)) (:categories config)))))) (:folder-category-map config))
+      (conj (inbox-folder-config config))))
 
 (defrecord Connection [id config folders ^IdleManager idle-manager context state]
   int/IMAPConnection
+
+  (config [this] (get-config this))
 
   (connect [this] (connect-imap this))
 
@@ -323,27 +339,21 @@
     (if (.connected? this)
       (close-and-clean-up this)
       (do (stop-health-checks this)
-          (t/log! :info ["You are trying to disconnect from the connection with id" (:id this) "but it is not connected."])))))
+          (t/log! :info ["You are trying to disconnect from the connection with id" (:id this) "but it is not connected."]))))
 
-(defn inbox-folder-name [name]
-  (if (or (nil? name) (s/blank? name)) "INBOX" name))
+  (update-config [this config]
+    (reset! (:folders this) (fcmap->folder-config config))
+    (reset! (:config this) config)))
 
 (defn- create-idle-manager [config]
   (IdleManager. (session/config->session config) executor-service))
-
-(defn- inbox-folder-config [config]
-  (->FolderConfig (inbox-folder-name (:folder (:imap config))) :inbox nil))
-
-(defn fcmap->folder-config [config]
-  (-> (mapv (fn [[_ fcmap]] (->FolderConfig (:folder fcmap) :category (:id (first (filterv #(= (:category-id fcmap) (:id %)) (:categories config)))))) (:folder-category-map config))
-      (conj (inbox-folder-config config))))
 
 (defn create-connection
   "Creates the connection record.
   Requires a notification channel as input. Informs its caller via this channel about critical changes (such as disconnections)"
   [config context]
   (let [id (:id (:imap config))
-        db (:db context)
         idle-manager (create-idle-manager config)
-        store (connection-config->store config)]
-    (->Connection id config (fcmap->folder-config config) idle-manager context (atom {:store store}))))
+        store (connection-config->store config)
+        folder-config (atom (fcmap->folder-config config))]
+    (->Connection id (atom config) folder-config idle-manager context (atom {:store store}))))

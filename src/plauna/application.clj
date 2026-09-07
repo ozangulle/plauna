@@ -126,7 +126,7 @@
          category (core-email/category enriched-email)]
      (t/log! :info ["Email with subject:" (core-email/subject email) "was categorized as" category])
      (int/save-email db enriched-email-with-connection-id)
-     {:category category}))
+     {:category category :category-id (core-email/category-id enriched-email)}))
   ([email message folder connection {:keys [move? assigned-category assigned-category-id]}]
    (let [{:keys [analyzer db]} (:context connection)]
      (if (not (empty? assigned-category))
@@ -142,7 +142,7 @@
          (int/save-email db enriched-email-with-connection-id)
          (t/log! :info ["Email with subject:" (core-email/subject email) "was successfully saved to the database"])
          (move-message move? connection folder email message category)
-         {:category category})))))
+         {:category category :category-id (core-email/category-id email)})))))
 
 (defn handle-incoming-imap-email
   "Handle incoming emails synchronously on a single thread. Returns a result."
@@ -170,17 +170,26 @@
 (defn recategorize-email [email category-id connection]
   (let [context (:context connection)
         db (:db context)
-        message-id (core-email/message-id email)
-        email-in-db (int/fetch-email db message-id)]
-    (if (nil? email-in-db)
+        message-id (core-email/message-id email)]
+    (if-let [email-in-db (int/fetch-email db message-id)]
+      (let [metadata (:metadata email-in-db)]
+        (db/update-metadata
+         message-id
+         category-id
+         1
+         (:language metadata)
+         (:language-confidence metadata)
+         (:connection-id metadata)))
       (let [language-result (int/detect-language (:analyzer context) email)
             enriched-raw-email (-> email
-                               (assoc-in [:metadata :connection-id] (:id connection))
-                               (assoc-in [:metadata :language] (:code language-result))
-                               (assoc-in [:metadata :language-confidence] (:confidence language-result))
-                               (assoc-in [:metadata :category-id] category-id)
-                               (assoc-in [:metadata :category-confidence] 1))
-            enriched-email (core-email/->EnrichedEmail (:header enriched-raw-email) (:body enriched-raw-email) (:participants enriched-raw-email) (:metadata enriched-raw-email))]
-        (int/save-email (:db context) enriched-email))
-      (let [metadata (:metadata email-in-db)]
-        (db/update-metadata message-id category-id 1 (:language metadata) (:language-confidence metadata) (:connection-id metadata))))))
+                                   (assoc-in [:metadata :connection-id] (:id connection))
+                                   (assoc-in [:metadata :language] (:code language-result))
+                                   (assoc-in [:metadata :language-confidence] (:confidence language-result))
+                                   (assoc-in [:metadata :category-id] category-id)
+                                   (assoc-in [:metadata :category-confidence] 1))
+            enriched-email (core-email/->EnrichedEmail
+                            (:header enriched-raw-email)
+                            (:body enriched-raw-email)
+                            (:participants enriched-raw-email)
+                            (:metadata enriched-raw-email))]
+        (int/save-email (:db context) enriched-email)))))

@@ -28,7 +28,8 @@
    [plauna.interfaces :as int])
   (:import [java.net ServerSocket]
            [java.util UUID]
-           [org.eclipse.jetty.server Server]))
+           [org.eclipse.jetty.server Server]
+           [plauna.interfaces IMAPConnection]))
 
 (set! *warn-on-reflection* true)
 
@@ -285,12 +286,17 @@
      (let [fcmap (:body request)]
        (int/delete-folder-category-map (:db context) (:id fcmap))
        (success-json-with-body (generate-string {}))))
-   
+
    (comp/POST "/api/admin/connections/:id/categories" request
-              (let [id (:id (:route-params request))
-                    fcmap (:body request)]
-                (int/save-folder-category-map (:db context) (assoc fcmap :connection-id id))
-                (success-json-with-body (generate-string {}))))
+     (let [id (:id (:route-params request))
+           fcmap (:body request)
+           connection (int/fetch-connection (:db context) id)]
+       (println connection)
+       (if (some? connection)
+         (do (int/save-folder-category-map (:db context) (assoc fcmap :connection-id id))
+             (.update-config ^IMAPConnection (client/get-connection id) (client/connection-config id context))
+             (success-json-with-body (generate-string {})))
+         (error-json-with-body 404 {:message (str "Connection " id " was not found")}))))
 
    (comp/PUT "/api/admin/connections/:id/categories" request
      (let [connection-id (:id (:route-params request))
@@ -299,7 +305,9 @@
          (error-json-with-body 400 {:message "id cannot be empty"})
          (let [operation (client/edit-fcmap-in-connection connection-id fcmap context)]
            (if (= :success (:result operation))
-             (success-json-with-body {})
+             (do
+               (.update-config ^IMAPConnection (client/get-connection connection-id) (client/connection-config connection-id context))
+               (success-json-with-body {}))
              (error-json-with-body 404 operation))))))
 
    (comp/POST "/api/admin/connections/:id/controls" request

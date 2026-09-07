@@ -346,8 +346,8 @@
             context {}
             connection (sut/create-connection config context)]
         (t/testing "Inbox is always attached even if fcmap is empty"
-          (t/is (= 1 (count (:folders connection))))
-          (t/is (= :inbox (:type (first (:folders connection))))))))))
+          (t/is (= 1 (count @(:folders connection))))
+          (t/is (= :inbox (:type (first @(:folders connection))))))))))
 
 (t/deftest fcmap->folder-configuration-correct-2
   (let [idle-manager (Mockito/mock IdleManager)]
@@ -363,9 +363,54 @@
             context {}
             connection (sut/create-connection config context)]
         (t/testing "fcmap is converted correctly to FolderConfig"
-          (t/is (= 2 (count (:folders connection))))
-          (t/is (= "Newsletters" (:name (first (filterv #(not (= :inbox (:type %))) (:folders connection))))))
-          (t/is (= 1 (:category (first (filterv #(not (= :inbox (:type %))) (:folders connection)))))))))))
+          (t/is (= 2 (count @(:folders connection))))
+          (t/is (= "Newsletters" (:name (first (filterv #(not (= :inbox (:type %))) @(:folders connection))))))
+          (t/is (= 1 (:category (first (filterv #(not (= :inbox (:type %))) @(:folders connection)))))))))))
+
+(t/deftest update-config-test
+  (let [idle-manager (Mockito/mock IdleManager)]
+    (with-redefs [sut/create-idle-manager (fn [_] idle-manager)
+                  sut/connection-config->store
+                  (fn [_] (mock-store
+                           {:connect-fn (fn [_ _ _] true)
+                            :connected-fn (fn [] true)
+                            :disconnect-fn (fn [] true)}))]
+      (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+                    :categories [{:id 1 :name "news"}]
+                    :folder-category-map {"Newsletters" {:id 1 :folder "Newsletters" :category-id 1}}}
+            config-to-update {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "new-secret"}
+                         :categories [{:id 1 :name "news"}]
+                         :folder-category-map {"Newsletters" {:id 1 :folder "Newsletters" :category-id 2}
+                                               "Some Other" {:id 2 :folder "Some Other" :category-id 1}}}
+            context {}
+            connection (sut/create-connection config context)]
+        (t/testing "Update config works"
+          (t/is (= config (.config connection)))
+          (.update-config connection config-to-update)
+          (t/is (= config-to-update (.config connection))))))))
+
+;; FIXME this tests the internals of IMAPConnection
+(t/deftest update-folder-configs-test
+  (let [idle-manager (Mockito/mock IdleManager)]
+    (with-redefs [sut/create-idle-manager (fn [_] idle-manager)
+                  sut/connection-config->store
+                  (fn [_] (mock-store
+                           {:connect-fn (fn [_ _ _] true)
+                            :connected-fn (fn [] true)
+                            :disconnect-fn (fn [] true)}))]
+      (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
+                    :categories [{:id 1 :name "news"}]
+                    :folder-category-map {"Newsletters" {:id 1 :folder "Newsletters" :category-id 1}}}
+            config-to-update {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "new-secret"}
+                              :categories [{:id 1 :name "news"}]
+                              :folder-category-map {"Newsletters" {:id 1 :folder "Newsletters" :category-id 2}
+                                                    "Some Other" {:id 2 :folder "Some Other" :category-id 1}}}
+            context {}
+            connection (sut/create-connection config context)]
+        (t/testing "Update config also update the correct folder configs"
+          (t/is (= 2 (count @(:folders connection))))
+          (.update-config connection config-to-update)
+          (t/is (= 3 (count @(:folders connection)))))))))
 
 (comment
   ;; TODO find a way to make this test work

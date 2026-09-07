@@ -338,9 +338,11 @@
     (when (some? result) (:value result))))
 
 (defn db-connection->model [db-conn]
-  (apply (comp records/map->ImapConnection
-               (fn [conn] (update conn :check-ssl-certs #(= % 1)))
-               (fn [conn] (update conn :debug #(= % 1)))) [db-conn]))
+  (if (nil? db-conn)
+    nil
+    (apply (comp records/map->ImapConnection
+                 (fn [conn] (update conn :check-ssl-certs #(= % 1)))
+                 (fn [conn] (update conn :debug #(= % 1)))) [db-conn])))
 
 (defn get-connections [] (map
                           db-connection->model

@@ -107,6 +107,8 @@
 
 (defn category [email] (-> email :metadata :category))
 
+(defn category-id [email] (-> email :metadata :category-id))
+
 (defn category-confidence [email] (-> email :metadata :category-confidence))
 
 (defn language [email] (-> email :metadata :language))

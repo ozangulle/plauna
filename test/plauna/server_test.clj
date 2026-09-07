@@ -9,6 +9,7 @@
             [ring.mock.request :as mock]
             [taoensso.telemere :as tel])
   (:import [org.mockito Mockito]
+           [org.mockito.stubbing Answer]
            [plauna.interfaces IMAPConnection DB]
            [plauna.database SqliteDB]))
 
@@ -36,30 +37,35 @@
 (defn fcmap-api [id] (str (connections-api id) "/categories"))
 
 (t/deftest calling-connections-returns-expected-data
-  (def base-connection-data
-    {"imap"
-     {"host" "imap.test.com"
-      "user" "test-user"
-      "secret" "1234"
-      "folder" ""
-      "security" "ssl"
-      "port" ""
-      "debug" false
-      "check-ssl-certs" true
-      "auth-type" "basic"
-      "connected" true
-      "id" "c4aaaf19-c259-3694-9d50-31ecbdcea869"
-      "auth-provider" nil
-      "auth-providers" []}
-     "folders" ["INBOX" "newsletter" "spam"]
-     "categories" [{"id" 1 "name" "news"} {"id" 2 "name" "misc"}]
-     "folder-category-map" {}})
-
-  (let [mock-conn (Mockito/mock IMAPConnection)
-        db ^DB (:db *context*)]
+  (let [base-connection-data
+        {"imap"
+         {"host" "imap.test.com"
+          "user" "test-user"
+          "secret" "1234"
+          "folder" ""
+          "security" "ssl"
+          "port" ""
+          "debug" false
+          "check-ssl-certs" true
+          "auth-type" "basic"
+          "connected" true
+          "id" "c4aaaf19-c259-3694-9d50-31ecbdcea869"
+          "auth-provider" nil
+          "auth-providers" []}
+         "folders" ["INBOX" "newsletter" "spam"]
+         "categories" [{"id" 1 "name" "news"} {"id" 2 "name" "misc"}]
+         "folder-category-map" {}}
+        mock-conn (Mockito/mock IMAPConnection)
+        update-called (atom false)
+        db ^DB  (:db *context*)]
     (-> (Mockito/doReturn true)
         (.when mock-conn)
         (.connected?))
+    (-> (Mockito/doAnswer
+         (reify Answer
+           (answer [_ _](reset! update-called true))))
+        (.when mock-conn)
+        (.update-config (Mockito/any)))
     (-> (Mockito/doReturn ["INBOX" "newsletter" "spam"])
         (.when mock-conn)
         (.list-folders))
@@ -156,11 +162,48 @@
                              (-> (mock/request :put (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
                                  (mock/json-body {:folder "news" :category-id 1 :id 1})))))))
 
+        (t/testing "/connections/:id/categories - put - call update config on a successful config update"
+          ;; set to false because other test might have triggered update-config
+          (reset! update-called false)
+          (t/is (= 200
+                   (:status (handler
+                             (-> (mock/request :put (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
+                                 (mock/json-body {:folder "newsletter" :category-id 2 :id 1}))))))
+          (t/is (= true @update-called )))
+
+        (t/testing "/connections/:id/categories - do not call update config on an erroneous config update"
+          ;; set to false because other test might have triggered update-config
+          (reset! update-called false)
+          (t/is (= 404
+                   (:status (handler
+                             (-> (mock/request :put (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
+                                 (mock/json-body {:folder "news" :category-id 2 :id 1}))))))
+          (t/is (= false @update-called )))
+
         (t/testing "/connections/:id/categories - delete works"
           (t/is (= 200
                    (:status (handler
                              (-> (mock/request :delete (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
                                  (mock/json-body {:id 1}))))))
           (t/is (= {}
-                   (get (parse-string (:body (handler (mock/request :get (connections-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))))) "folder-category-map"))))))))
+                   (get (parse-string (:body (handler (mock/request :get (connections-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))))) "folder-category-map"))))
+
+        (t/testing "/connections/:id/categories - post - call update config on a successful config update"
+          ;; set to false because other test might have triggered update-config
+          (reset! update-called false)
+          (t/is (= 200
+                   (:status (handler
+                             (-> (mock/request :post (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
+                                 (mock/json-body {:folder "newsletter" :category-id 2 :id 1}))))))
+          (t/is (= true @update-called )))
+
+        (t/testing "/connections/:id/categories - post do not call update config on an erroneous config update"
+          ;; set to false because other test might have triggered update-config
+          (reset! update-called false)
+          (t/is (= 404
+                   (:status (handler
+                             (-> (mock/request :post (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea868"))
+                                 (mock/json-body {:folder "news" :category-id 2 :id 1}))))))
+          (t/is (= false @update-called )))
+        ))))
 

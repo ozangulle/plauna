@@ -35,12 +35,14 @@
   (normalize [this body-part]))
 
 (defprotocol IMAPConnection
+  (config [this])
   (connect [this])
   (connected? [this])
+  (disconnect-and-stop-monitoring [this])
   (list-folders [this])
   (no-of-messages-in-folder [this folder-name])
   (nth-message-in-folder [this folder-name n])
   (move-message [this message source-name target-name])
   (move-email-by-id [this message-id source-name target-name])
   (monitor-folders [this])
-  (disconnect-and-stop-monitoring [this]))
+  (update-config [this config]))
