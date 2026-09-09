@@ -1,5 +1,6 @@
 (ns plauna.client.connection-test
   (:require [plauna.client.connection :as sut]
+            [plauna.client.mock-server :as ms]
             [clojure.test :as t]
             [clojure.core.async :as async]
             [plauna.interfaces :as int])
@@ -25,19 +26,13 @@
     (fetch-oauth-token-data [_ id] (oauth-token-fn id))))
 
 (t/deftest no-auth-type-uses-non-oauth2-login
-  (let [called-connect (atom false)]
-    (with-redefs [sut/connection-config->store
-                  (fn [_]
-                    (mock-store
-                     {:connect-fn
-                      (fn [host user secret]
-                        (t/is (and (= host "test-host.com") (= user "test-user") (= secret "test-secret")))
-                        (reset! called-connect true))}))]
-      (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
-            context {}
-            connection (sut/create-connection config context)]
-        (.connect connection)
-        (t/is (true? @called-connect))))))
+  (ms/start-server)
+  (let [config {:imap {:id "test-id" :host "localhost" :user "test-user" :secret "secret" :port "3143" :security "plain"}}
+        context {}
+        connection (sut/create-connection config context)]
+    (.connect connection)
+    (t/is (true? (.connected? connection)))
+    (ms/stop-server)))
 
 (t/deftest auth-type-oauth2
   (let [called-connect (atom false)
@@ -60,93 +55,43 @@
 
 (t/testing "Disconnection Tests"
   (t/deftest test-disconnect
-    (let [called-disconnect (atom false)
-          called-connected (atom false)
-          folder (Mockito/mock IMAPFolder)
-          idle-manager (Mockito/mock IdleManager)
-          remove-listener-calls (atom 0)]
-      (-> (Mockito/doNothing)
-          (.when folder)
-          (.addMessageCountListener (Mockito/any)))
-      (-> (Mockito/doAnswer
-           (reify Answer
-             (answer [_ _] (swap! remove-listener-calls inc) true)))
-          (.when folder)
-          (.removeFolderListener (Mockito/any)))
-      (-> (Mockito/doNothing)
-          (.when idle-manager)
-          (.watch (Mockito/any)))
-      (with-redefs [sut/create-idle-manager (fn [_] idle-manager)
-                    sut/connection-config->store
-                    (fn [_] (mock-store
-                             {:disconnect-fn (fn [] (reset! called-disconnect true))
-                              :connected-fn (fn [] (reset! called-connected true) true)
-                              :get-folder-fn (fn [_] folder)}))]
-        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
-              context {}
-              connection (sut/create-connection config context)]
-          (.connect connection)
-          (.monitor-folders connection)
-          (.disconnect-and-stop-monitoring connection)
-          (t/is (true? @called-connected))
-          (t/is (true? @called-disconnect))
-          (t/is (= 1 @remove-listener-calls))))))
+    (ms/start-server)
+    (let [config {:imap {:id "test-id" :host "localhost" :user "test-user" :secret "secret" :port "3143" :security "plain"}}
+          context {}
+          connection (sut/create-connection config context)]
+      (.connect connection)
+      (t/is (true? (.connected? connection)))
+      (.disconnect-and-stop-monitoring connection)
+      (t/is (false? (.connected? connection))))
+    (ms/stop-server))
 
   (t/deftest test-disconnect-without-connection
-    (let [called-disconnect (atom false)
-          called-connected (atom true)]
-      (with-redefs [sut/connection-config->store
-                    (fn [_] (mock-store
-                             {:disconnect-fn (fn [_] (reset! called-disconnect true))
-                              :connected-fn (fn [] (reset! called-connected true) false)}))]
-        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
-              context {}
-              connection (sut/create-connection config context)]
-          (.disconnect-and-stop-monitoring connection)
-          (t/is (true? @called-connected))
-          (t/is (false? @called-disconnect)))))))
+    (ms/start-server)
+    (let [config {:imap {:id "test-id" :host "localhost" :user "test-user" :secret "secret" :port "3143" :security "plain"}}
+          context {}
+          connection (sut/create-connection config context)]
+      (.disconnect-and-stop-monitoring connection)
+      (t/is (false? (.connected? connection))))
+    (ms/stop-server)))
 
 (t/testing "Monitoring when not logged in returns false"
   (t/deftest monitor-without-connection
-    (let [folder (Mockito/mock IMAPFolder)
-          idle-manager (Mockito/mock IdleManager)]
-      (-> (Mockito/doNothing)
-          (.when folder)
-          (.addMessageCountListener (Mockito/any)))
-      (-> (Mockito/doNothing)
-          (.when idle-manager)
-          (.watch (Mockito/any)))
-      (with-redefs [sut/create-idle-manager (fn [_] idle-manager)
-                    sut/connection-config->store
-                    (fn [_] (mock-store
-                             {:connected-fn (fn [] false)
-                              :get-folder-fn (fn [_] folder)}))]
-        (let [config {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}
-              context {}
-              connection (sut/create-connection config context)]
-          (.connect connection)
-          (t/is (false? (.monitor-folders connection))))))))
+    (ms/start-server)
+    (let [config {:imap {:id "test-id" :host "localhost" :user "test-user" :secret "secret" :port "3143" :security "plain"}}
+          context {}
+          connection (sut/create-connection config context)]
+      (t/is (false? (.monitor-folders connection))))
+    (ms/stop-server)))
 
 (t/testing "Monitoring when logged in returns true"
   (t/deftest monitor-without-connection
-    (let [folder (Mockito/mock IMAPFolder)
-          idle-manager (Mockito/mock IdleManager)]
-      (-> (Mockito/doNothing)
-          (.when folder)
-          (.addMessageCountListener (Mockito/any)))
-      (-> (Mockito/doNothing)
-          (.when idle-manager)
-          (.watch (Mockito/any)))
-      (with-redefs [sut/create-idle-manager (fn [_] idle-manager)
-                    sut/connection-config->store
-                    (fn [_] (mock-store
-                             {:connected-fn (fn [] true)
-                              :get-folder-fn (fn [_] folder)}))]
-        (let [config {:imap {:id "test-id" :host "test-host.com" :user "test-user" :secret "test-secret"}}
-              context {}
-              connection (sut/create-connection config context)]
-          (.connect connection)
-          (t/is (true? (.monitor-folders connection))))))))
+    (ms/start-server)
+    (let [config {:imap {:id "test-id" :host "localhost" :user "test-user" :secret "secret" :port "3143" :security "plain"}}
+          context {}
+          connection (sut/create-connection config context)]
+      (.connect connection)
+      (t/is (true? (.monitor-folders connection))))
+    (ms/stop-server)))
 
 (t/testing "Monitoring when logged in calls health-check-funtion"
   (t/deftest monitor-without-connection

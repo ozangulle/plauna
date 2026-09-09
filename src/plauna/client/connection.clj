@@ -36,7 +36,7 @@
   (str parent-folder-name (folder-separator store) (s/capitalize lower-case-folder-name)))
 
 (defn- connection-config->store [connection-config]
-  (let [session ^Session (session/config->session connection-config)]
+  (let [session ^Session (session/config->session (:imap connection-config))]
     (.getStore session "imap")))
 
 (defn- capability-name [^IMAPStore store ^String cap-name]
