@@ -291,7 +291,6 @@
      (let [id (:id (:route-params request))
            fcmap (:body request)
            connection (int/fetch-connection (:db context) id)]
-       (println connection)
        (if (some? connection)
          (do (int/save-folder-category-map (:db context) (assoc fcmap :connection-id id))
              (.update-config ^IMAPConnection (client/get-connection id) (client/connection-config id context))

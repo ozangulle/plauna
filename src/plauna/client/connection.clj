@@ -110,6 +110,8 @@
       (t/log! :error e))))
 
 (defn copy-message [^Message message ^Folder source-folder ^Folder target-folder]
+  (t/log! :error (.getName source-folder))
+  (t/log! :error (.getName target-folder))
   (try
     (.setPeek ^IMAPMessage message true)
     (.copyMessages source-folder (into-array Message [message]) target-folder)
@@ -129,13 +131,27 @@
 (defn- category-in-folder-configs [connection category]
   (:name (first (filter #(= category (:category %)) @(:folders connection)))))
 
+(defn- folder-configs [connection folder-name]
+  (first (filter #(= folder-name (:name %)) @(:folders connection))))
+
+(defn- pause-folder [connection folder-name]
+  (reset! (:paused (folder-configs connection folder-name)) true))
+
+(defn- resume-folder [connection folder-name]
+  (reset! (:paused (folder-configs connection folder-name)) false))
+
 (defn inbox-or-category-folder-name [^Store store ^String folder-name default]
   (let [real-default (if (s/blank? default) "INBOX" default)]
     (if (nil? folder-name) real-default (structured-folder-name store folder-name))))
 
+(defn- watch-folder [connection ^IMAPFolder folder]
+  (t/log! :debug ["Starting to watch" (.getName folder)])
+  (.watch ^IdleManager (:idle-manager connection) folder))
+
 (defn move-message-from-folder-to-folder-name
   "Find the proper location for the email and move it there. Returns the name of the folder to which the email was moved."
   [connection ^Message message ^Folder source-folder ^String target-category-and-id]
+  ;; FIXME If categories and folder-map are empty, nothing happens
   (let [store (get-state connection :store)
         capabilities ^PersistentVector (capabilities store)
         target-folder-name (category-in-folder-configs connection (:category-id target-category-and-id))
@@ -143,10 +159,14 @@
     (if (.contains capabilities :move)
       (do (t/log! :debug ["Moving message from" source-folder "to" target-folder])
           (.setPeek ^IMAPMessage message true)
+          (pause-folder connection target-folder-name)
           (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder)
+          (resume-folder connection target-folder-name)
           target-folder-name)
       (do (t/log! :debug "Server does not support the IMAP MOVE command. Using copy and delete as fallback.")
+          (pause-folder connection target-folder)
           (copy-message message source-folder target-folder)
+          (resume-folder connection target-folder)
           target-folder-name))))
 
 (defmulti handle-move-email (fn [_ _ source-folder _] (type source-folder)))
@@ -157,11 +177,7 @@
 (defmethod handle-move-email java.lang.String [connection message source-name target-name]
   (move-message-from-folder-to-folder-name connection message (open-folder-in-store (:store connection) source-name) target-name))
 
-(defrecord FolderConfig [name type category])
-
-(defn- watch-folder [connection ^IMAPFolder folder]
-  (t/log! :debug ["Starting to watch" (.getName folder)])
-  (.watch ^IdleManager (:idle-manager connection) folder))
+(defrecord FolderConfig [name type category paused])
 
 (defmulti message-count-listener (fn [folder-config _ _ ] (nil? (:category folder-config))))
 
@@ -190,14 +206,16 @@
   [folder-config imap-folder connection]
   (proxy [MessageCountAdapter] []
     (messagesAdded [^MessageCountEvent event]
-      (t/log! :debug "Received new message event.")
-      (doseq [message ^IMAPMessage (.getMessages event)]
-        (t/log! :debug ["Processing message:" message])
-        (.setPeek ^IMAPMessage message true)
-        (try
-          (let [parsed-email (parser/message->email message (:id connection))]
-            (app/recategorize-email parsed-email (.category folder-config) connection))
-          (finally (watch-folder connection imap-folder)))))))
+      (let [paused @(:paused folder-config)]
+        (when-not paused
+          (t/log! :debug "Received new message event.")
+          (doseq [message ^IMAPMessage (.getMessages event)]
+            (t/log! :debug ["Processing message:" message])
+            (.setPeek ^IMAPMessage message true)
+            (try
+              (let [parsed-email (parser/message->email message (:id connection))]
+                (app/recategorize-email parsed-email (.category folder-config) connection))
+              (finally (watch-folder connection imap-folder)))))))))
 
 (defn- remove-all-folder-listeners [folder-listener-pairs]
   (doseq [pair folder-listener-pairs]
@@ -287,12 +305,13 @@
   (if (or (nil? name) (s/blank? name)) "INBOX" name))
 
 (defn- inbox-folder-config [config]
-  (->FolderConfig (inbox-folder-name (:folder (:imap config))) :inbox nil))
+  (->FolderConfig (inbox-folder-name (:folder (:imap config))) :inbox nil (atom false)))
 
 (defn fcmap->folder-config [config]
-  (-> (mapv (fn [[_ fcmap]] (->FolderConfig (:folder fcmap) :category (:id (first (filterv #(= (:category-id fcmap) (:id %)) (:categories config)))))) (:folder-category-map config))
+  (-> (mapv (fn [[_ fcmap]] (->FolderConfig (:folder fcmap) :category (:id (first (filterv #(= (:category-id fcmap) (:id %)) (:categories config)))) (atom false))) (:folder-category-map config))
       (conj (inbox-folder-config config))))
 
+;; TODO make folders a map instead of a vec
 (defrecord Connection [id config folders ^IdleManager idle-manager context state]
   int/IMAPConnection
 

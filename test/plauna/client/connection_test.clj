@@ -3,13 +3,20 @@
             [plauna.client.mock-server :as ms]
             [clojure.test :as t]
             [clojure.core.async :as async]
-            [plauna.interfaces :as int])
+            [plauna.interfaces :as int]
+            [plauna.files :as files]
+            [plauna.database :as db]
+            [plauna.application :as app]
+            [taoensso.telemere :as tel])
   (:import [org.eclipse.angus.mail.imap IdleManager IMAPStore IMAPFolder]
            [java.util Properties]
            [plauna.interfaces DB]
            [org.mockito Mockito]
            [org.mockito.stubbing Answer]
+           [plauna.database SqliteDB]
            [jakarta.mail Store URLName Session Folder Message Flags$Flag AuthenticationFailedException]))
+
+(tel/set-min-level! :error)
 
 (defn mock-store [function-map]
   (let [session (Session/getInstance (new Properties))
@@ -24,6 +31,19 @@
 (defn mock-db [oauth-token-fn]
   (reify DB
     (fetch-oauth-token-data [_ id] (oauth-token-fn id))))
+
+(def ^:dynamic *context* {})
+
+(defn setup-clean-db [f]
+  (swap! files/plauna-config (fn [_] {:data-folder "tmp/"}))
+  (files/check-and-create-database-file)
+  (db/create-db)
+  (alter-var-root #'db/batch-size (fn [_] 2))
+  (binding [*context* {:db (new SqliteDB)}]
+    (f))
+  (files/delete-database-file))
+
+(t/use-fixtures :each setup-clean-db)
 
 (t/deftest no-auth-type-uses-non-oauth2-login
   (ms/start-server)
@@ -398,3 +418,25 @@
           (.messagesAdded (first @listeners) message-count-event)
           (t/is (= 2 (count (:folder-listener-pairs (deref(:state connection))))))
           (.disconnect-and-stop-monitoring connection))))))
+
+(t/testing "Inbox to Category Folder move"
+  (t/deftest inbox-receive
+    (let [called-recategorize-email (atom 0)]
+      (ms/start-server)
+      (ms/create-folder "test")
+      (with-redefs [app/handle-incoming-imap-email (fn [_ _] {:category-id 1 :category "test" :result :ok})
+                    app/recategorize-email (fn [_ _ _] (swap! called-recategorize-email inc))]
+        (let [config {:imap {:id "test-id" :host "localhost" :user "test-user" :secret "secret" :port "3143" :security "plain"}
+                      :categories [{:id 1 :name "test"}]
+                      :folder-category-map {"test" {:id 1 :folder "test" :category-id 1}}}
+              db ^DB  (:db *context*)
+              connection (sut/create-connection config *context*)]
+          (int/save-category db "test")
+          (.connect connection)
+          (.monitor-folders connection)
+          (ms/send-email-to-folder "INBOX")
+          (Thread/sleep 400)
+          (t/is (some? (.nth-message-in-folder connection "test" 1)))
+          (t/is (= 0 @called-recategorize-email))
+          (.disconnect-and-stop-monitoring connection))))
+    (ms/stop-server)))
