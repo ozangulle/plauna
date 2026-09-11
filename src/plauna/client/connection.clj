@@ -175,7 +175,9 @@
   (move-message-from-folder-to-folder-name connection message source-folder target-name))
 
 (defmethod handle-move-email java.lang.String [connection message source-name target-name]
-  (move-message-from-folder-to-folder-name connection message (open-folder-in-store (:store connection) source-name) target-name))
+  (let [source-folder (open-folder-in-store (get-state connection :store) source-name)
+        target-folder (open-folder-in-store (get-state connection :store) target-name)]
+    (.moveMessages ^IMAPFolder source-folder (into-array Message [message]) target-folder)))
 
 (defrecord FolderConfig [name type category paused])
 

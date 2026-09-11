@@ -1,7 +1,7 @@
 (ns plauna.client.mock-server
   (:require  [clojure.test :as t])
   (:import [com.icegreen.greenmail.util GreenMail GreenMailUtil ServerSetup ServerSetupTest]
-           [jakarta.mail Folder Session]
+           [jakarta.mail Folder Session Message]
            [java.util Properties]))
 
 (def imap-server (atom nil))
@@ -30,9 +30,18 @@
     (when-not (.exists target-folder)
       (.create target-folder Folder/HOLDS_MESSAGES))))
 
-(defn send-email-to-folder [folder]
+(defn send-email-to-inbox []
   (let [subject (GreenMailUtil/random)
         body (GreenMailUtil/random)
         message (createMimeMessage subject body @imap-server)
         user (.setUser @imap-server "test-user@localhost" "test-user", "secret")]
     (.deliver user message)))
+
+(defn move-email-to-folder [folder-name]
+  (let [connected-store (store)
+        inbox (.getFolder connected-store "INBOX")
+        target-folder (.getFolder connected-store folder-name)
+        _ (.open inbox Folder/READ_WRITE)
+        message (.getMessage inbox 1)]
+    (.open target-folder Folder/READ_WRITE)
+    (.moveMessages inbox (into-array Message [message]) target-folder)))

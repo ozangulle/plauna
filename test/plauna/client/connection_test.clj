@@ -414,7 +414,6 @@
               connection (sut/create-connection config context)]
           (.connect connection)
           (.monitor-folders connection)
-          (println (first @listeners))
           (.messagesAdded (first @listeners) message-count-event)
           (t/is (= 2 (count (:folder-listener-pairs (deref(:state connection))))))
           (.disconnect-and-stop-monitoring connection))))))
@@ -434,9 +433,49 @@
           (int/save-category db "test")
           (.connect connection)
           (.monitor-folders connection)
-          (ms/send-email-to-folder "INBOX")
+          (ms/send-email-to-inbox)
           (Thread/sleep 400)
           (t/is (some? (.nth-message-in-folder connection "test" 1)))
           (t/is (= 0 @called-recategorize-email))
           (.disconnect-and-stop-monitoring connection))))
+    (ms/stop-server)))
+
+(t/testing "Move email to a category folder"
+  (t/deftest category-folder-receive
+    (let [called-recategorize-email (atom 0)]
+      (ms/start-server)
+      (ms/create-folder "test")
+      (ms/send-email-to-inbox)
+      (with-redefs [app/recategorize-email (fn [_ _ _] (swap! called-recategorize-email inc))]
+        (let [config {:imap {:id "test-id" :host "localhost" :user "test-user" :secret "secret" :port "3143" :security "plain"}
+                      :categories [{:id 1 :name "test"}]
+                      :folder-category-map {"test" {:id 1 :folder "test" :category-id 1}}}
+              db ^DB  (:db *context*)
+              connection (sut/create-connection config *context*)]
+          (int/save-category db "test")
+          (.connect connection)
+          (.monitor-folders connection)
+          (ms/move-email-to-folder "test")
+          (Thread/sleep 200)
+          (t/is (some? (.nth-message-in-folder connection "test" 1)))
+          (t/is (= 1 @called-recategorize-email))
+          (.disconnect-and-stop-monitoring connection))))
+    (ms/stop-server)))
+
+(t/testing "move-message"
+  (t/deftest move-message
+    (ms/start-server)
+    (ms/create-folder "test")
+    (ms/send-email-to-inbox)
+    (let [config {:imap {:id "test-id" :host "localhost" :user "test-user" :secret "secret" :port "3143" :security "plain"}
+                  :categories [{:id 1 :name "test"}]
+                  :folder-category-map {"test" {:id 1 :folder "test" :category-id 1}}}
+          db ^DB  (:db *context*)
+          connection (sut/create-connection config *context*)]
+      (.connect connection)
+      (.monitor-folders connection)
+      (t/is (= 0 (:message-count (.no-of-messages-in-folder connection "test"))))
+      (.move-message connection (:message (.nth-message-in-folder connection "INBOX" 1)) "INBOX" "test")
+      (t/is (some? (.nth-message-in-folder connection "test" 1)))
+      (.disconnect-and-stop-monitoring connection))
     (ms/stop-server)))
