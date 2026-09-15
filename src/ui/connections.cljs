@@ -287,7 +287,7 @@
                                                                       :parse
                                                                       @parse-settings)
                                                             :on-success
-                                                            (fn [res] (components/show-snackbar (-> res :body :message) (-> res :body :type)))}))} "Parse E-Mails"]]])]
+                                                            (fn [res-body] (components/show-snackbar (:message res-body) (:type res-body)))}))} "Parse E-Mails"]]])]
 
               (when (= "oauth2" (:auth-type (:imap @connection-data)))
                 [:> material/Grid {:size 12}
