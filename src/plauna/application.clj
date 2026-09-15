@@ -111,11 +111,13 @@
         (error-result nil "Moving email failed. Please check the logs.")))
     (catch Exception e (t/log! :error e) (error-result e "Moving email failed. Please check the logs."))))
 
-(defn- move-message [move? connection folder email message category]
-  (if (and (true? move?) (some? category))
-    (do (int/move-message connection message folder category)
+(defn- move-message
+  "category-object must contain category and category-id"
+  [move? connection folder email message category-object]
+  (if (and (true? move?) (some? category-object))
+    (do (int/move-message connection message folder category-object)
         (t/log! :debug ["Email with subject:" (core-email/subject email) "was successfully moved to the corresponding folder"]))
-    (do (t/log! :debug ["move option:" move? "category:" category "the email" (core-email/subject email) "will not be moved"])
+    (do (t/log! :debug ["move option:" move? "category:" category-object "the email" (core-email/subject email) "will not be moved"])
         :na)))
 
 (defn- incoming-email-workflow
@@ -141,7 +143,7 @@
              category (core-email/category enriched-email)]
          (int/save-email db enriched-email-with-connection-id)
          (t/log! :info ["Email with subject:" (core-email/subject email) "was successfully saved to the database"])
-         (move-message move? connection folder email message category)
+         (move-message move? connection folder email message {:category category :category-id (core-email/category-id enriched-email)})
          {:category category :category-id (core-email/category-id email)})))))
 
 (defn handle-incoming-imap-email

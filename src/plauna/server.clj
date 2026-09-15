@@ -339,12 +339,14 @@
                                          folder (:folder settings)
                                          move (:move settings)
                                          assigned-category-pair (st/split (:category settings) #"-")
-                                         connection (client/get-connection id)
-                                         message-count (app/read-emails-from-folder connection folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)})
-                                         response (make-server-response :success
-                                                                        (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)
-                                                                        nil)]
-                                     (success-json-with-body (generate-string response))))))
+                                         connection (client/get-connection id)]
+                                     (if (nil? connection)
+                                       (error-json-with-body 404 {:message "Connection is not active"})
+                                       (let [message-count (app/read-emails-from-folder connection folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)})
+                                             response (make-server-response :success
+                                                                            (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)
+                                                                            nil)]
+                                         (success-json-with-body (generate-string response))))))))
 
    (comp/GET "/oauth2/callback" request
      (let [params (:params request)

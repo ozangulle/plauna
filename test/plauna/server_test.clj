@@ -7,22 +7,30 @@
             [plauna.interfaces :as int]
             [plauna.database :as db]
             [ring.mock.request :as mock]
+            [plauna.client.mock-server :as ms]
             [taoensso.telemere :as tel])
   (:import [org.mockito Mockito]
            [org.mockito.stubbing Answer]
-           [plauna.interfaces IMAPConnection DB]
+           [plauna.interfaces IMAPConnection DB Analyzer]
            [plauna.database SqliteDB]))
 
 (tel/set-min-level! :error)
+(tel/set-ns-filter! {:disallow "com.icegreen.greenmail.*"})
 
 (def ^:dynamic *context* {})
+
+(defn mock-analyzer []
+  (proxy [Analyzer] []
+    (enrich_email [email] (-> (assoc-in email [:metadata :category] "test")
+                              (assoc-in [:metadata :category-id] 1)))))
 
 (defn setup-clean-db [f]
   (swap! files/plauna-config (fn [_] {:data-folder "tmp/"}))
   (files/check-and-create-database-file)
   (db/create-db)
   (alter-var-root #'db/batch-size (fn [_] 2))
-  (binding [*context* {:db (new SqliteDB)}]
+  (binding [*context* {:db (new SqliteDB)
+                       :analyzer (mock-analyzer)}]
     (f))
   (files/delete-database-file))
 
@@ -35,6 +43,8 @@
   ([id] (str api-endpoint "/admin/connections/" id)))
 
 (defn fcmap-api [id] (str (connections-api id) "/categories"))
+
+(defn controls-api [id] (str (connections-api id) "/controls"))
 
 (t/deftest calling-connections-returns-expected-data
   (let [base-connection-data
@@ -207,3 +217,65 @@
           (t/is (= false @update-called )))
         ))))
 
+(t/deftest parse-emails-with-categorization-fail1
+  (let [db ^DB  (:db *context*)
+        handler (sut/app {:db db})]
+    (int/save-connection db {:host "imap.test.com"
+                             :user "test-user"
+                             :secret "1234"
+                             :folder ""
+                             :security "ssl"
+                             :port ""
+                             :debug false
+                             :check-ssl-certs true
+                             :auth-type "basic"
+                             :id "c4aaaf19-c259-3694-9d50-31ecbdcea869"
+                             :auth-provider nil
+                             :auth-providers []})
+    (int/save-category db "test")
+    (int/save-folder-category-map db {:category-id 1 :folder "test"})
+
+    (t/testing
+     "Server returns the correct response because connection is not initialized"
+      ;; FIXME Test edge cases with wrong input
+      (t/is (= 404
+               (:status (handler
+                         (-> (mock/request :post (controls-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
+                             (mock/json-body {:operation "parse" :parse-settings {:move true :folder "INBOX" :category ""}})))))))))
+
+(t/deftest parse-emails-with-categorization
+  (let [db ^DB  (:db *context*)
+        handler (sut/app {:db db})]
+    (int/save-connection db {:host "localhost"
+                             :user "test-user"
+                             :secret "secret"
+                             :folder ""
+                             :security "plain"
+                             :port "3143"
+                             :debug false
+                             :check-ssl-certs true
+                             :auth-type "basic"
+                             :id "c4aaaf19-c259-3694-9d50-31ecbdcea869"
+                             :auth-provider nil
+                             :auth-providers []})
+    (int/save-category db "test")
+    (int/save-folder-category-map db {:category-id 1 :folder "test" :connection-id "c4aaaf19-c259-3694-9d50-31ecbdcea869"})
+    (ms/start-server)
+    (ms/create-folder "test")
+    (ms/send-email-to-inbox)
+    (client/start-imap-connections *context*)
+
+    (t/testing
+        "Server returns the correct success response"
+      (t/is (= 200
+               (:status (handler
+                         (-> (mock/request :post (controls-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
+                             (mock/json-body {:operation "parse" :parse-settings {:move true :folder "INBOX" :category ""}})))))))
+    (Thread/sleep 500)
+    (t/testing
+        "Email is actually moved"
+      (let [connection (client/get-connection "c4aaaf19-c259-3694-9d50-31ecbdcea869")]
+        (t/is (= 0 (:message-count (.no-of-messages-in-folder connection "INBOX"))))
+        (t/is (= 1 (:message-count (.no-of-messages-in-folder connection "test"))))
+        (.disconnect-and-stop-monitoring connection)))
+    (ms/stop-server)))
