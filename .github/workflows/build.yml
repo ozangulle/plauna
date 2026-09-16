@@ -26,6 +26,15 @@ jobs:
       - name: Run tests
         run: clojure -M:test
 
+      - name: Run tests with coverage
+        run: clj -X:coverage
+
+      - name: Upload to Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            path-to-lcov: ./target/coverage/lcov.info
+
       - name: Install npm dependencies
         run: npm ci
 
