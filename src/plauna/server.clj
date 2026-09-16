@@ -24,8 +24,7 @@
    [ring.middleware.params :refer [wrap-params]]
    [ring.util.codec :refer [base64-decode]]
    [ring.util.response :refer [redirect]]
-   [taoensso.telemere :as t]
-   [plauna.interfaces :as int])
+   [taoensso.telemere :as t])
   (:import [java.net ServerSocket]
            [java.util UUID]
            [org.eclipse.jetty.server Server]

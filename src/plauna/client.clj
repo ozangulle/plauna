@@ -1,7 +1,6 @@
 (ns plauna.client
   (:require
    [plauna.imap.connection :as imap-conn]
-   [plauna.core.common-records :as records]
    [plauna.interfaces :as int]
    [taoensso.telemere :as t])
   (:import
@@ -58,7 +57,6 @@
   [connection-id fcmap context]
   (let [fcmaps (restructure-fcmaps (int/fetch-folder-category-maps (:db context) connection-id))
         categories (int/fetch-categories (:db context))
-        folders (.list-folders ^IMAPConnection (get-connection connection-id))
         found-fcmap (get fcmaps (:folder fcmap))]
     (cond
       (nil? (seq (filter #(= (:category-id fcmap) (:id %)) categories)))
