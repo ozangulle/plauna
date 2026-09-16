@@ -23,11 +23,8 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Run tests
-        run: clojure -M:test
-
       - name: Run tests with coverage
-        run: clj -X:coverage
+        run: clj -M:coverage
 
       - name: Upload to Coveralls
         uses: coverallsapp/github-action@master
