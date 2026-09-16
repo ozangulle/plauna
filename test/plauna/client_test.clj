@@ -1,7 +1,7 @@
 (ns plauna.client-test
   (:require [plauna.client :as sut]
             [plauna.interfaces :as int]
-            [plauna.client.connection :as conn]
+            [plauna.imap.connection :as conn]
             [clojure.test :as t])
   (:import [plauna.interfaces DB IMAPConnection]))
 

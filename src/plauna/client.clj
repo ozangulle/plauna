@@ -1,6 +1,6 @@
 (ns plauna.client
   (:require
-   [plauna.client.connection :as imap-conn]
+   [plauna.imap.connection :as imap-conn]
    [plauna.core.common-records :as records]
    [plauna.interfaces :as int]
    [taoensso.telemere :as t])

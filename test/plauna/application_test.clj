@@ -6,7 +6,7 @@
             [plauna.core.email :refer :all]
             [plauna.database :as db]
             [plauna.analysis :an al]
-            [plauna.client.parser :as imap-parser]
+            [plauna.imap.parser :as imap-parser]
             [plauna.files :as files]
             [plauna.application :as app])
   (:import [plauna.database SqliteDB]

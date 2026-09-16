@@ -7,7 +7,7 @@
             [plauna.interfaces :as int]
             [plauna.database :as db]
             [ring.mock.request :as mock]
-            [plauna.client.mock-server :as ms]
+            [plauna.imap.mock-server :as ms]
             [taoensso.telemere :as tel])
   (:import [org.mockito Mockito]
            [org.mockito.stubbing Answer]
