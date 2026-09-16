@@ -32,7 +32,8 @@
   (binding [*context* {:db (new SqliteDB)
                        :analyzer (mock-analyzer)}]
     (f))
-  (files/delete-database-file))
+  (files/delete-database-file)
+  (ms/stop-server))
 
 (t/use-fixtures :each setup-clean-db)
 
@@ -277,5 +278,37 @@
       (let [connection (client/get-connection "c4aaaf19-c259-3694-9d50-31ecbdcea869")]
         (t/is (= 0 (:message-count (.no-of-messages-in-folder connection "INBOX"))))
         (t/is (= 1 (:message-count (.no-of-messages-in-folder connection "test"))))
+        (.disconnect-and-stop-monitoring connection)))
+    (ms/stop-server)))
+
+
+(t/deftest changing-folder-category-map-updates-connection
+  (let [db ^DB  (:db *context*)
+        handler (sut/app {:db db})]
+    (int/save-connection db {:host "localhost"
+                             :user "test-user"
+                             :secret "secret"
+                             :folder ""
+                             :security "plain"
+                             :port "3143"
+                             :debug false
+                             :check-ssl-certs true
+                             :auth-type "basic"
+                             :id "c4aaaf19-c259-3694-9d50-31ecbdcea869"
+                             :auth-provider nil
+                             :auth-providers []})
+    (int/save-category db "test")
+    (int/save-category db "newsletter")
+    (int/save-folder-category-map db {:category-id 1 :folder "test" :connection-id "c4aaaf19-c259-3694-9d50-31ecbdcea869"})
+    (ms/start-server)
+    (ms/create-folder "test")
+    (client/start-imap-connections *context*)
+
+    (t/testing "Updating fcmap updates the connection as well"
+      (handler
+       (-> (mock/request :post (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
+           (mock/json-body {:folder "newsletter" :category-id 2})))
+      (let [connection (client/get-connection "c4aaaf19-c259-3694-9d50-31ecbdcea869")]
+        (t/is (= ["test" "newsletter" "INBOX"]  (map :name @(:folders connection))))
         (.disconnect-and-stop-monitoring connection)))
     (ms/stop-server)))
