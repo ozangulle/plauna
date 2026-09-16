@@ -56,7 +56,7 @@
   (let [connection-id (str (first (gen/sample gen/uuid)))]
     (db/add-connection {:id connection-id :host "bla" :user "bla" :secret "bla" :folder "" :security "ssl"})
     (.save_category db-instance "newsletter")
-    
+
     (testing "Wrong connection id throws an exception on save"
       (let [fcp {:connection-id "wrong-id" :folder "newsletters" :category-id 1}]
         (is (thrown? org.sqlite.SQLiteException (.save-folder-category-map db-instance fcp)))))

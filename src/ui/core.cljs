@@ -32,7 +32,7 @@
                                :borderRight (str "1px solid " (get-in @theme-atom [:palette :divider]))
                                :display "flex"
                                :flexDirection "column"}}}
-   
+
    [:> material/Box
     {:sx {:p 3
           :display "flex"

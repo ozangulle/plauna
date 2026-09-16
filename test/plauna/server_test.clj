@@ -74,7 +74,7 @@
         (.connected?))
     (-> (Mockito/doAnswer
          (reify Answer
-           (answer [_ _](reset! update-called true))))
+           (answer [_ _] (reset! update-called true))))
         (.when mock-conn)
         (.update-config (Mockito/any)))
     (-> (Mockito/doReturn ["INBOX" "newsletter" "spam"])
@@ -180,7 +180,7 @@
                    (:status (handler
                              (-> (mock/request :put (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
                                  (mock/json-body {:folder "newsletter" :category-id 2 :id 1}))))))
-          (t/is (= true @update-called )))
+          (t/is (= true @update-called)))
 
         (t/testing "/connections/:id/categories - do not call update config on an erroneous config update"
           ;; set to false because other test might have triggered update-config
@@ -189,7 +189,7 @@
                    (:status (handler
                              (-> (mock/request :put (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
                                  (mock/json-body {:folder "news" :category-id 2 :id 1}))))))
-          (t/is (= false @update-called )))
+          (t/is (= false @update-called)))
 
         (t/testing "/connections/:id/categories - delete works"
           (t/is (= 200
@@ -206,7 +206,7 @@
                    (:status (handler
                              (-> (mock/request :post (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
                                  (mock/json-body {:folder "newsletter" :category-id 2 :id 1}))))))
-          (t/is (= true @update-called )))
+          (t/is (= true @update-called)))
 
         (t/testing "/connections/:id/categories - post do not call update config on an erroneous config update"
           ;; set to false because other test might have triggered update-config
@@ -215,8 +215,7 @@
                    (:status (handler
                              (-> (mock/request :post (fcmap-api "c4aaaf19-c259-3694-9d50-31ecbdcea868"))
                                  (mock/json-body {:folder "news" :category-id 2 :id 1}))))))
-          (t/is (= false @update-called )))
-        ))))
+          (t/is (= false @update-called)))))))
 
 (t/deftest parse-emails-with-categorization-fail1
   (let [db ^DB  (:db *context*)
@@ -267,20 +266,19 @@
     (client/start-imap-connections *context*)
 
     (t/testing
-        "Server returns the correct success response"
+     "Server returns the correct success response"
       (t/is (= 200
                (:status (handler
                          (-> (mock/request :post (controls-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
                              (mock/json-body {:operation "parse" :parse-settings {:move true :folder "INBOX" :category ""}})))))))
     (Thread/sleep 500)
     (t/testing
-        "Email is actually moved"
+     "Email is actually moved"
       (let [connection (client/get-connection "c4aaaf19-c259-3694-9d50-31ecbdcea869")]
         (t/is (= 0 (:message-count (.no-of-messages-in-folder connection "INBOX"))))
         (t/is (= 1 (:message-count (.no-of-messages-in-folder connection "test"))))
         (.disconnect-and-stop-monitoring connection)))
     (ms/stop-server)))
-
 
 (t/deftest changing-folder-category-map-updates-connection
   (let [db ^DB  (:db *context*)

@@ -37,8 +37,8 @@
 
 (defmacro with-foreign-keys [form]
   `(let [conn# (jdbc/get-connection (ds))]
-       (jdbc/execute! conn# ["PRAGMA foreign_keys = ON"])
-       (jdbc/execute! conn# ~@(rest (rest form)))))
+     (jdbc/execute! conn# ["PRAGMA foreign_keys = ON"])
+     (jdbc/execute! conn# ~@(rest (rest form)))))
 
 (def builder-function {:builder-fn as-unqualified-lower-maps :keywordize? true})
 

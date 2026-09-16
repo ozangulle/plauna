@@ -10,7 +10,7 @@
             [plauna.files :as files]
             [plauna.application :as app])
   (:import [plauna.database SqliteDB]
-           [plauna.analysis BasicAnalyzer ]))
+           [plauna.analysis BasicAnalyzer]))
 
 (t/set-ns-filter! {:disallow "plauna.*"})
 
