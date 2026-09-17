@@ -5,7 +5,8 @@
 [[./docs/resources/plauna-hero-banner.png]]
 
 [[https://coveralls.io/github/ozangulle/plauna?branch=fix/connections][file:https://coveralls.io/repos/github/ozangulle/plauna/badge.svg?branch=fix/connections]]
-
+[[https://web.libera.chat/#plauna][
+file:https://img.shields.io/badge/chat-Libera.Chat-blue?logo=irc]]
 
 *Organize your e-mails without sacrificing your privacy*
 
