@@ -23,7 +23,9 @@
   (doto (new Properties)
     (.setProperty "mail.imap.port" (port connection-config))
     (.setProperty "mail.imap.usesocketchannels" "true")
-    (.setProperty "mail.imap.timeout" "5000")
+    (.setProperty "mail.imap.timeout" "30000")
+    (.setProperty "mail.imap.connectiontimeout" "30000")
+    (.setProperty "mail.imap.socktimeout" "30000")
     (.setProperty "mail.imap.partialfetch" "false")
     (.setProperty "mail.imap.fetchsize" "1048576")))
 
