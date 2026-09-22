@@ -8,8 +8,10 @@
    [reagent.core :as r]
    [ui.backend :as backend]
    [ui.components :as components]
+   [ui.components :as comps]
    [ui.inputs :as inputs]
-   [ui.utils :as utils]))
+   [ui.utils :as utils]
+   [ui.macros :refer-macros [backend-call]]))
 
 (defonce connections-data (r/atom []))
 
@@ -19,7 +21,15 @@
 
 (defonce parse-settings (r/atom {:folder "" :move false :category ""}))
 
+(def connections-backend-call (r/atom false))
+
 (defn fetch-connections-and-refresh [] (backend/fetch-connections (fn [res] (reset! connections-data (:body res)))))
+
+(defn fetch-connection-and-refresh [id loading-atom]
+  (backend/fetch-connection id
+                            (fn [response]
+                              (reset! connection-data (:body response))
+                              (reset! loading-atom false))))
 
 (defn- delete-button [id]
   (r/with-let [open (r/atom false)]
@@ -50,14 +60,55 @@
                                        (reset! open false))}
         "Cancel"]]]]))
 
+(defn connection-control [id command]
+  (backend-call
+   {:backend (backend/post-connection-control id command nil)
+    :on-success (fn [_]
+                  (reset! connections-backend-call false)
+                  (fetch-connections-and-refresh))
+    :on-error (fn [body]
+                (reset! connections-backend-call false)
+                (comps/show-snackbar (:content (:message body)) :warning nil)
+                (fetch-connections-and-refresh))}))
+
+(defn add-fcmp [connection-id fcm]
+  (backend-call
+   {:backend (backend/add-new-fcm connection-id fcm)
+    :on-success (fn [_] (fetch-connection-and-refresh connection-id (atom false)))
+    :on-error (fn [body]
+                (comps/show-snackbar (:message body) :warning nil)
+                (fn [_] (fetch-connection-and-refresh connection-id (atom false))))}))
+
+(defn edit-fcmp [connection-id fcm]
+  (backend-call
+   {:backend (backend/edit-fcm connection-id fcm)
+    :on-success (fn [_] (fetch-connection-and-refresh connection-id (atom false)))
+    :on-error (fn [body]
+                (comps/show-snackbar (:message body) :warning nil)
+                (fn [_] (fetch-connection-and-refresh connection-id (atom false))))}))
+
+(defn delete-fcmp [connection-id fcm]
+  (backend-call
+   {:backend (backend/delete-fcm connection-id fcm)
+    :on-success (fn [_] (fetch-connection-and-refresh connection-id (atom false)))
+    :on-error (fn [body]
+                (comps/show-snackbar (:message body) :warning nil)
+                (fn [_] (fetch-connection-and-refresh connection-id (atom false))))}))
+
 (defn reconnect-button [id connected]
   (if connected
-    [:> material/Button {:color "secondary" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :reconnect nil (fn [_] (fetch-connections-and-refresh))))} "Reconnect"]
-    [:> material/Button {:variant :contained :color "secondary" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :connect nil (fn [_] (fetch-connections-and-refresh))))} "Connect"]))
+    [:> material/Button {:color "secondary" :on-click (fn [event] (.stopPropagation event)
+                                                        (reset! connections-backend-call true)
+                                                        (connection-control id :reconnect))} "Reconnect"]
+    [:> material/Button {:variant :contained :color "secondary" :on-click (fn [event] (.stopPropagation event)
+                                                                            (reset! connections-backend-call true)
+                                                                            (connection-control id :connect))} "Connect"]))
 
 (defn disconnect-button [id connected]
   (if connected
-    [:> material/Button {:variant :outlined :color "error" :on-click (fn [event] (.stopPropagation event) (backend/post-connection-control id :disconnect nil (fn [_] (fetch-connections-and-refresh))))} "Disconnect"]
+    [:> material/Button {:variant :outlined :color "error" :on-click (fn [event] (.stopPropagation event)
+                                                                       (reset! connections-backend-call true)
+                                                                       (connection-control id :disconnect))} "Disconnect"]
     [:> material/Button {:variant :outlined :color "error" :disabled true :on-click (fn [event] (.stopPropagation event))} "Disconnect"]))
 
 (defn connections-page []
@@ -67,7 +118,7 @@
         (when @loading? (backend/fetch-connections (fn [response]
                                                      (reset! connections-data (:body response))
                                                      (reset! loading? false))))
-        (if @loading?
+        (if (or @loading? @connections-backend-call)
           [:> material/LinearProgress {:aria-label "Loading"}]
           [:<>
            [:h2 "Connections"]
@@ -78,7 +129,6 @@
                [:> material/TableCell "Account"]
                [:> material/TableCell "Host"]
                [:> material/TableCell "Connected"]
-               [:> material/TableCell "Folder Open"]
                [:> material/TableCell ""]]]
              [:> material/TableBody
               (for [connection @connections-data]
@@ -86,7 +136,6 @@
                  [:> material/TableCell (:user connection)]
                  [:> material/TableCell (:host connection)]
                  [:> material/TableCell (str (:connected connection))]
-                 [:> material/TableCell (str (:folder-open connection))]
                  [:> material/TableCell
                   [reconnect-button (:id connection) (:connected connection)]
                   [disconnect-button (:id connection) (:connected connection)]
@@ -119,10 +168,17 @@
                             :onClick #(reset! open false)}
         "Cancel"]]]]))
 
+(defn handle-fcmp [category folder]
+  (if (= -1 category)
+    (delete-fcmp (:id (:imap @connection-data)) (get (:folder-category-map @connection-data) (keyword folder)))
+    (if-let [fcmp (get (:folder-category-map @connection-data) (keyword (str (:id category))))]
+      (edit-fcmp (:id (:imap @connection-data)) (assoc fcmp :folder folder))
+      (add-fcmp (:id (:imap @connection-data)) {:folder folder :category-id (:id category)}))))
+
 (defn update-connection-data-config [key] (fn [event new-value]
                                             (if (and (some? new-value) (boolean? new-value))
-                                              (swap! connection-data (fn [old] (update-in old [:config key] (fn [_] new-value))))
-                                              (swap! connection-data (fn [old] (update-in old [:config key] (fn [_] (utils/event-val event))))))))
+                                              (swap! connection-data (fn [old] (update-in old [:imap key] (fn [_] new-value))))
+                                              (swap! connection-data (fn [old] (update-in old [:imap key] (fn [_] (utils/event-val event))))))))
 
 (defn update-new-provider [key] (fn [event]
                                   (swap! new-provider (fn [old] (update old key (fn [_] (utils/event-val event)))))))
@@ -136,17 +192,15 @@
       (r/with-let [loading? (r/atom true)]
         (cond
           (and @loading? (= :edit mode))
-          (backend/fetch-connection (get (js->clj params) "id")
-                                    (fn [response]
-                                      (reset! connection-data (:body response))
-                                      (reset! loading? false)))
-          (and @loading? (= :new mode)) (backend/fetch-auth-providers
-                                         (fn [response]
-                                           (swap! connection-data assoc-in [:config :auth-providers] (:body response))
-                                           (reset! loading? false))))
+          (fetch-connection-and-refresh (get (js->clj params) "id") loading?)
+          (and @loading? (= :new mode))
+          (backend/fetch-auth-providers
+           (fn [response]
+             (swap! connection-data assoc-in [:imap :auth-providers] (:body response))
+             (reset! loading? false))))
         (if @loading?
           [:> material/LinearProgress {:aria-label "Loading"}]
-          (let [config (:config @connection-data)]
+          (let [config (:imap @connection-data)]
             [:<>
              [:h2 "IMAP Connection for " (:host config) " - " (:user config)]
              [:> material/Grid {:container true :spacing 2}
@@ -189,7 +243,7 @@
                  (if (= :new mode)
                    [:> material/Button {:variant :contained
                                         :on-click (fn [] (backend/add-connection
-                                                          (:config @connection-data)
+                                                          (:imap @connection-data)
                                                           (fn [_] (backend/fetch-connection (get (js->clj params) "id")
                                                                                             (fn [response]
                                                                                               (reset! connection-data (:body response))
@@ -197,7 +251,7 @@
                    [:> material/Button {:variant :contained
                                         :on-click (fn [] (backend/update-connection
                                                           (get (js->clj params) "id")
-                                                          (:config @connection-data)
+                                                          (:imap @connection-data)
                                                           (fn [_] (backend/fetch-connection (get (js->clj params) "id")
                                                                                             (fn [response]
                                                                                               (reset! connection-data (:body response)))))))} "Update Connection"])]]]
@@ -227,12 +281,15 @@
                         ^{:key (:id category)}
                         [:> material/MenuItem {:value (str (:id category) "-" (:name category))} (:name category)])]]]
                    [:> material/Button {:variant :contained
-                                        :on-click (fn [_] (backend/post-connection-control
-                                                           (get (js->clj params) "id")
-                                                           :parse
-                                                           @parse-settings
-                                                           (fn [res] (components/show-snackbar (-> res :body :message) (-> res :body :type)))))} "Parse E-Mails"]]])]
-              (when (= "oauth2" (:auth-type (:config @connection-data)))
+                                        :on-click (fn [_] (backend-call
+                                                           {:backend (backend/post-connection-control
+                                                                      (get (js->clj params) "id")
+                                                                      :parse
+                                                                      @parse-settings)
+                                                            :on-success
+                                                            (fn [res-body] (components/show-snackbar (:message res-body) (:type res-body)))}))} "Parse E-Mails"]]])]
+
+              (when (= "oauth2" (:auth-type (:imap @connection-data)))
                 [:> material/Grid {:size 12}
                  [:h3 "Authentication Providers"]
                  [:<>
@@ -267,43 +324,82 @@
                                                                                                                  (fn [response]
                                                                                                                    (reset! connection-data (:body response)))))))} [:> AddIcon]]]]
                      (doall
-                      (for [index (range (count (:auth-providers (:config @connection-data))))
-                            :let [provider (get (:auth-providers (:config @connection-data)) index)]]
+                      (for [index (range (count (:auth-providers (:imap @connection-data))))
+                            :let [provider (get (:auth-providers (:imap @connection-data)) index)]]
                         [:> material/TableRow {:key (:id provider)}
                          [:> material/TableCell [:f> inputs/debounced-input
                                                  (:name provider)
                                                  ""
-                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :name] new-value))]]
+                                                 (fn [_] (update-provider (get (:auth-providers (:imap @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:imap :auth-providers index :name] new-value))]]
                          [:> material/TableCell [:f> inputs/debounced-input
                                                  (:auth-url provider)
                                                  ""
-                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :auth-url] new-value))]]
+                                                 (fn [_] (update-provider (get (:auth-providers (:imap @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:imap :auth-providers index :auth-url] new-value))]]
                          [:> material/TableCell [:f> inputs/debounced-input
                                                  (:token-url provider)
                                                  ""
-                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :token-url] new-value))]]
+                                                 (fn [_] (update-provider (get (:auth-providers (:imap @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:imap :auth-providers index :token-url] new-value))]]
                          [:> material/TableCell [:f> inputs/debounced-input
                                                  (:redirect-url provider)
                                                  ""
-                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :redirect-url] new-value))]]
+                                                 (fn [_] (update-provider (get (:auth-providers (:imap @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:imap :auth-providers index :redirect-url] new-value))]]
                          [:> material/TableCell [:f> inputs/debounced-input
                                                  (:client-id provider)
                                                  ""
-                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :client-id] new-value))]]
+                                                 (fn [_] (update-provider (get (:auth-providers (:imap @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:imap :auth-providers index :client-id] new-value))]]
                          [:> material/TableCell [:f> inputs/debounced-input
                                                  (:client-secret provider)
                                                  ""
-                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :client-secret] new-value))]]
+                                                 (fn [_] (update-provider (get (:auth-providers (:imap @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:imap :auth-providers index :client-secret] new-value))]]
                          [:> material/TableCell [:f> inputs/debounced-input
                                                  (:scope provider)
                                                  ""
-                                                 (fn [_] (update-provider (get (:auth-providers (:config @connection-data)) index) (get (js->clj params) "id")))
-                                                 (fn [new-value] (swap! connection-data assoc-in [:config :auth-providers index :scope] new-value))]]
-                         [:> material/TableCell [delete-auth-provider-button (:name provider) (:id provider) (get (js->clj params) "id")]]]))]]]]])]]))
+                                                 (fn [_] (update-provider (get (:auth-providers (:imap @connection-data)) index) (get (js->clj params) "id")))
+                                                 (fn [new-value] (swap! connection-data assoc-in [:imap :auth-providers index :scope] new-value))]]
+                         [:> material/TableCell [delete-auth-provider-button (:name provider) (:id provider) (get (js->clj params) "id")]]]))]]]]])]
+
+             [:> material/Grid {:size 12}
+              [:h3 "Associate Categories with Folders"]
+              [:> material/TableContainer {:component material/Paper}
+               [:> material/Table
+                [:> material/TableHead
+                 [:> material/TableRow
+                  [:> material/TableCell "Category"]
+                  [:> material/TableCell "Folder"]
+                  [:> material/TableCell ""]]]
+                [:> material/TableBody
+                 (for [category (:categories @connection-data)]
+                   [:> material/TableRow
+                    [:> material/TableCell (:name category)]
+                    [:> material/TableCell
+                     [:> material/FormControl {:fullWidth true
+                                               :variant "outlined"}
+
+                      [:> material/InputLabel {:id "folder-label"} ""]
+                      [:> material/Select
+                       {:labelId "folder-label"
+                        :label ""
+                        :value (or (:folder (get (:folder-category-map @connection-data) (keyword (str (:id category))))) "")
+                        :onChange
+                        (fn [event]
+                          (handle-fcmp category (.. event -target -value)))}
+
+                       (for [folder (sort (:folders @connection-data))]
+                         ^{:key folder}
+                         [:> material/MenuItem {:value folder}
+                          folder])]]]
+                    [:> material/TableCell
+                     [:> material/Button {:variant :text
+                                          :color "secondary"
+                                          :onClick (fn [] (let [fcmp (get (:folder-category-map @connection-data) (keyword (str (:id category))))]
+                                                            (when (some? fcmp)
+                                                              (delete-fcmp (:id (:imap @connection-data)) fcmp))))}
+                      "Clear"]]])]]]]]))
+
         (finally (reset! loading? true) (reset! connection-data {}))))))

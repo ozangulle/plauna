@@ -183,8 +183,8 @@
                 [:> material/FormControlLabel {:label "Move this email after update"
                                                :control (r/create-element material/Checkbox
                                                                           #js
-                                                                          {:checked @move-email
-                                                                           :onChange (fn [_ new] (reset! move-email new))
-                                                                           :label "Test"})}]]]]]]
+                                                                           {:checked @move-email
+                                                                            :onChange (fn [_ new] (reset! move-email new))
+                                                                            :label "Test"})}]]]]]]
            [:h3 "Content(s)"]
            (into [:<>] (contents (:body email)))])))))

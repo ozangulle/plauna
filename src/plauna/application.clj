@@ -3,7 +3,8 @@
             [taoensso.telemere :as t]
             [clojure.core.async :as async]
             [plauna.core.email :as core-email]
-            [plauna.util.page :as page]))
+            [plauna.util.page :as page]
+            [plauna.database :as db]))
 
 (defn- filter->sql-clause [filter]
   (cond
@@ -110,11 +111,13 @@
         (error-result nil "Moving email failed. Please check the logs.")))
     (catch Exception e (t/log! :error e) (error-result e "Moving email failed. Please check the logs."))))
 
-(defn- move-message [move? connection folder email message category]
-  (if (and (true? move?) (some? category))
-    (do (int/move-message connection message folder category)
+(defn- move-message
+  "category-object must contain category and category-id"
+  [move? connection folder email message category-object]
+  (if (and (true? move?) (some? category-object))
+    (do (int/move-message connection message folder category-object)
         (t/log! :debug ["Email with subject:" (core-email/subject email) "was successfully moved to the corresponding folder"]))
-    (do (t/log! :debug ["move option:" move? "category:" category "the email" (core-email/subject email) "will not be moved"])
+    (do (t/log! :debug ["move option:" move? "category:" category-object "the email" (core-email/subject email) "will not be moved"])
         :na)))
 
 (defn- incoming-email-workflow
@@ -125,7 +128,7 @@
          category (core-email/category enriched-email)]
      (t/log! :info ["Email with subject:" (core-email/subject email) "was categorized as" category])
      (int/save-email db enriched-email-with-connection-id)
-     {:category category}))
+     {:category category :category-id (core-email/category-id enriched-email)}))
   ([email message folder connection {:keys [move? assigned-category assigned-category-id]}]
    (let [{:keys [analyzer db]} (:context connection)]
      (if (not (empty? assigned-category))
@@ -140,8 +143,8 @@
              category (core-email/category enriched-email)]
          (int/save-email db enriched-email-with-connection-id)
          (t/log! :info ["Email with subject:" (core-email/subject email) "was successfully saved to the database"])
-         (move-message move? connection folder email message category)
-         {:category category})))))
+         (move-message move? connection folder email message {:category category :category-id (core-email/category-id enriched-email)})
+         {:category category :category-id (core-email/category-id email)})))))
 
 (defn handle-incoming-imap-email
   "Handle incoming emails synchronously on a single thread. Returns a result."
@@ -165,3 +168,30 @@
             (incoming-email-workflow (:email email-message) (:message email-message) folder connection options))))
       (t/log! :info ["There are no emails in the folder. Doing nothing."]))
     (:message-count messages-result)))
+
+(defn recategorize-email [email category-id connection]
+  (let [context (:context connection)
+        db (:db context)
+        message-id (core-email/message-id email)]
+    (if-let [email-in-db (int/fetch-email db message-id)]
+      (let [metadata (:metadata email-in-db)]
+        (db/update-metadata
+         message-id
+         category-id
+         1
+         (:language metadata)
+         (:language-confidence metadata)
+         (:connection-id metadata)))
+      (let [language-result (int/detect-language (:analyzer context) email)
+            enriched-raw-email (-> email
+                                   (assoc-in [:metadata :connection-id] (:id connection))
+                                   (assoc-in [:metadata :language] (:code language-result))
+                                   (assoc-in [:metadata :language-confidence] (:confidence language-result))
+                                   (assoc-in [:metadata :category-id] category-id)
+                                   (assoc-in [:metadata :category-confidence] 1))
+            enriched-email (core-email/->EnrichedEmail
+                            (:header enriched-raw-email)
+                            (:body enriched-raw-email)
+                            (:participants enriched-raw-email)
+                            (:metadata enriched-raw-email))]
+        (int/save-email (:db context) enriched-email)))))

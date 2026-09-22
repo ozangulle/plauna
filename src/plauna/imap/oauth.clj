@@ -1,4 +1,4 @@
-(ns plauna.client.oauth
+(ns plauna.imap.oauth
   (:require [clj-http.client :as http]
             [ring.util.codec :refer [url-encode]]))
 

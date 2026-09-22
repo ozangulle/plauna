@@ -19,13 +19,6 @@
 
 (set! *warn-on-reflection* true)
 
-(defn start-imap-client
-  [context]
-  (let [connections-in-db (db/get-connections)]
-    (doseq [client-config connections-in-db]
-      (client/create-connection-from-config-and-start-watching client-config context)))
-  (t/log! :debug "Listening to new emails from listen-channel"))
-
 (defn -main
   [& args]
   (setup-logging)
@@ -35,7 +28,7 @@
     (db/create-db)
     (t/log! :info "Setting log level according to preferences.")
     (t/set-min-level! (preferences/log-level))
-    (start-imap-client context)
+    (client/start-imap-connections  context)
     (server/start-server context)))
 
 (comment

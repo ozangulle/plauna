@@ -8,13 +8,14 @@
    [plauna.analysis :as analysis]
    [plauna.application :as app]
    [plauna.client :as client]
-   [plauna.client.oauth :as oauth]
-   [plauna.client.connection :as imap-conn]
+   [plauna.imap.oauth :as oauth]
+   [plauna.imap.connection :as imap-conn]
    [plauna.core.server-comm :refer [make-server-response]]
    [plauna.core.email :as core-email]
    [plauna.database :as db]
    [plauna.files :as files]
    [plauna.messaging :as messaging]
+   [plauna.interfaces :as int]
    [plauna.preferences :as p]
    [ring.adapter.jetty :as jetty]
    [ring.middleware.defaults :refer [wrap-defaults]]
@@ -23,11 +24,11 @@
    [ring.middleware.params :refer [wrap-params]]
    [ring.util.codec :refer [base64-decode]]
    [ring.util.response :refer [redirect]]
-   [taoensso.telemere :as t]
-   [plauna.interfaces :as int])
+   [taoensso.telemere :as t])
   (:import [java.net ServerSocket]
            [java.util UUID]
-           [org.eclipse.jetty.server Server]))
+           [org.eclipse.jetty.server Server]
+           [plauna.interfaces IMAPConnection]))
 
 (set! *warn-on-reflection* true)
 
@@ -142,7 +143,9 @@
                                               (conj acc {k (:default v)})))
                             {} template)))
 
-(defn connection-information [id] (let [conn (db/get-connection id)] (merge conn {:connected (int/connected? (client/get-connection id))})))
+(defn connection-information [id context]
+  (let [conn (int/fetch-connection (:db context) id)]
+    (merge conn {:connected (int/connected? (client/get-connection id))})))
 
 (defn connection-folders [connection-config]
   (let [conn (client/get-connection (:id connection-config))]
@@ -233,7 +236,8 @@
      {:status  200})
 
    (comp/GET "/api/admin/connections" _
-     (success-json-with-body (generate-string (mapv (fn [connection-config] (merge connection-config {:connected (int/connected? (client/get-connection (:id connection-config)))})) (db/get-connections)))))
+     (success-json-with-body (generate-string (mapv (fn [connection-config]
+                                                      (merge connection-config {:connected (if-let [conn (client/get-connection (:id connection-config))] (int/connected? conn) false)})) (db/get-connections)))))
 
    (comp/POST "/api/admin/connections" request
      (let [params (:body request)
@@ -266,10 +270,10 @@
        (success-json-with-body {})))
 
    (comp/GET "/api/admin/connections/:id" [id]
-     (let [conn-info (connection-information id)
-           providers (db/get-auth-providers)
-           categories (db/get-categories)]
-       (success-json-with-body (generate-string {:config (assoc conn-info :auth-providers providers) :folders (mapv str (connection-folders conn-info)) :categories categories}))))
+     (let [result (client/connection-config id context)]
+       (if (nil? result)
+         (error-json-with-body 404 {})
+         (success-json-with-body (generate-string (client/connection-config id context))))))
 
    (comp/PUT "/api/admin/connections/:id" request
      (let [config (:config (:body request))
@@ -277,15 +281,46 @@
        (db/update-connection {:id id :host (get config :host) :user (get config :user) :secret (get config :secret) :folder (get config :folder) :debug (get config :debug) :security (get config :security) :port (get config :port) :check-ssl-certs (get config :check-ssl-certs) :auth-type (get config :auth-type) :auth-provider (get config :auth-provider)})
        (success-json-with-body {})))
 
+   (comp/DELETE "/api/admin/connections/:id/categories" request
+     (let [fcmap (:body request)]
+       (int/delete-folder-category-map (:db context) (:id fcmap))
+       (success-json-with-body (generate-string {}))))
+
+   (comp/POST "/api/admin/connections/:id/categories" request
+     (let [id (:id (:route-params request))
+           fcmap (:body request)
+           connection (int/fetch-connection (:db context) id)]
+       (if (some? connection)
+         (do (int/save-folder-category-map (:db context) (assoc fcmap :connection-id id))
+             (.update-config ^IMAPConnection (client/get-connection id) (client/connection-config id context))
+             (success-json-with-body (generate-string {})))
+         (error-json-with-body 404 {:message (str "Connection " id " was not found")}))))
+
+   (comp/PUT "/api/admin/connections/:id/categories" request
+     (let [connection-id (:id (:route-params request))
+           fcmap (:body request)]
+       (if (nil? (:id fcmap))
+         (error-json-with-body 400 {:message "id cannot be empty"})
+         (let [operation (client/edit-fcmap-in-connection connection-id fcmap context)]
+           (if (= :success (:result operation))
+             (do
+               (.update-config ^IMAPConnection (client/get-connection connection-id) (client/connection-config connection-id context))
+               (success-json-with-body {}))
+             (error-json-with-body 404 operation))))))
+
    (comp/POST "/api/admin/connections/:id/controls" request
      (let [id (:id (:route-params request))
            operation (:operation (:body request))]
        (cond (= "reconnect" operation)
-             (if (client/restart-connection id)
-               (success-json-with-body {})
-               (error-json-with-body 408 {:message "Operation timed out"}))
+             (let [connection ^plauna.interfaces.IMAPConnection (client/get-connection id)]
+               (if (int/connected? connection)
+                 (do (.disconnect-and-stop-monitoring connection)
+                     (.connect connection)
+                     (.monitor-folders connection)
+                     (success-json-with-body {}))
+                 (error-json-with-body 400 {:message "The connection is not active."})))
              (= "disconnect" operation) (let [connection ^plauna.interfaces.IMAPConnection (client/get-connection id)]
-                                          (if (int/connected? connection)
+                                          (if (.connected? connection)
                                             (do (.disconnect-and-stop-monitoring connection)
                                                 (success-json-with-body {}))
                                             (error-json-with-body 400 {:message "The connection is not active."})))
@@ -298,18 +333,19 @@
                  (= :ok (:result action))
                  (success-json-with-body {})
                  (= :error (:result action))
-                 (success-json-with-body {}))
-               (success-json-with-body (generate-string (make-server-response :success nil nil))))
+                 (error-json-with-body 500 {:message (:message action)})))
              (= "parse" operation) (let [settings (:parse-settings (:body request))
                                          folder (:folder settings)
                                          move (:move settings)
                                          assigned-category-pair (st/split (:category settings) #"-")
-                                         connection (client/get-connection id)
-                                         message-count (app/read-emails-from-folder connection folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)})
-                                         response (make-server-response :success
-                                                                        (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)
-                                                                        nil)]
-                                     (success-json-with-body (generate-string response))))))
+                                         connection (client/get-connection id)]
+                                     (if (nil? connection)
+                                       (error-json-with-body 404 {:message "Connection is not active"})
+                                       (let [message-count (app/read-emails-from-folder connection folder {:move? move :assigned-category (second assigned-category-pair) :assigned-category-id (first assigned-category-pair)})
+                                             response (make-server-response :success
+                                                                            (str "Started parsing " folder " asynchronously. There are " message-count " emails in the folder. Move folders after parsing: " move)
+                                                                            nil)]
+                                         (success-json-with-body (generate-string response))))))))
 
    (comp/GET "/oauth2/callback" request
      (let [params (:params request)

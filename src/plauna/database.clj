@@ -29,17 +29,19 @@
   (.load (doto (Flyway/configure)
            (.dataSource (ds)))))
 
-(def my-addresses (atom #{}))
-
 (defn create-db []
   (.migrate ^Flyway (flyway))
   (jdbc/execute! (ds) ["PRAGMA foreign_keys = ON;"])
-  (jdbc/execute! (ds) ["PRAGMA journal_mode = WAL;"])
-  (jdbc/execute! (ds) ["PRAGMA foreign_keys=on;"]))
+  (jdbc/execute! (ds) ["PRAGMA journal_mode = WAL;"]))
 
-(def builder-function {:builder-fn as-unqualified-lower-maps})
+(defmacro with-foreign-keys [form]
+  `(let [conn# (jdbc/get-connection (ds))]
+     (jdbc/execute! conn# ["PRAGMA foreign_keys = ON"])
+     (jdbc/execute! conn# ~@(rest (rest form)))))
 
-(def builder-function-kebab {:builder-fn as-unqualified-kebab-maps})
+(def builder-function {:builder-fn as-unqualified-lower-maps :keywordize? true})
+
+(def builder-function-kebab {:builder-fn as-unqualified-kebab-maps :keywordize? true})
 
 ;; Insert Clauses
 
@@ -189,6 +191,9 @@
 (defn delete-email-by-message-id [message-id]
   (let [conn (jdbc/get-connection (ds))]
     (jdbc/execute! conn ["PRAGMA foreign_keys = ON"])
+    (jdbc/execute! conn ["DELETE FROM communications WHERE message_id = ?" message-id])
+    (jdbc/execute! conn ["DELETE FROM bodies WHERE message_id = ?" message-id])
+    (jdbc/execute! conn ["DELETE FROM metadata WHERE message_id = ?" message-id])
     (jdbc/execute! conn ["DELETE FROM headers WHERE message_id = ?" message-id])))
 
 (defn category-by-name [category-name]
@@ -332,9 +337,11 @@
     (when (some? result) (:value result))))
 
 (defn db-connection->model [db-conn]
-  (apply (comp records/map->ImapConnection
-               (fn [conn] (update conn :check-ssl-certs #(= % 1)))
-               (fn [conn] (update conn :debug #(= % 1)))) [db-conn]))
+  (if (nil? db-conn)
+    nil
+    (apply (comp records/map->ImapConnection
+                 (fn [conn] (update conn :check-ssl-certs #(= % 1)))
+                 (fn [conn] (update conn :debug #(= % 1)))) [db-conn])))
 
 (defn get-connections [] (map
                           db-connection->model
@@ -369,9 +376,9 @@
 (defn add-connection [connection]
   (jdbc/execute! (ds)
                  (honey/format {:insert-into [:connections]
-                                :columns [:id :host :user :secret :folder :debug :security :port :check-ssl-certs]
+                                :columns [:id :host :user :secret :folder :debug :security :port :check-ssl-certs :auth-type]
                                 :values [[(:id connection) (:host connection) (:user connection)
-                                          (:secret connection) (:folder connection) (:debug connection) (:security connection) (:port connection) (:check-ssl-certs connection)]]})
+                                          (:secret connection) (:folder connection) (:debug connection) (:security connection) (:port connection) (:check-ssl-certs connection) (:auth-type connection)]]})
                  builder-function))
 
 (defn update-connection [connection]
@@ -409,15 +416,38 @@
 
 (deftype SqliteDB []
   int/DB
+  (delete-folder-category-map [_ id]
+    (with-foreign-keys (jdbc/execute! (ds) (honey/format {:delete-from [:folder_category_maps] :where [:= :id id]}) builder-function)))
   (fetch-connection [_ id] (get-connection id))
+  (fetch-connections [_] (get-connections))
   (fetch-oauth-token-data [_ connection-id] (get-oauth-tokens connection-id))
   (fetch-auth-provider [_ id] (get-auth-provider id))
   (fetch-categories [_] (get-categories))
+  (fetch-email [_ id] (let [headers (jdbc/execute-one! (ds) ["SELECT DISTINCT * FROM headers WHERE message_id = ?" id] builder-function-kebab)
+                            body (jdbc/execute! (ds) ["SELECT * from bodies WHERE message_id = ?" id] builder-function-kebab)
+                            participants (jdbc/execute! (ds) ["SELECT contacts.contact_key, name, address, communications.type from contacts LEFT JOIN communications ON contacts.contact_key = communications.contact_key WHERE message_id = ?" id] builder-function-kebab)
+                            metadata (jdbc/execute-one! (ds) ["SELECT message_id, language, language_modified, language_confidence, category AS category_id, categories.name AS category, category_confidence, connection_id from metadata LEFT JOIN categories ON categories.id = metadata.category WHERE message_id = ?" id] builder-function-kebab)]
+                        (if (nil? headers)
+                          nil
+                          (core.email/->EnrichedEmail
+                           (core.email/map->Header headers)
+                           body
+                           participants
+                           (core.email/map->Metadata metadata)))))
   (fetch-emails [_ entity customization] (fetch-data entity customization))
+  (fetch-folder-category-maps [_ connection-id]
+    (jdbc/execute! (ds) (honey/format {:select [:*] :from [:folder_category_maps] :where [:= :connection_id connection-id]}) builder-function-kebab))
+  (fetch-auth-providers [_] (jdbc/execute! (ds) (honey/format {:select [:*] :from [:auth_providers]}) builder-function-kebab))
   (save-category [_ category-name] (create-category category-name))
+  (save-connection [_ connection] (add-connection connection))
   (save-email [_ email]
     (save-headers [(:header email)])
     (save-bodies (:body email))
     (save-contacts (:participants email))
     (save-communications (:participants email))
-    (when (not (empty? (:metadata email))) (update-metadata-batch [(:metadata email)]))))
+    (when (not (empty? (:metadata email))) (update-metadata-batch [(:metadata email)])))
+  (save-folder-category-map [_ fcmap]
+    (with-foreign-keys (jdbc/execute! (ds) (-> {:insert-into [:folder_category_maps] :values [fcmap]}
+                                               honey/format
+                                               (insert->insert-update)) builder-function))))
+

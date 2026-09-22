@@ -1,5 +1,5 @@
-(ns plauna.client.session-test
-  (:require [plauna.client.session :as sut]
+(ns plauna.imap.session-test
+  (:require [plauna.imap.session :as sut]
             [clojure.test :as t])
   (:import
    (java.util Properties)
@@ -11,7 +11,9 @@
                               (.setProperty "mail.imap.ssl.enable", "true")
                               (.setProperty "mail.imap.port", "993")
                               (.setProperty "mail.imap.usesocketchannels" "true")
-                              (.setProperty "mail.imap.timeout" "5000")
+                              (.setProperty "mail.imap.timeout" "30000")
+                              (.setProperty "mail.imap.connectiontimeout" "30000")
+                              (.setProperty "mail.imap.socktimeout" "30000")
                               (.setProperty "mail.imap.partialfetch" "false")
                               (.setProperty "mail.imap.fetchsize" "1048576"))]
     (t/is (= expected-properties (.getProperties session)))))
@@ -22,7 +24,9 @@
                               (.setProperty "mail.imap.starttls.enable", "true")
                               (.setProperty "mail.imap.port", "143")
                               (.setProperty "mail.imap.usesocketchannels" "true")
-                              (.setProperty "mail.imap.timeout" "5000")
+                              (.setProperty "mail.imap.timeout" "30000")
+                              (.setProperty "mail.imap.connectiontimeout" "30000")
+                              (.setProperty "mail.imap.socktimeout" "30000")
                               (.setProperty "mail.imap.partialfetch" "false")
                               (.setProperty "mail.imap.fetchsize" "1048576"))]
     (t/is (= expected-properties (.getProperties session)))))
@@ -32,7 +36,9 @@
         expected-properties (doto (new Properties)
                               (.setProperty "mail.imap.usesocketchannels" "true")
                               (.setProperty "mail.imap.port", "143")
-                              (.setProperty "mail.imap.timeout" "5000")
+                              (.setProperty "mail.imap.timeout" "30000")
+                              (.setProperty "mail.imap.connectiontimeout" "30000")
+                              (.setProperty "mail.imap.socktimeout" "30000")
                               (.setProperty "mail.imap.partialfetch" "false")
                               (.setProperty "mail.imap.fetchsize" "1048576"))]
     (t/is (= expected-properties (.getProperties session)))))
@@ -43,7 +49,9 @@
                               (.setProperty "mail.imap.ssl.enable", "true")
                               (.setProperty "mail.imap.port", "993")
                               (.setProperty "mail.imap.usesocketchannels" "true")
-                              (.setProperty "mail.imap.timeout" "5000")
+                              (.setProperty "mail.imap.timeout" "30000")
+                              (.setProperty "mail.imap.connectiontimeout" "30000")
+                              (.setProperty "mail.imap.socktimeout" "30000")
                               (.setProperty "mail.imap.partialfetch" "false")
                               (.setProperty "mail.imap.fetchsize" "1048576"))]
     (t/is (= expected-properties (.getProperties session)))))
@@ -54,7 +62,9 @@
                               (.setProperty "mail.imap.ssl.enable", "true")
                               (.setProperty "mail.imap.port" "993")
                               (.setProperty "mail.imap.usesocketchannels" "true")
-                              (.setProperty "mail.imap.timeout" "5000")
+                              (.setProperty "mail.imap.timeout" "30000")
+                              (.setProperty "mail.imap.connectiontimeout" "30000")
+                              (.setProperty "mail.imap.socktimeout" "30000")
                               (.setProperty "mail.imap.partialfetch" "false")
                               (.setProperty "mail.imap.fetchsize" "1048576"))]
     (t/is (= expected-properties (.getProperties session)))))
