@@ -35,7 +35,6 @@ You can parse your e-mails from mbox files or directly by connecting to your IMA
 
 Plauna has recently introduced a new UI. Furthermore, work is underway to improve the categorization process. Efforts are focused on making the transition from the old workflow to the new one as smooth as possible. If you encounter any bugs or believe these changes have invalidated your workflow, please open a bug ticket.
 
-
 * What Plauna is NOT
 
 Plauna is not an e-mail archive tool. It only saves headers and contents from e-mail that it thinks will be useful for categorizing your e-mails. Certain things like the attachments are explicitly not stored in order to save db space. Please do no rely on Plauna to successfully preserve the e-mails you want to archive. 
@@ -61,12 +60,6 @@ It is important to run the frontend build first, as it creates the artifacts for
 #+begin_src
   java -jar target/plauna-standalone.jar
 #+end_src
-
-* Security
-
-Plauna comes without security features like different users. It is made to be used by self-hosters who own and use the service themselves in an internal network that is isolated.
-
-*Please do not use Plauna in an open network or open ports to outside!*
 
 * How to use
 
@@ -120,42 +113,57 @@ After you set up your configuration, go to the "Connections" page and click on "
 
 ** Getting Started
 
-When you start Plauna, it starts a web server on the port which you specified (defaults to 8080) and connects to the IMAP servers that you configured. You can use Plauna without configuring any IMAP servers but you would be missing out on the "move e-mail" functionality. On your very first start, the database is empty. You need to fill it with e-mails. There are three non-exclusive ways of doing this:
-
-1. Go to "Admin". Under the header "Parse E-mails" select an mbox file and click on the button "Parse Mbox". You can see your e-mails under the "E-mails" tab shortly thereafter.
-
-2. Go to "Watchers", click on any IMAP account name, select a folder you want to parse the e-mails in, make sure "Move e-mails after categorization" is unchecked and click on the button "Parse E-mails". This will read all the e-mails in the selected folder.
-
-3. Just leave Plauna running and watch it save your e-mails. Beware: Depending on how many e-mails you receive on any given day, this method may be very slow.
-
-   
-** Language Detection
-
-Plauna automatically detects the language of an e-mail upon parsing it. Here, you must also select the languages that you want to use in training - therefore the languages you want to use in categorization.
-
-** Categorization
+When you start Plauna, it starts a web server on the port which you specified (defaults to 8080). Here are the steps you need to follow in order to set it up.
 
 *** Create Categories
 
-Go to "Admin" -> "Manage Categories" in order to create and delete categories. If you set up connections to your IMAP servers in your settings file, anytime you create a category Plauna will try to create a folder on the servers. If you however delete a category, Plauna will not delete it on the server. As a general rule, Plauna reads and moves e-mails as well as it creates folders but it never deletes anything.
+Go to "Admin" -> "Categories" in order to create and delete categories. You can theoretically create as many categories as you want but usually less is more. Start simple. Two to three categories are often more effective than many.
 
-*** Categorize E-mails
+Common examples: "Important" and "Not Important", or "Newsletters", "Work", and "Personal".
 
-Under the tab "E-mails" you can edit the language and category of every e-mail; either as a batch operation or by clicking on an e-mail and changing it at the details page.
+The most important thing is to take your time and think about what you want to achieve.
 
-#+CAPTION: List emails and edit metadata
-[[./docs/resources/plauna-new-1.png]]
+*** IMAP Connection 
 
-#+CAPTION: See details of an email and edit metadata
-[[./docs/resources/plauna-new-2.png]]
+IMAP Connections are listed under the "Connections" tab. Here you can create, edit, and delete IMAP connections.
+
+After creating a connection for the first time, you need to connect to it under the "Connections" overview page.
+
+After a successful connection, click on the connection you want to manage. You will see the categories you created in the previous step.
+
+Map each category to an IMAP folder — assign the folder where you want emails in that category to be stored (e.g., map "Newsletters" category to your Newsletters folder).
+
+After assigning all folders, you will need to reconnect.
+
+After this step, Plauna monitors your Inbox for incoming emails and watches your category folders for emails to learn from.
+
+*** Initial Categorization
+
+At this point, Plauna knows about your desired categories and your IMAP setup but its own database is empty. You need to populate the database with emails before you can start training Plauna to automatically categorize your emails. There are three ways of populating the database:
+
+1. Move relevant emails to the folder you specified: If you have a category folder for newsletters, move at least a 50-60 emails to this folder.
+
+2. Go to the "Connections" tab, click on any IMAP account name, select a folder you want to parse the e-mails in, make sure "Move e-mails after categorization" is unchecked, select which category should be assigned to these emails and click on the button "Parse E-mails". This will read all the e-mails in the selected folder and assign them to the corresponding category. You can also leave the category empty and then manually assign the categories through Plauna's interface.
+
+3. Let Plauna run and automatically save incoming emails as you manually sort them. Depending on how many e-mails you receive on any given day, this method may be very slow.
+
+   
+*** Languages
+
+Plauna is designed for multilingualism in mind and automatically detects the language of an e-mail upon parsing it. There is a possibility that you do not want to automatically categorize for every language you have. Plauna does not make any assumptions for you. This is why you need to go to "Administration" and check the languages that are relevant for your data training.
 
 *** Data Training
 
-Under the tab "E-mails" there is an expandable section called "Data Training". Click on the button "Train with Existing Data" to train the model(s) using the existing categorized data. *Important:* You must have more than one category saved for each language you want to train in.
-
-You must have selected at least one language in "Admin" -> "Manage Languages" in order to start training on your e-mails.
+After you have at least roughly 50 emails in every category per language, you can click on the button "Traing Using Existing Data" button where your emails are listed.
+*Important:* You must have more than one category saved for each language you want to train in.
 
 *** Automatic Categorization
 
 After training your models on the categories you created, Plauna will categorize each e-mail you receive and moved it automatically to its corresponding folder.
 
+
+* Security
+
+Plauna comes without security features like different users. It is made to be used by self-hosters who own and use the service themselves in an internal network that is isolated.
+
+*Please do not use Plauna in an open network or open ports to outside!*
