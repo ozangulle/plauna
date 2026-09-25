@@ -128,14 +128,12 @@
               [:> material/TableRow
                [:> material/TableCell "Account"]
                [:> material/TableCell "Host"]
-               [:> material/TableCell "Connected"]
                [:> material/TableCell ""]]]
              [:> material/TableBody
               (for [connection @connections-data]
                 [:> material/TableRow {:key (:id connection) :on-click (fn [_] (navigate (str "/connections/" (:id connection)))) :sx {:cursor "pointer"}}
                  [:> material/TableCell (:user connection)]
                  [:> material/TableCell (:host connection)]
-                 [:> material/TableCell (str (:connected connection))]
                  [:> material/TableCell
                   [reconnect-button (:id connection) (:connected connection)]
                   [disconnect-button (:id connection) (:connected connection)]

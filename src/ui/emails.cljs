@@ -76,13 +76,11 @@
                            ""
                            (fn [mail] (save-metadata mail))
                            (fn [new-value] (get (:data (swap! emails assoc-in [:data index :metadata :language] new-value)) index))]]
-   [:> material/TableCell (utils/decimal-place (ce/language-confidence email) 4)]
    [:> material/TableCell (inputs/category-select email
                                                   ""
                                                   (:categories (:optional @emails))
                                                   (category-debouncer)
-                                                  (category-update-handler email))]
-   [:> material/TableCell (utils/decimal-place (ce/category-confidence email) 4)]])
+                                                  (category-update-handler email))]])
 
 (defn handle-change-size [event]
   (swap! emails (fn [old] (update-in old [:parameters :size] (fn [_] (event-val event)))))
@@ -145,9 +143,7 @@
                [:> material/TableCell "From"]
                [:> material/TableCell "To"]
                [:> material/TableCell "Language"]
-               [:> material/TableCell "Confidence"]
-               [:> material/TableCell "Category"]
-               [:> material/TableCell "Confidence"]]]
+               [:> material/TableCell "Category"]]]
              [:> material/TableBody
               (doall
                (for [index (range (count (:data @emails)))
