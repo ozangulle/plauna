@@ -13,7 +13,7 @@ Plauna is a privacy focused service that helps you categorize your e-mails. All 
 
 You can parse your e-mails from mbox files or directly by connecting to your IMAP servers. Plauna helps you categorize your e-mails and automates the process so that incoming e-mails are moved to their respective folders on your IMAP server.
 
-*IMPORTANT:* Plauna is still under heavy development at the moment. The features are subject to change.
+*Questions?* If the documentation is unclear or you are unsure about how to use Plauna, feel free to open an issue on Github or join the libera chat group. I am usually available there on Mondays and Wednesdays from 8:00 to 10:00 PM CET.
 
 * Features
 
