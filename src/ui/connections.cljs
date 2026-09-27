@@ -3,6 +3,7 @@
    ["@mui/icons-material/Add" :default AddIcon]
    ["@mui/icons-material/DeleteForever" :default DeleteForeverIcon]
    ["@mui/icons-material/WarningRounded" :default WarningRoundedIcon]
+   ["@mui/icons-material/Info" :default InfoIcon]
    ["@mui/material" :as material]
    [react-router-dom :as rr]
    [reagent.core :as r]
@@ -363,7 +364,10 @@
                          [:> material/TableCell [delete-auth-provider-button (:name provider) (:id provider) (get (js->clj params) "id")]]]))]]]]])]
 
              [:> material/Grid {:size 12}
-              [:h3 "Associate Categories with Folders"]
+              [:h3 "Associate Categories with Folders"
+               [:> material/Tooltip {:title "You’ll need to reconnect for these changes to take effect."}
+                [:> material/IconButton
+                 [:> InfoIcon]]]]
               [:> material/TableContainer {:component material/Paper}
                [:> material/Table
                 [:> material/TableHead
