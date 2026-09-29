@@ -1,6 +1,7 @@
 (ns ui.connections
   (:require
    ["@mui/icons-material/Add" :default AddIcon]
+   ["@mui/icons-material/ArrowBack" :default ArrowBackIcon]
    ["@mui/icons-material/DeleteForever" :default DeleteForeverIcon]
    ["@mui/icons-material/WarningRounded" :default WarningRoundedIcon]
    ["@mui/icons-material/Info" :default InfoIcon]
@@ -22,6 +23,8 @@
 (defonce parse-settings (r/atom {:folder "" :move false :category ""}))
 
 (def connections-backend-call (r/atom false))
+
+(def connection-backend-call (r/atom false))
 
 (defn fetch-connections-and-refresh [] (backend/fetch-connections (fn [res] (reset! connections-data (:body res)))))
 
@@ -60,16 +63,16 @@
                                        (reset! open false))}
         "Cancel"]]]]))
 
-(defn connection-control [id command]
+(defn connection-control [id command callback-fn]
   (backend-call
    {:backend (backend/post-connection-control id command nil)
     :on-success (fn [_]
                   (reset! connections-backend-call false)
-                  (fetch-connections-and-refresh))
+                  (callback-fn))
     :on-error (fn [body]
                 (reset! connections-backend-call false)
                 (comps/show-snackbar (:content (:message body)) :warning nil)
-                (fetch-connections-and-refresh))}))
+                (callback-fn))}))
 
 (defn add-fcmp [connection-id fcm]
   (backend-call
@@ -95,21 +98,36 @@
                 (comps/show-snackbar (:message body) :warning nil)
                 (fn [_] (fetch-connection-and-refresh connection-id (atom false))))}))
 
-(defn reconnect-button [id connected]
+(defn reconnect-button [id connected callback-fn loading-atom]
   (if connected
     [:> material/Button {:color "secondary" :on-click (fn [event] (.stopPropagation event)
                                                         (reset! connections-backend-call true)
-                                                        (connection-control id :reconnect))} "Reconnect"]
+                                                        (when (some? loading-atom) (reset! loading-atom true))
+                                                        (connection-control id :reconnect callback-fn))} "Reconnect"]
     [:> material/Button {:variant :contained :color "secondary" :on-click (fn [event] (.stopPropagation event)
                                                                             (reset! connections-backend-call true)
-                                                                            (connection-control id :connect))} "Connect"]))
+                                                                            (when (some? loading-atom) (reset! loading-atom true))
+                                                                            (connection-control id :connect callback-fn))} "Connect"]))
 
-(defn disconnect-button [id connected]
+(defn reconnect-button-for-connections [id connected]
+  (reconnect-button id connected (fn [] (fetch-connections-and-refresh)) nil))
+
+(defn reconnect-button-for-connection [id connected loading-atom]
+  (reconnect-button id connected (fn [] (fetch-connection-and-refresh id loading-atom)) loading-atom))
+
+(defn disconnect-button [id connected callback-fn loading-atom]
   (if connected
     [:> material/Button {:variant :outlined :color "error" :on-click (fn [event] (.stopPropagation event)
                                                                        (reset! connections-backend-call true)
-                                                                       (connection-control id :disconnect))} "Disconnect"]
+                                                                       (when (some? loading-atom) (reset! loading-atom true))
+                                                                       (connection-control id :disconnect callback-fn))} "Disconnect"]
     [:> material/Button {:variant :outlined :color "error" :disabled true :on-click (fn [event] (.stopPropagation event))} "Disconnect"]))
+
+(defn disconnect-button-for-connections [id connected]
+  (disconnect-button id connected (fn [] (fetch-connections-and-refresh)) nil))
+
+(defn disconnect-button-for-connection [id connected loading-atom]
+  (disconnect-button id connected (fn [] (fetch-connection-and-refresh id loading-atom)) loading-atom))
 
 (defn connections-page []
   (fn []
@@ -135,8 +153,8 @@
                  [:> material/TableCell (:user connection)]
                  [:> material/TableCell (:host connection)]
                  [:> material/TableCell
-                  [reconnect-button (:id connection) (:connected connection)]
-                  [disconnect-button (:id connection) (:connected connection)]
+                  [reconnect-button-for-connections (:id connection) (:connected connection)]
+                  [disconnect-button-for-connections (:id connection) (:connected connection)]
                   [delete-button (:id connection)]]])]]]
            [:> material/Button {:variant :contained :on-click (fn [event] (.stopPropagation event) (navigate "/connections/new"))} "Add new"]])))))
 
@@ -196,10 +214,14 @@
            (fn [response]
              (swap! connection-data assoc-in [:imap :auth-providers] (:body response))
              (reset! loading? false))))
-        (if @loading?
+        (if (or @loading? @connection-backend-call)
           [:> material/LinearProgress {:aria-label "Loading"}]
           (let [config (:imap @connection-data)]
             [:<>
+             [:div
+              [:> material/IconButton {:on-click #(navigate -1)} [:> ArrowBackIcon]]
+              [reconnect-button-for-connection (:id (:imap @connection-data)) (:connected (:imap @connection-data)) connection-backend-call]
+              [disconnect-button-for-connection (:id (:imap @connection-data)) (:connected (:imap @connection-data)) connection-backend-call]]
              [:h2 "IMAP Connection for " (:host config) " - " (:user config)]
              [:> material/Grid {:container true :spacing 2}
               [:> material/Grid {:size 6}
