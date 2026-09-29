@@ -8,7 +8,6 @@
    [react-router-dom :as rr]
    [reagent.core :as r]
    [ui.backend :as backend]
-   [ui.components :as components]
    [ui.components :as comps]
    [ui.inputs :as inputs]
    [ui.utils :as utils]
@@ -255,38 +254,40 @@
                                                                                             (fn [response]
                                                                                               (reset! connection-data (:body response)))))))} "Update Connection"])]]]
               [:> material/Grid {:size 6}
-               (when (> (count (:folders @connection-data)) 0)
-                 [:> material/Paper {:sx {:p 3}}
-                  [:> material/Stack {:spacing 2}
-                   [:h3 "Parse E-mails from Folders"]
-                   [:> material/FormControl {:fullWidth true}
-                    [:> material/InputLabel {:id "folders-select-label"} "Folders"]
-                    [:> material/Select {:labelId "folders-select-label"
-                                         :value (:folder @parse-settings)
-                                         :label "Folders"
-                                         :on-change (fn [e] (swap! parse-settings assoc-in [:folder] (utils/event-val e)))}
-                     (for [folder (:folders @connection-data)]
-                       ^{:key folder}
-                       [:> material/MenuItem {:value folder} folder])]]
-                   [:> material/FormControl {:fullWidth true}
-                    [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:move @parse-settings) :onChange (fn [_ new] (swap! parse-settings assoc-in [:move] new))}) :label "Move e-mails after categorization"}]
+               [:> material/Paper {:sx {:p 3}}
+                [:> material/Stack {:spacing 2}
+                 [:h3 "Parse E-mails from Folders"]
+                 (if (seq (:folders @connection-data))
+                   [:div
                     [:> material/FormControl {:fullWidth true}
-                     [:> material/InputLabel {:id "category-select-label"} "Assign following category for all e-mails in folder. Leave blank for automatic category detection."]
-                     [:> material/Select {:labelId "category-select-label"
-                                          :value (:category @parse-settings)
-                                          :label "Assign following category for all e-mails in folder. Leave blank for automatic category detection."
-                                          :on-change (fn [e] (swap! parse-settings assoc-in [:category] (utils/event-val e)))}
-                      (for [category (:categories @connection-data)]
-                        ^{:key (:id category)}
-                        [:> material/MenuItem {:value (str (:id category) "-" (:name category))} (:name category)])]]]
-                   [:> material/Button {:variant :contained
-                                        :on-click (fn [_] (backend-call
-                                                           {:backend (backend/post-connection-control
-                                                                      (get (js->clj params) "id")
-                                                                      :parse
-                                                                      @parse-settings)
-                                                            :on-success
-                                                            (fn [res-body] (components/show-snackbar (:message res-body) (:type res-body)))}))} "Parse E-Mails"]]])]
+                     [:> material/InputLabel {:id "folders-select-label"} "Folders"]
+                     [:> material/Select {:labelId "folders-select-label"
+                                          :value (:folder @parse-settings)
+                                          :label "Folders"
+                                          :on-change (fn [e] (swap! parse-settings assoc-in [:folder] (utils/event-val e)))}
+                      (for [folder (:folders @connection-data)]
+                        ^{:key folder}
+                        [:> material/MenuItem {:value folder} folder])]]
+                    [:> material/FormControl {:fullWidth true}
+                     [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:move @parse-settings) :onChange (fn [_ new] (swap! parse-settings assoc-in [:move] new))}) :label "Move e-mails after categorization"}]
+                     [:> material/FormControl {:fullWidth true}
+                      [:> material/InputLabel {:id "category-select-label"} "Assign following category for all e-mails in folder. Leave blank for automatic category detection."]
+                      [:> material/Select {:labelId "category-select-label"
+                                           :value (:category @parse-settings)
+                                           :label "Assign following category for all e-mails in folder. Leave blank for automatic category detection."
+                                           :on-change (fn [e] (swap! parse-settings assoc-in [:category] (utils/event-val e)))}
+                       (for [category (:categories @connection-data)]
+                         ^{:key (:id category)}
+                         [:> material/MenuItem {:value (str (:id category) "-" (:name category))} (:name category)])]]]
+                    [:> material/Button {:variant :contained
+                                         :on-click (fn [_] (backend-call
+                                                            {:backend (backend/post-connection-control
+                                                                       (get (js->clj params) "id")
+                                                                       :parse
+                                                                       @parse-settings)
+                                                             :on-success
+                                                             (fn [res-body] (comps/show-snackbar (:message res-body) (:type res-body)))}))} "Parse E-Mails"]]
+                   [:div "You need to be connected for this operation."])]]]
 
               (when (= "oauth2" (:auth-type (:imap @connection-data)))
                 [:> material/Grid {:size 12}
@@ -364,44 +365,47 @@
                          [:> material/TableCell [delete-auth-provider-button (:name provider) (:id provider) (get (js->clj params) "id")]]]))]]]]])]
 
              [:> material/Grid {:size 12}
-              [:h3 "Associate Categories with Folders"
-               [:> material/Tooltip {:title "You’ll need to reconnect for these changes to take effect."}
-                [:> material/IconButton
-                 [:> InfoIcon]]]]
-              [:> material/TableContainer {:component material/Paper}
-               [:> material/Table
-                [:> material/TableHead
-                 [:> material/TableRow
-                  [:> material/TableCell "Category"]
-                  [:> material/TableCell "Folder"]
-                  [:> material/TableCell ""]]]
-                [:> material/TableBody
-                 (for [category (:categories @connection-data)]
-                   [:> material/TableRow
-                    [:> material/TableCell (:name category)]
-                    [:> material/TableCell
-                     [:> material/FormControl {:fullWidth true
-                                               :variant "outlined"}
+              [:> material/Paper {:sx {:p 3}}
+               [:h3 "Associate Categories with Folders"
+                [:> material/Tooltip {:title "You’ll need to reconnect for these changes to take effect."}
+                 [:> material/IconButton
+                  [:> InfoIcon]]]]
+               (if (seq (:folders @connection-data))
+                 [:> material/TableContainer {:component material/Paper}
+                  [:> material/Table
+                   [:> material/TableHead
+                    [:> material/TableRow
+                     [:> material/TableCell "Category"]
+                     [:> material/TableCell "Folder"]
+                     [:> material/TableCell ""]]]
+                   [:> material/TableBody
+                    (for [category (:categories @connection-data)]
+                      [:> material/TableRow
+                       [:> material/TableCell (:name category)]
+                       [:> material/TableCell
+                        [:> material/FormControl {:fullWidth true
+                                                  :variant "outlined"}
 
-                      [:> material/InputLabel {:id "folder-label"} ""]
-                      [:> material/Select
-                       {:labelId "folder-label"
-                        :label ""
-                        :value (or (:folder (get (:folder-category-map @connection-data) (keyword (str (:id category))))) "")
-                        :onChange
-                        (fn [event]
-                          (handle-fcmp category (.. event -target -value)))}
+                         [:> material/InputLabel {:id "folder-label"} ""]
+                         [:> material/Select
+                          {:labelId "folder-label"
+                           :label ""
+                           :value (or (:folder (get (:folder-category-map @connection-data) (keyword (str (:id category))))) "")
+                           :onChange
+                           (fn [event]
+                             (handle-fcmp category (.. event -target -value)))}
 
-                       (for [folder (sort (:folders @connection-data))]
-                         ^{:key folder}
-                         [:> material/MenuItem {:value folder}
-                          folder])]]]
-                    [:> material/TableCell
-                     [:> material/Button {:variant :text
-                                          :color "secondary"
-                                          :onClick (fn [] (let [fcmp (get (:folder-category-map @connection-data) (keyword (str (:id category))))]
-                                                            (when (some? fcmp)
-                                                              (delete-fcmp (:id (:imap @connection-data)) fcmp))))}
-                      "Clear"]]])]]]]]))
+                          (for [folder (sort (:folders @connection-data))]
+                            ^{:key folder}
+                            [:> material/MenuItem {:value folder}
+                             folder])]]]
+                       [:> material/TableCell
+                        [:> material/Button {:variant :text
+                                             :color "secondary"
+                                             :onClick (fn [] (let [fcmp (get (:folder-category-map @connection-data) (keyword (str (:id category))))]
+                                                               (when (some? fcmp)
+                                                                 (delete-fcmp (:id (:imap @connection-data)) fcmp))))}
+                         "Clear"]]])]]]
+                 [:div "You need to be connected for this operation."])]]]))
 
         (finally (reset! loading? true) (reset! connection-data {}))))))
