@@ -1,3 +1,23 @@
+## [2026-09-30.0] - 2026-09-30
+
+### 🚀 Features
+
+- Add connection-id to metadata
+- User can map categories to email folders
+- *(ui)* Add information tool tip to category folder mapping
+- *(ui)* Disable folder category mapping and parsing folders when not connected
+- *(ui)* Add navigation and connection buttons to the connection details page
+
+### 📚 Documentation
+
+- Adjust "getting started" according to the new workflow
+
+### ⚙️ Miscellaneous Tasks
+
+- Update Changelog
+- *(ui)* Clean up connections and emails pages
+- Update README
+
 ## [2026-08-01.0] - 2026-08-10
 
 ### 🚀 Features
