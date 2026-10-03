@@ -24,7 +24,8 @@
 
 ![img](./docs/resources/plauna-hero-banner.png "Plauna Banner")
 
-[![img](https://coveralls.io/repos/github/ozangulle/plauna/badge.svg?branch=fix/connections)](https://coveralls.io/github/ozangulle/plauna?branch=fix/connections) [![img](https://img.shields.io/badge/chat-Libera.Chat-blue.svg?logo=irc)](https://web.libera.chat/#plauna)
+[![img](https://coveralls.io/repos/github/ozangulle/plauna/badge.svg?branch=fix/connections)](https://coveralls.io/github/ozangulle/plauna?branch=fix/connections) ![Docker Image Version (tag)](https://img.shields.io/docker/v/ozangulle/plauna/latest)
+ [![img](https://img.shields.io/badge/chat-Libera.Chat-blue.svg?logo=irc)](https://web.libera.chat/#plauna) 
 
 **Organize your e-mails without sacrificing your privacy**
 
