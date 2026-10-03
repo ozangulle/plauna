@@ -64,7 +64,7 @@
         io.github.emidln/cld {:mvn/version "0.2.0"}
         jakarta.mail/jakarta.mail-api {:mvn/version "2.1.5"}
         org.apache.james/apache-mime4j {:mvn/version "0.8.13" :extension "pom"}
-        org.apache.opennlp/opennlp-tools {:mvn/version "2.5.6.1"}
+        org.apache.opennlp/opennlp-tools {:mvn/version "2.5.9"}
         org.clj-commons/claypoole {:mvn/version "1.2.2"}
         org.clojure/clojure {:mvn/version "1.12.3"}
         org.clojure/core.async {:mvn/version "1.8.741"}
