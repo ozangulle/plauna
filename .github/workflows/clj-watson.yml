@@ -12,7 +12,7 @@ name: clj-watson
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "clj-watson" ]
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ "master" ]
