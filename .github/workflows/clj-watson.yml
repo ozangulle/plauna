@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Dependency scan
-        uses: clj-holmes/clj-watson-action@39b8ed306f2c125860cf6e69b6939363689f998c
+        uses: clj-holmes/clj-watson-action@b4c3623c4d603932e60e6012a3a1db7bc60058c2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -45,6 +45,12 @@ jobs:
           aliases: clojure-lsp,test
           deps-edn-path: deps.edn
           suggest-fix: true
-          output-type: json
-          output-file: clj-watson-results.json
+          output-type: sarif
+          output-file: clj-watson-results.sarif
           fail-on-result: false
+
+      - name: Upload analysis results to GitHub
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: clj-watson-results.sarif
+          category: clj-watson
