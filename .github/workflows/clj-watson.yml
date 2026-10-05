@@ -45,13 +45,6 @@ jobs:
           aliases: clojure-lsp,test
           deps-edn-path: deps.edn
           suggest-fix: true
-          output-type: sarif
-          output-file: clj-watson-results.sarif
+          output-type: json
+          output-file: clj-watson-results.json
           fail-on-result: false
-
-      - name: Upload analysis results to GitHub
-        if: ${{ always() && hashFiles('clj-watson-results.sarif') != '' }}
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: clj-watson-results.sarif
-          category: clj-watson
