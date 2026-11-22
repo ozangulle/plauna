@@ -1,27 +1,3 @@
-
-# Table of Contents
-
-1.  [Features](#orga1b7f02)
-2.  [Current Changes](#orgffd2760)
-3.  [What Plauna is NOT](#org60cb303)
-4.  [How to get Plauna](#org0b1ca16)
-    1.  [Docker](#orgb707d5d)
-    2.  [Build from source](#org1f3e9d1)
-5.  [How to use](#org7f9aec3)
-    1.  [Configuration](#org3bbee80)
-        1.  [Environment Variables](#orgeb3d06b)
-        2.  [CLI Parameters](#orgbadad8a)
-        3.  [Order of Priority](#orgc237a87)
-    2.  [Authentication](#org7287ddf)
-    3.  [Getting Started](#orgd5e0f9f)
-        1.  [Create Categories](#org63fee85)
-        2.  [IMAP Connection](#org68d3df9)
-        3.  [Initial Categorization](#org5c1090b)
-        4.  [Languages](#orgd9decd6)
-        5.  [Data Training](#org4428640)
-        6.  [Automatic Categorization](#org8b33b64)
-6.  [Security](#orga73d278)
-
 ![img](./docs/resources/plauna-hero-banner.png "Plauna Banner")
 
 [![img](https://coveralls.io/repos/github/ozangulle/plauna/badge.svg?branch=fix/connections)](https://coveralls.io/github/ozangulle/plauna?branch=fix/connections) ![Docker Image Version (tag)](https://img.shields.io/docker/v/ozangulle/plauna/latest)
@@ -34,9 +10,6 @@ Plauna is a privacy focused service that helps you categorize your e-mails. All 
 You can parse your e-mails from mbox files or directly by connecting to your IMAP servers. Plauna helps you categorize your e-mails and automates the process so that incoming e-mails are moved to their respective folders on your IMAP server.
 
 **Questions?** If the documentation is unclear or you are unsure about how to use Plauna, feel free to open an issue on Github or join the libera chat group. I am usually available there on Mondays and Wednesdays from 8:00 to 10:00 PM CET.
-
-
-<a id="orga1b7f02"></a>
 
 # Features
 
@@ -54,27 +27,17 @@ You can parse your e-mails from mbox files or directly by connecting to your IMA
 
 -   Read emails directly from IMAP folders.
 
-
-<a id="orgffd2760"></a>
-
 # Current Changes
 
 Plauna has recently introduced a new UI. Furthermore, work is underway to improve the categorization process. Efforts are focused on making the transition from the old workflow to the new one as smooth as possible. If you encounter any bugs or believe these changes have invalidated your workflow, please open a bug ticket.
 
-
-<a id="org60cb303"></a>
 
 # What Plauna is NOT
 
 Plauna is not an e-mail archive tool. It only saves headers and contents from e-mail that it thinks will be useful for categorizing your e-mails. Certain things like the attachments are explicitly not stored in order to save db space. Please do no rely on Plauna to successfully preserve the e-mails you want to archive. 
 
 
-<a id="org0b1ca16"></a>
-
 # How to get Plauna
-
-
-<a id="orgb707d5d"></a>
 
 ## Docker
 
@@ -82,8 +45,6 @@ The easiest way to get Plauna is using the [Docker image](https://hub.docker.com
 
 Plauna requires some configuration to work as mention under "How to use" -> "How to run" below. If you're going to use docker, it makes sense to mount the configuration file in a separate volume.
 
-
-<a id="org1f3e9d1"></a>
 
 ## Build from source
 
@@ -97,12 +58,8 @@ It is important to run the frontend build first, as it creates the artifacts for
     java -jar target/plauna-standalone.jar
 
 
-<a id="org7f9aec3"></a>
-
 # How to use
 
-
-<a id="org3bbee80"></a>
 
 ## Configuration
 
@@ -114,14 +71,10 @@ The server port - Defaults to 8080
 Note: If you run Plauna as a Docker container, the directory /var/lib/plauna is created automatically. If you want to run it on your computer as a jar file, you must create this directory yourself.
 
 
-<a id="orgeb3d06b"></a>
-
 ### Environment Variables
 
 You can use the environment variables $DATA\_FOLDER and $SERVER\_PORT
 
-
-<a id="orgbadad8a"></a>
 
 ### CLI Parameters
 
@@ -129,8 +82,6 @@ You can also configure these values using the cli parameters &ndash;data-folder,
 
 E.g. java -jar plauna.jar &ndash;server-port 80
 
-
-<a id="orgc237a87"></a>
 
 ### Order of Priority
 
@@ -140,8 +91,6 @@ In case multiple values are provided, plauna decides on which value to use accor
 2.  Environment variables
 3.  Default configuration
 
-
-<a id="org7287ddf"></a>
 
 ## Authentication
 
@@ -164,14 +113,10 @@ Plauna supports basic (username - password) and oauth2 (XOAUTH2) authentication 
     After you set up your configuration, go to the "Connections" page and click on "Connect". On your first login, you will be redirected to your oauth provider in order to authorize the application you created to access your data. If everything is set up correctly, you will then be redirected automatically back to Plauna.
 
 
-<a id="orgd5e0f9f"></a>
-
 ## Getting Started
 
 When you start Plauna, it starts a web server on the port which you specified (defaults to 8080). Here are the steps you need to follow in order to set it up.
 
-
-<a id="org63fee85"></a>
 
 ### Create Categories
 
@@ -181,8 +126,6 @@ Common examples: "Important" and "Not Important", or "Newsletters", "Work", and 
 
 The most important thing is to take your time and think about what you want to achieve.
 
-
-<a id="org68d3df9"></a>
 
 ### IMAP Connection
 
@@ -199,8 +142,6 @@ After assigning all folders, you will need to reconnect.
 After this step, Plauna monitors your Inbox for incoming emails and watches your category folders for emails to learn from.
 
 
-<a id="org5c1090b"></a>
-
 ### Initial Categorization
 
 At this point, Plauna knows about your desired categories and your IMAP setup but its own database is empty. You need to populate the database with emails before you can start training Plauna to automatically categorize your emails. There are three ways of populating the database:
@@ -212,14 +153,10 @@ At this point, Plauna knows about your desired categories and your IMAP setup bu
 3.  Let Plauna run and automatically save incoming emails as you manually sort them. Depending on how many e-mails you receive on any given day, this method may be very slow.
 
 
-<a id="orgd9decd6"></a>
-
 ### Languages
 
 Plauna is designed for multilingualism in mind and automatically detects the language of an e-mail upon parsing it. There is a possibility that you do not want to automatically categorize for every language you have. Plauna does not make any assumptions for you. This is why you need to go to "Administration" and check the languages that are relevant for your data training.
 
-
-<a id="org4428640"></a>
 
 ### Data Training
 
@@ -227,14 +164,10 @@ After you have at least roughly 50 emails in every category per language, you ca
 **Important:** You must have more than one category saved for each language you want to train in.
 
 
-<a id="org8b33b64"></a>
-
 ### Automatic Categorization
 
 After training your models on the categories you created, Plauna will categorize each e-mail you receive and moved it automatically to its corresponding folder.
 
-
-<a id="orga73d278"></a>
 
 # Security
 
