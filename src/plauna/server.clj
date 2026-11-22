@@ -337,7 +337,7 @@
              (= "parse" operation) (let [settings (:parse-settings (:body request))
                                          folder (:folder settings)
                                          move (:move settings)
-                                         assigned-category-pair (st/split (:category settings) #"-")
+                                         assigned-category-pair (when (:category settings) (st/split (:category settings) #"-"))
                                          connection (client/get-connection id)]
                                      (if (nil? connection)
                                        (error-json-with-body 404 {:message "Connection is not active"})

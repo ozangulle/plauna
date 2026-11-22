@@ -22,6 +22,8 @@
 
 (defonce parse-settings (r/atom {:folder "" :move false :category ""}))
 
+(defonce assign-to-category (r/atom false))
+
 (def connections-backend-call (r/atom false))
 
 (def connection-backend-call (r/atom false))
@@ -33,6 +35,11 @@
                             (fn [response]
                               (reset! connection-data (:body response))
                               (reset! loading-atom false))))
+
+(defn- construct-parse-payload-for-backend []
+  (if @assign-to-category
+    @parse-settings
+    (dissoc @parse-settings :category)))
 
 (defn- delete-button [id]
   (r/with-let [open (r/atom false)]
@@ -148,14 +155,15 @@
                [:> material/TableCell "Host"]
                [:> material/TableCell ""]]]
              [:> material/TableBody
-              (for [connection @connections-data]
-                [:> material/TableRow {:key (:id connection) :on-click (fn [_] (navigate (str "/connections/" (:id connection)))) :sx {:cursor "pointer"}}
-                 [:> material/TableCell (:user connection)]
-                 [:> material/TableCell (:host connection)]
-                 [:> material/TableCell
-                  [reconnect-button-for-connections (:id connection) (:connected connection)]
-                  [disconnect-button-for-connections (:id connection) (:connected connection)]
-                  [delete-button (:id connection)]]])]]]
+              (doall
+               (for [connection @connections-data]
+                 [:> material/TableRow {:key (:id connection) :on-click (fn [_] (navigate (str "/connections/" (:id connection)))) :sx {:cursor "pointer"}}
+                  [:> material/TableCell (:user connection)]
+                  [:> material/TableCell (:host connection)]
+                  [:> material/TableCell
+                   [reconnect-button-for-connections (:id connection) (:connected connection)]
+                   [disconnect-button-for-connections (:id connection) (:connected connection)]
+                   [delete-button (:id connection)]]]))]]]
            [:> material/Button {:variant :contained :on-click (fn [event] (.stopPropagation event) (navigate "/connections/new"))} "Add new"]])))))
 
 (defn- delete-auth-provider-button [name id conn-id]
@@ -230,14 +238,13 @@
                  [:h3 "Configuration"]
                  [:> material/FormControl {:fullWidth true}
                   [:> material/InputLabel {:id "auth-type-select-label"} "Authentication Type"]
-                  [:> material/Select {:labelId "auth-type-select-label"
-                                       :value (:auth-type config)
+                  [:> material/Select {:value (:auth-type config)
                                        :label "Auth Type"
                                        :on-change (update-connection-data-config :auth-type)}
                    [:> material/MenuItem {:value "basic"} "Basic"]
                    [:> material/MenuItem {:value "oauth2"} "OAUTH2"]]]
                  [:> material/FormControl {:fullWidth true}
-                  [:> material/TextField {:value (:host config) :labelId "host-label" :label "Host" :on-change (update-connection-data-config :host)}]]
+                  [:> material/TextField {:value (:host config) :label "Host" :on-change (update-connection-data-config :host)}]]
                  [:> material/FormControl {:fullWidth true}
                   [:> material/TextField {:value (:user config) :label "User" :on-change (update-connection-data-config :user)}]]
                  [:> material/FormControl {:fullWidth true}
@@ -249,8 +256,7 @@
                  [:> material/FormControl {:fullWidth true}
                   [:> material/InputLabel {:id "security-select-label"} "Authentication Type"]]
                  [:> material/FormControl {:fullWidth true}
-                  [:> material/Select {:labelId "security-select-label"
-                                       :value (:security config)
+                  [:> material/Select {:value (:security config)
                                        :label "Security"
                                        :on-change (update-connection-data-config :security)}
                    [:> material/MenuItem {:value "ssl"} "SSL"]
@@ -278,35 +284,42 @@
               [:> material/Grid {:size 6}
                [:> material/Paper {:sx {:p 3}}
                 [:> material/Stack {:spacing 2}
-                 [:h3 "Parse E-mails from Folders"]
+                 [:h3 "Read Emails from Folder"]
                  (if (seq (:folders @connection-data))
                    [:div
                     [:> material/FormControl {:fullWidth true}
                      [:> material/InputLabel {:id "folders-select-label"} "Folders"]
-                     [:> material/Select {:labelId "folders-select-label"
-                                          :value (:folder @parse-settings)
+                     [:> material/Select {:value (:folder @parse-settings)
                                           :label "Folders"
                                           :on-change (fn [e] (swap! parse-settings assoc-in [:folder] (utils/event-val e)))}
-                      (for [folder (:folders @connection-data)]
-                        ^{:key folder}
-                        [:> material/MenuItem {:value folder} folder])]]
+                      (doall
+                       (for [folder (:folders @connection-data)]
+                         ^{:key folder}
+                         [:> material/MenuItem {:value folder} folder]))]]
                     [:> material/FormControl {:fullWidth true}
-                     [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:move @parse-settings) :onChange (fn [_ new] (swap! parse-settings assoc-in [:move] new))}) :label "Move e-mails after categorization"}]
-                     [:> material/FormControl {:fullWidth true}
-                      [:> material/InputLabel {:id "category-select-label"} "Assign following category for all e-mails in folder. Leave blank for automatic category detection."]
-                      [:> material/Select {:labelId "category-select-label"
-                                           :value (:category @parse-settings)
-                                           :label "Assign following category for all e-mails in folder. Leave blank for automatic category detection."
-                                           :on-change (fn [e] (swap! parse-settings assoc-in [:category] (utils/event-val e)))}
+                     [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked @assign-to-category :onChange (fn [_ new] (reset! assign-to-category new))}) :label "Assign all to category"}]]
+                    [:> material/FormControl {:fullWidth true :required true}
+                     [:> material/InputLabel {:id "category-select-label"} "Category"]
+                     [:> material/Select {:value (:category @parse-settings)
+                                          :disabled (not @assign-to-category)
+                                          :label "Category"
+                                          :on-change (fn [e] (swap! parse-settings assoc-in [:category] (utils/event-val e)))}
+                      (doall
                        (for [category (:categories @connection-data)]
                          ^{:key (:id category)}
-                         [:> material/MenuItem {:value (str (:id category) "-" (:name category))} (:name category)])]]]
+                         [:> material/MenuItem {:value (str (:id category) "-" (:name category))} (:name category)]))]
+                     [:> material/FormHelperText "Required when \"Assign all to category\" is selected"]]
+                    [:> material/FormControl {:fullWidth true}
+                     [:> material/FormControlLabel {:control (r/create-element material/Checkbox #js {:checked (:move @parse-settings) :onChange (fn [_ new] (swap! parse-settings assoc-in [:move] new))}) :label "Move e-mails after categorization"}]]
                     [:> material/Button {:variant :contained
+                                         :disabled (or (empty? (:folder @parse-settings))
+                                                       (and @assign-to-category
+                                                            (empty? (:category @parse-settings))))
                                          :on-click (fn [_] (backend-call
                                                             {:backend (backend/post-connection-control
                                                                        (get (js->clj params) "id")
                                                                        :parse
-                                                                       @parse-settings)
+                                                                       (construct-parse-payload-for-backend @parse-settings))
                                                              :on-success
                                                              (fn [res-body] (comps/show-snackbar (:message res-body) (:type res-body)))}))} "Parse E-Mails"]]
                    [:div "You need to be connected for this operation."])]]]
@@ -401,33 +414,33 @@
                      [:> material/TableCell "Folder"]
                      [:> material/TableCell ""]]]
                    [:> material/TableBody
-                    (for [category (:categories @connection-data)]
-                      [:> material/TableRow
-                       [:> material/TableCell (:name category)]
-                       [:> material/TableCell
-                        [:> material/FormControl {:fullWidth true
-                                                  :variant "outlined"}
+                    (doall
+                     (for [category (:categories @connection-data)]
+                       [:> material/TableRow {:key (:id category)}
+                        [:> material/TableCell (:name category)]
+                        [:> material/TableCell
+                         [:> material/FormControl {:fullWidth true
+                                                   :variant "outlined"}
 
-                         [:> material/InputLabel {:id "folder-label"} ""]
-                         [:> material/Select
-                          {:labelId "folder-label"
-                           :label ""
-                           :value (or (:folder (get (:folder-category-map @connection-data) (keyword (str (:id category))))) "")
-                           :onChange
-                           (fn [event]
-                             (handle-fcmp category (.. event -target -value)))}
+                          [:> material/InputLabel {:id "folder-label"} ""]
+                          [:> material/Select
+                           {:label ""
+                            :value (or (:folder (get (:folder-category-map @connection-data) (keyword (str (:id category))))) "")
+                            :onChange
+                            (fn [event]
+                              (handle-fcmp category (.. event -target -value)))}
 
-                          (for [folder (sort (:folders @connection-data))]
-                            ^{:key folder}
-                            [:> material/MenuItem {:value folder}
-                             folder])]]]
-                       [:> material/TableCell
-                        [:> material/Button {:variant :text
-                                             :color "secondary"
-                                             :onClick (fn [] (let [fcmp (get (:folder-category-map @connection-data) (keyword (str (:id category))))]
-                                                               (when (some? fcmp)
-                                                                 (delete-fcmp (:id (:imap @connection-data)) fcmp))))}
-                         "Clear"]]])]]]
+                           (for [folder (sort (:folders @connection-data))]
+                             ^{:key folder}
+                             [:> material/MenuItem {:value folder}
+                              folder])]]]
+                        [:> material/TableCell
+                         [:> material/Button {:variant :text
+                                              :color "secondary"
+                                              :onClick (fn [] (let [fcmp (get (:folder-category-map @connection-data) (keyword (str (:id category))))]
+                                                                (when (some? fcmp)
+                                                                  (delete-fcmp (:id (:imap @connection-data)) fcmp))))}
+                          "Clear"]]]))]]]
                  [:div "You need to be connected for this operation."])]]]))
 
         (finally (reset! loading? true) (reset! connection-data {}))))))

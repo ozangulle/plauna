@@ -235,6 +235,12 @@
       (t/is (= 404
                (:status (handler
                          (-> (mock/request :post (controls-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
+                             (mock/json-body {:operation "parse" :parse-settings {:move true :folder "INBOX" :category ""}})))))))
+    (t/testing
+     "Server returns the correct response because connection does not exist"
+      (t/is (= 404
+               (:status (handler
+                         (-> (mock/request :post (controls-api "obviously-wrong-id"))
                              (mock/json-body {:operation "parse" :parse-settings {:move true :folder "INBOX" :category ""}})))))))))
 
 (t/deftest parse-emails-with-categorization
@@ -258,6 +264,13 @@
     (ms/create-folder "test")
     (ms/send-email-to-inbox)
     (client/start-imap-connections *context*)
+
+    (t/testing
+     "Server handles missing :category field"
+      (t/is (= 200
+               (:status (handler
+                         (-> (mock/request :post (controls-api "c4aaaf19-c259-3694-9d50-31ecbdcea869"))
+                             (mock/json-body {:operation "parse" :parse-settings {:move false :folder "INBOX"}})))))))
 
     (t/testing
      "Server returns the correct success response"
