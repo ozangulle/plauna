@@ -1,5 +1,5 @@
 {:paths ["src" "classes" "resources"]
- :aliases {:build {:deps {io.github.clojure/tools.build {:git/tag "v0.10.3" :git/sha "15ead66"}}
+ :aliases {:build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.3"}}
                    :ns-default build
                    :jvm-opts ["-Dclojure.compiler.direct-linking=true" "-Xmx4000m"]}
            :cljs {:extra-deps {cljs-http/cljs-http {:mvn/version "0.1.49"}
